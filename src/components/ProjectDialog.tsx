@@ -219,15 +219,13 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
                 {stages.map((stage, index) => (
                   <div key={stage.id} className="flex items-center space-x-2 group">
                     <Popover>
-                      <PopoverTrigger asChild>
-                         <button 
-                           className={cn(
-                             "flex-shrink-0 w-6 h-6 rounded-full border border-border cursor-pointer transition-transform hover:scale-110",
-                             stage.color.split(' ')[0]
-                           )} 
-                           title="Change Color"
-                         />
-                      </PopoverTrigger>
+                      <PopoverTrigger
+                        className={cn(
+                          "flex-shrink-0 w-6 h-6 rounded-full border border-border cursor-pointer transition-transform hover:scale-110",
+                          stage.color.split(' ')[0]
+                        )} 
+                        title="Change Color"
+                      />
                       <PopoverContent className="w-64 p-3 bg-card border-border shadow-2xl z-[100]" align="start">
                         <div className="grid grid-cols-5 gap-2">
                           {STAGE_COLORS.map((c) => (
