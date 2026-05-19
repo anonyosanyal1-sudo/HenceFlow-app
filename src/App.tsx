@@ -32,7 +32,55 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { motion, AnimatePresence } from 'motion/react';
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-screen w-full flex flex-col items-center justify-center bg-[#0a0a0b] text-white p-6 text-center">
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center text-red-500 mb-6 font-bold text-2xl">!</div>
+          <h1 className="text-2xl font-bold mb-2">Something went wrong</h1>
+          <p className="text-zinc-400 max-w-md mb-6 font-mono text-xs overflow-auto max-h-40 bg-black/40 p-4 rounded-lg">
+            {this.state.error?.message || "An unexpected error occurred."}
+          </p>
+          <Button 
+            onClick={() => window.location.reload()}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            Reload Page
+          </Button>
+          <p className="mt-8 text-[10px] text-zinc-600">
+            If this persists, check if your Firebase environment variables are correctly set in your deployment settings.
+          </p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
+}
+
+function AppContent() {
   const [user, setUser] = React.useState<User | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [companies, setCompanies] = React.useState<Company[]>([]);
@@ -70,7 +118,16 @@ export default function App() {
         ensureUserProfile();
       }
     });
-    return () => unsubscribe();
+
+    // Fallback timer to prevent stuck loading if auth takes too long or fails silently
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   React.useEffect(() => {

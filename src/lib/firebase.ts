@@ -13,12 +13,24 @@ const config = {
   firestoreDatabaseId: import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID,
 };
 
-const app = initializeApp(config);
-export const db = getFirestore(app, config.firestoreDatabaseId);
+// Ensure Firebase config is valid before initializing
+const isConfigValid = !!(config.apiKey && config.projectId && config.apiKey !== "");
+
+if (!isConfigValid && typeof window !== 'undefined') {
+  console.warn("Firebase configuration is missing or incomplete. Check your environment variables.");
+}
+
+const app = initializeApp(isConfigValid ? config : { apiKey: "dummy-key", projectId: "dummy-project" });
+export const db = getFirestore(app, (isConfigValid && config.firestoreDatabaseId) ? config.firestoreDatabaseId : undefined);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+export const signInWithGoogle = async () => {
+  if (!isConfigValid) {
+    throw new Error("Firebase is not configured. Please add VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID to your environment variables.");
+  }
+  return signInWithPopup(auth, googleProvider);
+};
 export const logout = () => signOut(auth);
 
 // Connection test
