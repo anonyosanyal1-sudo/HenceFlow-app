@@ -1,0 +1,6 @@
+{
+  "name": "HenceFlow",
+  "description": "A high-performance development tracking application with real-time updates and structured workflows.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

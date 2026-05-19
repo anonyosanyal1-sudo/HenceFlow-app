@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Master Gate (Catch All Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- User Rules ---
+    function isValidUser(data) {
+      return data.uid == request.auth.uid 
+          && data.email is string && data.email.size() <= 256
+          && (data.displayName == null || (data.displayName is string && data.displayName.size() <= 128))
+          && (data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 512))
+          && data.keys().hasAll(['uid', 'email'])
+          && data.keys().size() <= 10;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && (userId == request.auth.uid);
+      allow create: if isEmailVerified() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming());
+      allow update: if isEmailVerified() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming())
+                       && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL']);
+    }
+
+    // --- Project Rules ---
+    function isValidProject(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 128
+          && data.ownerId == request.auth.uid
+          && data.members is list && data.members.size() <= 50
+          && data.keys().hasAll(['name', 'ownerId', 'members'])
+          && data.keys().size() <= 10;
+    }
+
+    function isProjectMember(projectId) {
+      return isSignedIn() && (
+        get(/databases/$(database)/documents/projects/$(projectId)).data.members.hasAny([request.auth.uid]) ||
+        get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid
+      );
+    }
+
+    function isProjectOwner(projectId) {
+      return isSignedIn() && get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid;
+    }
+
+    match /projects/{projectId} {
+      allow get: if isProjectMember(projectId);
+      allow list: if isSignedIn() && (resource.data.members.hasAny([request.auth.uid]) || resource.data.ownerId == request.auth.uid);
+      
+      allow create: if isEmailVerified() && isValidId(projectId) && isValidProject(incoming());
+      allow update: if isEmailVerified() && isValidId(projectId) && isProjectOwner(projectId) 
+                       && isValidProject(incoming())
+                       && incoming().ownerId == existing().ownerId
+                       && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'members', 'color']);
+      allow delete: if isEmailVerified() && isValidId(projectId) && isProjectOwner(projectId);
+    }
+
+    // --- Task Rules ---
+    function isValidTask(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 256
+          && data.projectId is string && isValidId(data.projectId)
+          && data.creatorId == request.auth.uid
+          && data.status in ['backlog', 'todo', 'in-progress', 'testing', 'done']
+          && data.priority in ['low', 'medium', 'high', 'urgent']
+          && (data.assigneeId == null || (data.assigneeId is string && isValidId(data.assigneeId)))
+          && data.keys().hasAll(['title', 'projectId', 'creatorId', 'status', 'priority'])
+          && data.keys().size() <= 15;
+    }
+
+    match /projects/{projectId}/tasks/{taskId} {
+      allow get: if isProjectMember(projectId);
+      allow list: if isProjectMember(projectId);
+      
+      allow create: if isEmailVerified() && isValidId(projectId) && isValidId(taskId) 
+                       && isProjectMember(projectId)
+                       && isValidTask(incoming())
+                       && incoming().projectId == projectId;
+      
+      allow update: if isEmailVerified() && isValidId(projectId) && isValidId(taskId)
+                       && isProjectMember(projectId)
+                       && isValidTask(incoming())
+                       && incoming().projectId == existing().projectId
+                       && incoming().creatorId == existing().creatorId
+                       && (
+                         // Action: Full Update (Owner/Creator)
+                         (incoming().creatorId == request.auth.uid || isProjectOwner(projectId)) ||
+                         // Action: Status Update Only (Member)
+                         (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+                       );
+      
+      allow delete: if isEmailVerified() && isValidId(projectId) && isValidId(taskId)
+                       && (isProjectOwner(projectId) || existing().creatorId == request.auth.uid);
+    }
+  }
+}

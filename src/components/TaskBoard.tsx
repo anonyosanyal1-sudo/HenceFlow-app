@@ -1,0 +1,202 @@
+import React from 'react';
+import { Task, TaskStatus, TaskPriority, Stage } from '../types';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Plus, MoreHorizontal, Clock, Calendar } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+
+interface TaskBoardProps {
+  tasks: Task[];
+  stages: Stage[];
+  onTaskClick: (task: Task) => void;
+  onAddTask: (status: TaskStatus) => void;
+  onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
+}
+
+const PRIORITY_STYLES: Record<TaskPriority, string> = {
+  low: 'bg-muted text-muted-foreground',
+  medium: 'bg-primary/20 text-primary',
+  high: 'bg-chart-3/20 text-chart-3',
+  urgent: 'bg-destructive/20 text-destructive animate-pulse',
+};
+
+export function TaskBoard({ tasks, stages, onTaskClick, onAddTask, onStatusChange }: TaskBoardProps) {
+  const getTasksByStatus = (status: TaskStatus) => tasks.filter(t => t.status === status);
+
+  const onDragEnd = (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+
+    if (!destination) return;
+
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
+    }
+
+    // Update status if dropped in a different column
+    if (destination.droppableId !== source.droppableId) {
+      onStatusChange(draggableId, destination.droppableId as TaskStatus);
+    }
+  };
+
+  return (
+    <DragDropContext onDragEnd={onDragEnd}>
+      <div className="flex-1 overflow-x-auto p-4 md:p-6 bg-background">
+        <div className="flex space-x-4 md:space-x-6 min-h-full">
+          {stages.map((col) => (
+            <div key={col.id} className="w-72 md:w-80 flex-shrink-0 flex flex-col">
+              <div className="flex items-center justify-between mb-4 px-2">
+                <div className="flex items-center space-x-2">
+                  <Badge variant="outline" className={cn("px-2 py-0.5 font-medium border-none", col.color)}>
+                    {col.label}
+                  </Badge>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {getTasksByStatus(col.id).length}
+                  </span>
+                </div>
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => onAddTask(col.id)}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <Droppable droppableId={col.id}>
+                {(provided, snapshot) => (
+                  <div
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    className={cn(
+                      "flex-1 space-y-3 pb-4 transition-colors rounded-lg px-1",
+                      snapshot.isDraggingOver ? "bg-muted/10 ring-1 ring-primary/20" : ""
+                    )}
+                  >
+                    <AnimatePresence>
+                      {getTasksByStatus(col.id).map((task, index) => (
+                        <Draggable key={task.id} draggableId={task.id} index={index}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              className={cn(
+                                "cursor-grab active:cursor-grabbing outline-none",
+                                snapshot.isDragging ? "z-50" : ""
+                              )}
+                              onClick={() => {
+                                if (!snapshot.isDragging) {
+                                  onTaskClick(task);
+                                }
+                              }}
+                            >
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                whileHover={{ y: -4, scale: 1.01 }}
+                                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                                layout
+                              >
+                                <Card className={cn(
+                                  "bg-card border-border hover:border-primary/40 transition-all duration-200 shadow-sm group cursor-pointer",
+                                  snapshot.isDragging ? "shadow-xl border-primary ring-2 ring-primary/10 scale-105" : "hover:shadow-lg hover:bg-accent/5"
+                                )}>
+                                  <CardContent className="p-4 space-y-3">
+                                    <div className="flex items-start justify-between">
+                                      <Badge className={cn("text-[10px] uppercase tracking-wider font-bold border-none", PRIORITY_STYLES[task.priority])}>
+                                        {task.priority}
+                                      </Badge>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <MoreHorizontal className="h-3 w-3 text-muted-foreground" />
+                                      </Button>
+                                    </div>
+                                    
+                                    <h4 className="text-sm font-medium text-foreground leading-snug">
+                                      {task.title}
+                                    </h4>
+
+                                    {task.description && (
+                                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                                        {task.description}
+                                      </p>
+                                    )}
+
+                                    <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
+                                      <div className="flex flex-col space-y-1.5">
+                                        <div className="flex items-center text-[10px] text-muted-foreground font-medium">
+                                          <Clock className="w-3 h-3 mr-1" />
+                                          {task.createdAt 
+                                            ? new Date(task.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                                            : 'Just now'}
+                                        </div>
+                                        {task.dueDate && (
+                                          <div className={cn(
+                                            "flex items-center text-[10px] font-bold",
+                                            new Date(task.dueDate) < new Date(new Date().setHours(0,0,0,0)) 
+                                              ? "text-destructive" 
+                                              : task.dueDate === new Date().toISOString().split('T')[0]
+                                                ? "text-orange-400"
+                                                : "text-secondary"
+                                          )}>
+                                            <Calendar className="w-3 h-3 mr-1" />
+                                            {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <Avatar className="h-6 w-6 ring-2 ring-card shadow-sm">
+                                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${task.assigneeId || task.creatorId}`} />
+                                        <AvatarFallback className="bg-muted text-muted-foreground font-bold text-[8px]">U</AvatarFallback>
+                                      </Avatar>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              </motion.div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                    </AnimatePresence>
+                    {provided.placeholder}
+                    
+                    {getTasksByStatus(col.id).length === 0 && !snapshot.isDraggingOver && (
+                      <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center text-center space-y-2 opacity-50">
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                          <CheckSquare className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <span className="text-xs text-muted-foreground">No tasks here</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Droppable>
+            </div>
+          ))}
+        </div>
+      </div>
+    </DragDropContext>
+  );
+}
+
+function CheckSquare(props: any) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="m9 11 3 3L22 4" />
+    </svg>
+  )
+}
