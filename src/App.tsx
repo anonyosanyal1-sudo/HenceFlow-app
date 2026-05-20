@@ -1,6 +1,6 @@
 import React from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, logout } from './lib/firebase';
+import { supabase, logout, toAppUser } from './lib/supabase';
+import type { AppUser } from './types';
 import { 
   subscribeToCompanies,
   createCompany,
@@ -62,7 +62,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
             Reload Page
           </Button>
           <p className="mt-8 text-[10px] text-zinc-600">
-            If this persists, check if your Firebase environment variables are correctly set in your deployment settings.
+            If this persists, check if your Supabase environment variables are correctly set in your deployment settings.
           </p>
         </div>
       );
@@ -81,7 +81,7 @@ export default function App() {
 }
 
 function AppContent() {
-  const [user, setUser] = React.useState<User | null>(null);
+  const [user, setUser] = React.useState<AppUser | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [companies, setCompanies] = React.useState<Company[]>([]);
   const [activeCompany, setActiveCompany] = React.useState<Company | null>(null);
@@ -111,21 +111,18 @@ function AppContent() {
   const [selectedCompanyForEdit, setSelectedCompanyForEdit] = React.useState<Company | null>(null);
 
   React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const appUser = session?.user ? toAppUser(session.user) : null;
+      setUser(appUser);
       setLoading(false);
-      if (u) {
-        ensureUserProfile();
-      }
+      if (appUser) ensureUserProfile();
     });
 
     // Fallback timer to prevent stuck loading if auth takes too long or fails silently
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
+    const timeoutId = setTimeout(() => setLoading(false), 5000);
 
     return () => {
-      unsubscribe();
+      subscription.unsubscribe();
       clearTimeout(timeoutId);
     };
   }, []);

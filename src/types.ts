@@ -78,14 +78,22 @@ export interface Comment {
   isEdited?: boolean;
 }
 
-export interface FirestoreErrorInfo {
+export interface AppUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}
+
+export interface DatabaseErrorInfo {
   error: string;
   operationType: 'create' | 'update' | 'delete' | 'list' | 'get' | 'write';
   path: string | null;
   authInfo: {
     userId?: string | null;
     email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
   };
 }
+
+/** @deprecated Use DatabaseErrorInfo */
+export type FirestoreErrorInfo = DatabaseErrorInfo;
