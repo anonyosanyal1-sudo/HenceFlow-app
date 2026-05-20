@@ -132,9 +132,10 @@ export function TaskDialog({ open, onOpenChange, task, defaultStatus, users, sta
                             <SelectValue placeholder="Select status">
                               {(() => {
                                 const currentStage = stages.find(s => s.id === status);
+                                const solidColor = currentStage ? currentStage.color.split(' ').find(c => c.startsWith('bg-'))?.split('/')[0] : '';
                                 return currentStage ? (
                                   <div className="flex items-center">
-                                    <div className={cn("w-2 h-2 rounded-full mr-2", currentStage.color.split(' ')[0])} />
+                                    <div className={cn("w-2 h-2 rounded-full mr-2", solidColor)} />
                                     <span className="font-medium text-sm">{currentStage.label}</span>
                                   </div>
                                 ) : (
@@ -144,14 +145,17 @@ export function TaskDialog({ open, onOpenChange, task, defaultStatus, users, sta
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent className="bg-popover border-border">
-                            {stages.map((s) => (
-                              <SelectItem key={s.id} value={s.id}>
-                                <div className="flex items-center">
-                                  <div className={cn("w-2 h-2 rounded-full mr-2", s.color.split(' ')[0])} />
-                                  <span className="text-sm">{s.label}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
+                            {stages.map((s) => {
+                              const solidColor = s.color.split(' ').find(c => c.startsWith('bg-'))?.split('/')[0];
+                              return (
+                                <SelectItem key={s.id} value={s.id}>
+                                  <div className="flex items-center">
+                                    <div className={cn("w-2 h-2 rounded-full mr-2", solidColor)} />
+                                    <span className="text-sm">{s.label}</span>
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
                           </SelectContent>
                         </Select>
                       </div>

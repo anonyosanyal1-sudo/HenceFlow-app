@@ -29,13 +29,13 @@ export interface Stage {
 
 export const DEFAULT_STAGES: Stage[] = [
   { id: 'todo', label: 'To Do', color: 'bg-muted text-muted-foreground' },
-  { id: 'analysis-in-progress', label: 'Analysis', color: 'bg-primary/20 text-primary border-primary/30' },
-  { id: 'dev-in-progress', label: 'Development', color: 'bg-secondary/20 text-secondary border-secondary/30' },
-  { id: 'dev-complete', label: 'Dev Complete', color: 'bg-chart-4/20 text-chart-4 border-chart-4/30' },
-  { id: 'test-in-progress', label: 'Testing', color: 'bg-chart-3/20 text-chart-3 border-chart-3/30' },
-  { id: 'test-passed', label: 'Test Passed', color: 'bg-emerald-400/20 text-emerald-400 border-emerald-400/30' },
-  { id: 'ready-for-migration', label: 'Ready for Migration', color: 'bg-chart-5/20 text-chart-5 border-chart-5/30' },
-  { id: 'closed', label: 'Closed', color: 'bg-emerald-900/40 text-emerald-500 border-emerald-800/50' },
+  { id: 'analysis-in-progress', label: 'Analysis', color: 'bg-primary/10 text-primary border-primary/20' },
+  { id: 'dev-in-progress', label: 'Development', color: 'bg-secondary/40 text-secondary-foreground border-secondary/60' },
+  { id: 'dev-complete', label: 'Dev Complete', color: 'bg-chart-4/10 text-chart-4 border-chart-4/20' },
+  { id: 'test-in-progress', label: 'Testing', color: 'bg-chart-3/10 text-chart-3 border-chart-3/20' },
+  { id: 'test-passed', label: 'Test Passed', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
+  { id: 'ready-for-migration', label: 'Ready for Migration', color: 'bg-chart-5/10 text-chart-5 border-chart-5/20' },
+  { id: 'closed', label: 'Closed', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
 ];
 
 export interface Project {

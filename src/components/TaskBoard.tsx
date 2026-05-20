@@ -47,20 +47,29 @@ export function TaskBoard({ tasks, stages, onTaskClick, onAddTask, onStatusChang
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="flex-1 overflow-x-auto p-4 md:p-6 bg-background">
+      <div className="flex-1 overflow-x-auto p-4 md:p-6 bg-transparent relative z-10">
         <div className="flex space-x-4 md:space-x-6 min-h-full">
-          {stages.map((col) => (
-            <div key={col.id} className="w-72 md:w-80 flex-shrink-0 flex flex-col">
-              <div className="flex items-center justify-between mb-4 px-2">
-                <div className="flex items-center space-x-2">
-                  <Badge variant="outline" className={cn("px-2 py-0.5 font-medium border-none", col.color)}>
-                    {col.label}
-                  </Badge>
-                  <span className="text-sm font-medium text-muted-foreground">
-                    {getTasksByStatus(col.id).length}
-                  </span>
-                </div>
-                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => onAddTask(col.id)}>
+          {stages.map((col) => {
+            const borderColor = col.color.split(' ').find(c => c.startsWith('border-'));
+            const bgColorRaw = col.color.split(' ').find(c => c.startsWith('bg-'));
+            const bgColor = bgColorRaw ? bgColorRaw.split('/')[0] : '';
+            const borderSolidColor = borderColor ? borderColor.split('/')[0].replace('border-', 'bg-') : bgColor;
+
+            return (
+              <div key={col.id} className="w-72 md:w-80 flex-shrink-0 flex flex-col relative">
+                {/* Column color accent line */}
+                <div className={cn("absolute top-0 left-0 right-0 h-1 rounded-t-xl opacity-60", borderSolidColor)} />
+                
+                <div className="flex items-center justify-between mb-4 px-2 pt-3">
+                  <div className="flex items-center space-x-2">
+                    <div className={cn("px-2.5 py-0.5 text-xs font-semibold rounded-full border", col.color)}>
+                      {col.label}
+                    </div>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {getTasksByStatus(col.id).length}
+                    </span>
+                  </div>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => onAddTask(col.id)}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -174,7 +183,8 @@ export function TaskBoard({ tasks, stages, onTaskClick, onAddTask, onStatusChang
                 )}
               </Droppable>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </DragDropContext>

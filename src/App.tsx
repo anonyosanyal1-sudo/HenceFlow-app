@@ -326,6 +326,13 @@ function AppContent() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden relative">
+      {/* Ambient Colorful Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-secondary/30 blur-[120px] opacity-70" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-chart-1/10 blur-[120px] opacity-70" />
+        <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] rounded-full bg-chart-4/10 blur-[100px] opacity-50" />
+      </div>
+
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -409,7 +416,7 @@ function AppContent() {
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {!activeCompany ? (
-          <div className="relative flex-1 flex flex-col items-center justify-center p-8 text-center bg-background">
+          <div className="relative flex-1 flex flex-col items-center justify-center p-8 text-center bg-transparent z-10">
             <div className="absolute top-4 left-4 lg:hidden">
               <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
                 <Menu className="w-5 h-5" />

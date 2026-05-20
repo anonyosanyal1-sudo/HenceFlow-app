@@ -113,148 +113,101 @@ export function Dashboard({
   const activeProjects = projects.length;
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-6 md:space-y-8">
+    <div className="flex-1 overflow-y-auto bg-transparent p-6 md:p-12 relative z-10">
+      <div className="max-w-5xl mx-auto space-y-10">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground font-sans">
-              {company.name} Dashboard
+            <h1 className="text-3xl font-medium tracking-tight text-foreground">
+              {company.name}
             </h1>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
-              {company.location && (
-                <div className="flex items-center">
-                  <MapPin className="w-3.5 h-3.5 mr-1.5 opacity-70" />
-                  {company.location}
-                </div>
-              )}
-              {company.industry && (
-                <div className="flex items-center">
-                  <div className="w-1 h-1 rounded-full bg-muted-foreground/30 mr-4 hidden md:block" />
-                  <Briefcase className="w-3.5 h-3.5 mr-1.5 opacity-70" />
-                  {company.industry}
-                </div>
-              )}
+              {company.location && <span>{company.location}</span>}
+              {company.industry && <span>{company.industry}</span>}
               {company.website && (
-                <div className="flex items-center">
-                  <div className="w-1 h-1 rounded-full bg-muted-foreground/30 mr-4 hidden md:block" />
-                  <a 
-                    href={company.website.startsWith('http') ? company.website : `https://${company.website}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="hover:text-primary transition-colors flex items-center"
-                  >
-                    <Globe className="w-3.5 h-3.5 mr-1.5 opacity-70" />
-                    {company.website.replace(/^https?:\/\//, '')}
-                  </a>
-                </div>
+                <a 
+                  href={company.website.startsWith('http') ? company.website : `https://${company.website}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:text-primary transition-colors"
+                >
+                  {company.website.replace(/^https?:\/\//, '')}
+                </a>
               )}
             </div>
           </div>
-          <Button onClick={onNewProject} className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
-            <Plus className="w-4 h-4 mr-2" />
+          <Button onClick={onNewProject} variant="outline" className="w-full md:w-auto h-9 px-4 text-xs rounded-full shadow-none hover:bg-muted font-medium border-border/40">
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
             New Workspace
           </Button>
         </div>
 
         {/* Tabs for Workspaces and Setup */}
-        <Tabs defaultValue="workspaces" className="w-full mt-8">
-          <TabsList className="mb-6 bg-muted/50 p-1 rounded-xl">
-            <TabsTrigger value="workspaces" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">Workspaces</TabsTrigger>
-            <TabsTrigger value="setup" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">Company Setup</TabsTrigger>
+        <Tabs defaultValue="workspaces" className="w-full">
+          <TabsList className="bg-transparent w-full justify-start border-b border-border/40 p-0 h-auto rounded-none space-x-6 mb-8 mt-4">
+            <TabsTrigger value="workspaces" className="pb-3 pt-0 px-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground data-[state=active]:text-foreground font-medium transition-none">Workspaces</TabsTrigger>
+            <TabsTrigger value="setup" className="pb-3 pt-0 px-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground data-[state=active]:text-foreground font-medium transition-none">Company Setup</TabsTrigger>
           </TabsList>
 
           <TabsContent value="workspaces" className="space-y-6 md:space-y-8 mt-0 focus-visible:outline-none">
-            {/* Global Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="border-none shadow-sm bg-card overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-4 opacity-5">
-                  <FolderOpen className="w-16 h-16" />
+            {/* Global Stats - Minimal */}
+            <div className="flex flex-wrap md:flex-nowrap gap-8 items-center text-sm mb-12">
+              <div className="flex flex-col space-y-1">
+                <span className="text-muted-foreground">Total Workspaces</span>
+                <span className="text-3xl font-light text-foreground">{activeProjects}</span>
+              </div>
+              <div className="w-px h-10 bg-border/40 hidden md:block" />
+              <div className="flex flex-col space-y-1">
+                <span className="text-muted-foreground">Completed Tasks</span>
+                <span className="text-3xl font-light text-foreground">{totalCompleted} <span className="text-lg text-muted-foreground">/ {totalTasks}</span></span>
+              </div>
+              <div className="w-px h-10 bg-border/40 hidden md:block" />
+              <div className="flex flex-col space-y-2 flex-1 max-w-xs pt-1">
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-muted-foreground">Overall Progress</span>
+                  <span className="text-sm font-medium">{totalTasks === 0 ? 0 : Math.round((totalCompleted / totalTasks) * 100)}%</span>
                 </div>
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Workspaces</CardDescription>
-                  <CardTitle className="text-3xl font-bold text-foreground">{activeProjects}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center text-xs text-primary font-medium">
-                    <TrendingUp className="w-3 h-3 mr-1" />
-                    <span>Active across accounts</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-none shadow-sm bg-card overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-4 opacity-5">
-                  <CheckCircle2 className="w-16 h-16" />
+                <div className="w-full bg-border/40 h-[2px] rounded-full overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${totalTasks === 0 ? 0 : (totalCompleted / totalTasks) * 100}%` }}
+                    className="bg-foreground h-full"
+                  />
                 </div>
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Tasks</CardDescription>
-                  <CardTitle className="text-3xl font-bold text-foreground">{totalTasks}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center text-xs text-secondary font-medium">
-                    <CheckCircle2 className="w-3 h-3 mr-1" />
-                    <span>{totalCompleted} tasks completed</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-none shadow-sm bg-primary text-primary-foreground overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-4 opacity-20">
-                  <BarChart3 className="w-16 h-16" />
-                </div>
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-xs font-semibold uppercase tracking-wider text-primary-foreground/80">Overall Progress</CardDescription>
-                  <CardTitle className="text-3xl font-bold">
-                    {totalTasks === 0 ? 0 : Math.round((totalCompleted / totalTasks) * 100)}%
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="w-full bg-primary-foreground/20 h-1.5 rounded-full mt-2 overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${totalTasks === 0 ? 0 : (totalCompleted / totalTasks) * 100}%` }}
-                      className="bg-primary-foreground h-full"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+              </div>
             </div>
 
             {/* Workspaces List */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <h2 className="text-lg font-semibold text-foreground">Your Workspaces</h2>
-                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                  <Layout className="w-4 h-4" />
-                  <span>Grid View</span>
-                </div>
-              </div>
+            <div className="space-y-6">
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {projects.map((project) => {
               const stats = getProjectStats(project.id);
               return (
                 <motion.div
                   key={project.id}
-                  whileHover={{ y: -4 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  whileHover={{ y: -2 }}
+                  transition={{ duration: 0.2 }}
                 >
-                  <Card className="bg-card border-border shadow-sm hover:shadow-md transition-all group h-full flex flex-col">
-                    <CardHeader className="pb-4">
+                  <Card 
+                    className="bg-card/40 border-border/40 shadow-none hover:bg-card/80 transition-colors group h-full flex flex-col rounded-2xl cursor-pointer"
+                    onClick={() => onProjectSelect(project)}
+                  >
+                    <CardHeader className="p-5 pb-0 border-none">
                       <div className="flex items-start justify-between">
-                        <div 
-                          className="w-10 h-10 rounded-xl flex items-center justify-center text-primary-foreground font-bold shadow-sm"
-                          style={{ backgroundColor: project.color || 'var(--primary)' }}
-                        >
-                          {project.name.charAt(0)}
+                        <div className="flex items-center space-x-3">
+                          <div 
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: project.color || 'var(--primary)' }}
+                          />
+                          <CardTitle className="text-base font-medium text-foreground">{project.name}</CardTitle>
                         </div>
-                        <div className="flex items-center space-x-1 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-9 w-9 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10"
+                            className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
                             onClick={(e) => {
                               e.stopPropagation();
                               onEditProject(project);
@@ -265,7 +218,7 @@ export function Dashboard({
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-9 w-9 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-400/10"
+                            className="h-8 w-8 rounded-full text-muted-foreground hover:text-red-400 hover:bg-red-400/10"
                             onClick={(e) => {
                               e.stopPropagation();
                               setProjectToDelete(project);
@@ -275,84 +228,61 @@ export function Dashboard({
                           </Button>
                         </div>
                       </div>
-                      <CardTitle className="mt-4 text-lg text-foreground">{project.name}</CardTitle>
                       {project.description && (
-                        <CardDescription className="line-clamp-2 min-h-[2.5rem] text-muted-foreground">
+                        <CardDescription className="line-clamp-2 mt-2 text-xs text-muted-foreground min-h-[2rem]">
                           {project.description}
                         </CardDescription>
                       )}
                     </CardHeader>
                     
-                    <CardContent className="flex-1 space-y-4">
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs font-semibold text-muted-foreground">
-                          <span>Completion Progress</span>
-                          <span>{stats.progress}%</span>
-                        </div>
-                        <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${stats.progress}%` }}
-                            className="bg-primary h-full"
-                          />
-                        </div>
+                    <CardContent className="flex-1 p-5 pt-4 border-none flex flex-col justify-end">
+                      <div className="w-full bg-border/40 h-[2px] rounded-full overflow-hidden mb-4">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${stats.progress}%` }}
+                          className="bg-foreground/40 h-full"
+                        />
                       </div>
-
-                      <div className="grid grid-cols-2 gap-2 mt-4">
-                        <div className="bg-muted rounded-lg p-2 flex flex-col items-center">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Total</span>
-                          <span className="text-sm font-bold text-foreground">{stats.total}</span>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground w-full">
+                        <div className="flex items-center space-x-4">
+                          <span className="flex items-center gap-1.5" title="Tasks completed">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {stats.completed}/{stats.total}
+                          </span>
+                          <span className="flex items-center gap-1.5" title="Tasks in progress">
+                            <Clock className="w-3.5 h-3.5" />
+                            {stats.inProgress}
+                          </span>
                         </div>
-                        <div className="bg-muted rounded-lg p-2 flex flex-col items-center">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Active</span>
-                          <span className="text-sm font-bold text-primary">{stats.inProgress}</span>
+                        <div className="flex items-center -space-x-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                          {project.members?.slice(0, 3).map((member, i) => (
+                            <div 
+                              key={i} 
+                              className="w-5 h-5 rounded-full border border-card bg-muted flex items-center justify-center text-[8px] font-medium text-foreground"
+                            >
+                              <Users className="w-2.5 h-2.5" />
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </CardContent>
-
-                    <CardFooter className="pt-4 border-t border-border flex items-center justify-between">
-                      <div className="flex items-center -space-x-1.5">
-                        {project.members?.slice(0, 3).map((member, i) => (
-                          <div 
-                            key={i} 
-                            className="w-6 h-6 rounded-full border-2 border-card bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground"
-                          >
-                            <Users className="w-3 h-3" />
-                          </div>
-                        ))}
-                        {project.members?.length > 3 && (
-                          <div className="w-6 h-6 rounded-full border-2 border-card bg-muted flex items-center justify-center text-[8px] font-bold text-muted-foreground">
-                            +{project.members.length - 3}
-                          </div>
-                        )}
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-primary hover:text-primary hover:bg-primary/10 font-semibold"
-                        onClick={() => onProjectSelect(project)}
-                      >
-                        Open Workspace
-                        <FolderOpen className="w-3.5 h-3.5 ml-2" />
-                      </Button>
-                    </CardFooter>
                   </Card>
                 </motion.div>
               );
             })}
 
             {projects.length === 0 && (
-              <div className="col-span-full border-2 border-dashed border-border rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-4">
-                <div className="w-16 h-16 rounded-full bg-card flex items-center justify-center">
-                  <Layout className="w-8 h-8 text-muted-foreground/30" />
+              <div className="col-span-full border border-dashed border-border/60 rounded-2xl p-10 flex flex-col items-center justify-center text-center space-y-4">
+                <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center">
+                  <Layout className="w-5 h-5 text-muted-foreground/50" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-foreground">No workspaces yet</h3>
-                  <p className="text-muted-foreground max-w-xs">Create your first workspace to start organizing your projects and tasks.</p>
+                  <h3 className="text-base font-medium text-foreground">No workspaces yet</h3>
+                  <p className="text-sm text-muted-foreground max-w-xs mt-1">Create your first workspace to start organizing your projects and tasks.</p>
                 </div>
-                <Button onClick={onNewProject} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Get Started
+                <Button onClick={onNewProject} variant="outline" className="mt-2 h-9 text-xs rounded-full shadow-none border-border/50 hover:bg-muted font-medium">
+                  <Plus className="w-3.5 h-3.5 mr-1.5" />
+                  New Workspace
                 </Button>
               </div>
             )}

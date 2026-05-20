@@ -31,31 +31,31 @@ interface ProjectDialogProps {
 }
 
 const STAGE_COLORS = [
-  { label: 'Slate', value: 'bg-slate-500/10 text-slate-400 border-slate-500/20' },
-  { label: 'Gray', value: 'bg-gray-500/10 text-gray-400 border-gray-500/20' },
-  { label: 'Zinc', value: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' },
-  { label: 'Neutral', value: 'bg-neutral-500/10 text-neutral-400 border-neutral-500/20' },
-  { label: 'Stone', value: 'bg-stone-500/10 text-stone-400 border-stone-500/20' },
-  { label: 'Red', value: 'bg-red-500/10 text-red-500 border-red-500/20' },
-  { label: 'Orange', value: 'bg-orange-500/10 text-orange-500 border-orange-500/20' },
-  { label: 'Amber', value: 'bg-amber-500/10 text-amber-500 border-amber-500/20' },
-  { label: 'Yellow', value: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' },
-  { label: 'Lime', value: 'bg-lime-500/10 text-lime-500 border-lime-500/20' },
-  { label: 'Green', value: 'bg-green-500/10 text-green-500 border-green-500/20' },
-  { label: 'Emerald', value: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' },
-  { label: 'Teal', value: 'bg-teal-500/10 text-teal-500 border-teal-500/20' },
-  { label: 'Cyan', value: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20' },
-  { label: 'Sky', value: 'bg-sky-500/10 text-sky-500 border-sky-500/20' },
-  { label: 'Blue', value: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
-  { label: 'Indigo', value: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' },
-  { label: 'Violet', value: 'bg-violet-500/10 text-violet-500 border-violet-500/20' },
-  { label: 'Purple', value: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
-  { label: 'Fuchsia', value: 'bg-fuchsia-500/10 text-fuchsia-500 border-fuchsia-500/20' },
-  { label: 'Pink', value: 'bg-pink-500/10 text-pink-500 border-pink-500/20' },
-  { label: 'Rose', value: 'bg-rose-500/10 text-rose-500 border-rose-500/20' },
-  { label: 'Primary', value: 'bg-primary/20 text-primary border-primary/30' },
-  { label: 'Secondary', value: 'bg-secondary/20 text-secondary border-secondary/30' },
-  { label: 'Accent', value: 'bg-accent/20 text-accent-foreground border-accent/30' },
+  { label: 'Slate', value: 'bg-slate-500/10 text-slate-700 border-slate-500/20' },
+  { label: 'Gray', value: 'bg-gray-500/10 text-gray-700 border-gray-500/20' },
+  { label: 'Zinc', value: 'bg-zinc-500/10 text-zinc-700 border-zinc-500/20' },
+  { label: 'Neutral', value: 'bg-neutral-500/10 text-neutral-700 border-neutral-500/20' },
+  { label: 'Stone', value: 'bg-stone-500/10 text-stone-700 border-stone-500/20' },
+  { label: 'Red', value: 'bg-red-500/10 text-red-700 border-red-500/20' },
+  { label: 'Orange', value: 'bg-orange-500/10 text-orange-700 border-orange-500/20' },
+  { label: 'Amber', value: 'bg-amber-500/10 text-amber-700 border-amber-500/20' },
+  { label: 'Yellow', value: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/20' },
+  { label: 'Lime', value: 'bg-lime-500/10 text-lime-700 border-lime-500/20' },
+  { label: 'Green', value: 'bg-green-500/10 text-green-700 border-green-500/20' },
+  { label: 'Emerald', value: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' },
+  { label: 'Teal', value: 'bg-teal-500/10 text-teal-700 border-teal-500/20' },
+  { label: 'Cyan', value: 'bg-cyan-500/10 text-cyan-700 border-cyan-500/20' },
+  { label: 'Sky', value: 'bg-sky-500/10 text-sky-700 border-sky-500/20' },
+  { label: 'Blue', value: 'bg-blue-500/10 text-blue-700 border-blue-500/20' },
+  { label: 'Indigo', value: 'bg-indigo-500/10 text-indigo-700 border-indigo-500/20' },
+  { label: 'Violet', value: 'bg-violet-500/10 text-violet-700 border-violet-500/20' },
+  { label: 'Purple', value: 'bg-purple-500/10 text-purple-700 border-purple-500/20' },
+  { label: 'Fuchsia', value: 'bg-fuchsia-500/10 text-fuchsia-700 border-fuchsia-500/20' },
+  { label: 'Pink', value: 'bg-pink-500/10 text-pink-700 border-pink-500/20' },
+  { label: 'Rose', value: 'bg-rose-500/10 text-rose-700 border-rose-500/20' },
+  { label: 'Primary', value: 'bg-primary/10 text-primary border-primary/20' },
+  { label: 'Secondary', value: 'bg-secondary/40 text-secondary-foreground border-secondary/60' },
+  { label: 'Accent', value: 'bg-accent/40 text-accent-foreground border-accent/60' },
 ];
 
 export function ProjectDialog({ open, onOpenChange, project, users, currentUserId, onSave, onDelete }: ProjectDialogProps) {
@@ -222,7 +222,7 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
                       <PopoverTrigger
                         className={cn(
                           "flex-shrink-0 w-6 h-6 rounded-full border border-border cursor-pointer transition-transform hover:scale-110",
-                          stage.color.split(' ')[0]
+                          stage.color.split(' ')[0].split('/')[0]
                         )} 
                         title="Change Color"
                       />
@@ -233,7 +233,7 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
                               key={c.value}
                               className={cn(
                                 "w-9 h-9 rounded-full border transition-all hover:scale-110",
-                                c.value.split(' ')[0],
+                                c.value.split(' ')[0].split('/')[0],
                                 stage.color === c.value ? "ring-2 ring-primary ring-offset-2 ring-offset-card" : "border-border"
                               )}
                               onClick={() => updateStageColor(index, c.value)}
