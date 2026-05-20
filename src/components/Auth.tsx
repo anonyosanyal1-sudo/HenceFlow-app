@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { signInWithGoogle } from '../lib/firebase';
+import { signInWithGoogle } from '../lib/supabase';
 import { motion } from 'motion/react';
 import { Loader2, AlertCircle } from 'lucide-react';
 
@@ -17,13 +17,11 @@ export function Auth() {
     } catch (err: any) {
       console.error("Login failed:", err);
       let message = "An unexpected error occurred during login.";
-      
-      if (err.code === 'auth/popup-blocked') {
-        message = "Login popup was blocked by your browser. Please allow popups for this site.";
-      } else if (err.code === 'auth/popup-closed-by-user') {
-        message = "Login popup was closed before completion. Please try again.";
-      } else if (err.code === 'auth/unauthorized-domain') {
-        message = "This domain is not authorized for Firebase Authentication. Please add it to 'Authorized domains' in your Firebase Console.";
+
+      if (err.message?.includes('provider is not enabled')) {
+        message = "Google sign-in is not enabled. Please enable the Google provider in your Supabase project's Authentication settings.";
+      } else if (err.message?.includes('redirect')) {
+        message = "Sign-in redirect failed. Make sure your site URL is added to Supabase's allowed redirect URLs.";
       } else if (err.message) {
         message = err.message;
       }

@@ -1,6 +1,5 @@
 import React from 'react';
-import { auth } from '../lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { supabase } from '../lib/supabase';
 import { addComment, subscribeToComments, deleteComment, updateComment } from '../services/api';
 import { Comment, UserProfile } from '../types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -22,7 +21,7 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
   const [newComment, setNewComment] = React.useState('');
   const [attachments, setAttachments] = React.useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [currentUserId, setCurrentUserId] = React.useState<string | null>(auth.currentUser?.uid || null);
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editContent, setEditContent] = React.useState('');
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -31,10 +30,13 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUserId(user?.uid || null);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUserId(session?.user?.id ?? null);
     });
-    return () => unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   React.useEffect(() => {
@@ -102,8 +104,8 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
   };
 
   const handleLike = async (comment: Comment) => {
-    if (!auth.currentUser) return;
-    const uid = auth.currentUser.uid;
+    if (!currentUserId) return;
+    const uid = currentUserId;
     const likes = comment.likes || [];
     const dislikes = comment.dislikes || [];
     
@@ -120,8 +122,8 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
   };
 
   const handleDislike = async (comment: Comment) => {
-    if (!auth.currentUser) return;
-    const uid = auth.currentUser.uid;
+    if (!currentUserId) return;
+    const uid = currentUserId;
     const likes = comment.likes || [];
     const dislikes = comment.dislikes || [];
     
