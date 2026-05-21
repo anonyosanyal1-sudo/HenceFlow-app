@@ -676,7 +676,15 @@ function AppContent() {
                 setTaskDialogOpen(true);
               }}
               onStatusChange={(taskId, newStatus) => {
-                updateTask(activeProject.id, taskId, { status: newStatus });
+                // Optimistic update: move the card immediately in local state
+                const prevStatus = tasks.find(t => t.id === taskId)?.status;
+                setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+                updateTask(activeProject.id, taskId, { status: newStatus }).catch(() => {
+                  // Revert if the DB write fails
+                  if (prevStatus !== undefined) {
+                    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: prevStatus } : t));
+                  }
+                });
               }}
             />
           </>
