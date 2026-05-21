@@ -3,7 +3,7 @@ import { Task, TaskStatus, TaskPriority, Stage, UserProfile } from '../types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, MoreHorizontal, Clock, Calendar } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -85,8 +85,7 @@ export function TaskBoard({ tasks, stages, users = [], onTaskClick, onAddTask, o
                       snapshot.isDraggingOver ? "bg-primary/8 ring-1 ring-primary/30" : ""
                     )}
                   >
-                    <AnimatePresence>
-                      {getTasksByStatus(col.id).map((task, index) => (
+                    {getTasksByStatus(col.id).map((task, index) => (
                         <Draggable key={task.id} draggableId={task.id} index={index}>
                           {(provided, snapshot) => (
                             <div
@@ -104,12 +103,11 @@ export function TaskBoard({ tasks, stages, users = [], onTaskClick, onAddTask, o
                               }}
                             >
                               <motion.div
-                                initial={{ opacity: 0, y: 10 }}
+                                initial={{ opacity: 0, y: 8 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                whileHover={{ y: -4, scale: 1.01 }}
-                                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                                layout
+                                exit={{ opacity: 0 }}
+                                whileHover={snapshot.isDragging ? undefined : { y: -2, scale: 1.01 }}
+                                transition={{ duration: 0.15 }}
                               >
                                 <Card className={cn(
                                   "bg-card border-border hover:border-primary/50 transition-all duration-200 shadow-sm group cursor-pointer",
@@ -177,7 +175,6 @@ export function TaskBoard({ tasks, stages, users = [], onTaskClick, onAddTask, o
                           )}
                         </Draggable>
                       ))}
-                    </AnimatePresence>
                     {provided.placeholder}
                     
                     {getTasksByStatus(col.id).length === 0 && !snapshot.isDraggingOver && (
