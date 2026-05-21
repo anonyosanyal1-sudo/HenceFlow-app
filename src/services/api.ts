@@ -1,6 +1,9 @@
 import { supabase } from '../lib/supabase';
 import { Task, Project, UserProfile, DatabaseErrorInfo, Comment, Company } from '../types';
 
+let _channelSeq = 0;
+const uid = () => `${++_channelSeq}`;
+
 async function getUser() {
   const { data: { session } } = await supabase.auth.getSession();
   return session?.user ?? null;
@@ -161,7 +164,7 @@ export const subscribeToCompanies = (callback: (companies: Company[]) => void) =
   fetchCompanies();
 
   const channel = supabase
-    .channel('companies-changes')
+    .channel(`companies-changes-${uid()}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'companies' }, fetchCompanies)
     .subscribe();
 
@@ -222,7 +225,7 @@ export const subscribeToProjects = (
   fetchProjects();
 
   const channel = supabase
-    .channel(`projects-${companyId}`)
+    .channel(`projects-${companyId}-${uid()}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'projects', filter: `company_id=eq.${companyId}` },
@@ -242,7 +245,7 @@ export const subscribeToUsers = (callback: (users: UserProfile[]) => void) => {
   fetchUsers();
 
   const channel = supabase
-    .channel('users-changes')
+    .channel(`users-changes-${uid()}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchUsers)
     .subscribe();
 
@@ -307,7 +310,7 @@ export const subscribeToTasks = (projectId: string, callback: (tasks: Task[]) =>
   fetchTasks();
 
   const channel = supabase
-    .channel(`tasks-${projectId}`)
+    .channel(`tasks-${projectId}-${uid()}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'tasks', filter: `project_id=eq.${projectId}` },
@@ -360,7 +363,7 @@ export const subscribeToComments = (
   fetchComments();
 
   const channel = supabase
-    .channel(`comments-${taskId}`)
+    .channel(`comments-${taskId}-${uid()}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'comments', filter: `task_id=eq.${taskId}` },
