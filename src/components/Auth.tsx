@@ -1,32 +1,74 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { signInWithGoogle } from '../lib/supabase';
-import { motion } from 'motion/react';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { supabase } from '../lib/supabase';
+import { motion, AnimatePresence } from 'motion/react';
+import { Loader2, AlertCircle, Mail, Lock, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+
+type Mode = 'signin' | 'signup';
 
 export function Auth() {
-  const [error, setError] = React.useState<string | null>(null);
+  const [mode, setMode] = React.useState<Mode>('signin');
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [showPassword, setShowPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
 
-  const handleLogin = async () => {
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    setError(null);
+    setSuccessMsg(null);
+    setPassword('');
+    setConfirmPassword('');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+
+    if (!email.trim() || !password) {
+      setError('Email and password are required.');
+      return;
+    }
+
+    if (mode === 'signup' && password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      setError(null);
-      setIsLoading(true);
-      await signInWithGoogle();
-    } catch (err: any) {
-      console.error("Login failed:", err);
-      let message = "An unexpected error occurred during login.";
-
-      if (err.message?.includes('provider is not enabled')) {
-        message = "Google sign-in is not enabled. Please enable the Google provider in your Supabase project's Authentication settings.";
-      } else if (err.message?.includes('redirect')) {
-        message = "Sign-in redirect failed. Make sure your site URL is added to Supabase's allowed redirect URLs.";
-      } else if (err.message) {
-        message = err.message;
+      if (mode === 'signin') {
+        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+        if (err) throw err;
+      } else {
+        const { data, error: err } = await supabase.auth.signUp({ email, password });
+        if (err) throw err;
+        if (!data.session) {
+          setSuccessMsg('Account created! Check your email for a confirmation link before signing in.');
+          setIsLoading(false);
+          return;
+        }
       }
-      
-      setError(message);
+    } catch (err: any) {
+      const msg = err?.message ?? 'An unexpected error occurred.';
+      setError(
+        msg === 'Invalid login credentials'
+          ? 'Incorrect email or password.'
+          : msg === 'User already registered'
+          ? 'An account with this email already exists. Please sign in.'
+          : msg
+      );
     } finally {
       setIsLoading(false);
     }
@@ -37,77 +79,158 @@ export function Auth() {
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="w-full max-w-md"
       >
-        <Card className="w-full max-w-md shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] border-zinc-800 bg-zinc-900/50 backdrop-blur-xl">
-          <CardHeader className="text-center space-y-2 pb-8">
+        <Card className="shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] border-zinc-800 bg-zinc-900/50 backdrop-blur-xl">
+          <CardHeader className="text-center space-y-2 pb-6">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-2xl mb-4 shadow-[0_0_20px_rgba(var(--primary),0.3)]">
               HF
             </div>
             <CardTitle className="text-3xl font-extrabold tracking-tight text-white">HenceFlow</CardTitle>
             <CardDescription className="text-zinc-400 text-base">
-              The high-performance platform for dev teams to plan, track, and ship software.
+              {mode === 'signin' ? 'Sign in to your account to continue.' : 'Create your account to get started.'}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {error && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-3 text-xs text-red-400 leading-relaxed"
-              >
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </motion.div>
-            )}
 
-            <Button 
-              className="w-full py-7 text-base font-semibold bg-white text-black hover:bg-zinc-200 transition-all shadow-lg flex items-center justify-center space-x-3 disabled:opacity-70" 
-              onClick={handleLogin}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+          <CardContent className="space-y-5">
+            <AnimatePresence mode="wait">
+              {error && (
+                <motion.div
+                  key="error"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-3 text-xs text-red-400 leading-relaxed"
+                >
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </motion.div>
+              )}
+              {successMsg && (
+                <motion.div
+                  key="success"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-3 text-xs text-emerald-400 leading-relaxed"
+                >
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{successMsg}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                  <Input
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                    className="pl-10 bg-zinc-800/60 border-zinc-700 text-white placeholder:text-zinc-600 focus-visible:ring-primary h-11"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                    className="pl-10 pr-10 bg-zinc-800/60 border-zinc-700 text-white placeholder:text-zinc-600 focus-visible:ring-primary h-11"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <AnimatePresence>
+                {mode === 'signup' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-1.5 overflow-hidden"
+                  >
+                    <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Confirm Password</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        autoComplete="new-password"
+                        className="pl-10 bg-zinc-800/60 border-zinc-700 text-white placeholder:text-zinc-600 focus-visible:ring-primary h-11"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-11 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all disabled:opacity-70"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : mode === 'signin' ? (
+                  'Sign In'
+                ) : (
+                  'Create Account'
+                )}
+              </Button>
+            </form>
+
+            <div className="text-center text-sm text-zinc-500">
+              {mode === 'signin' ? (
+                <>
+                  Don't have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => switchMode('signup')}
+                    className="text-primary font-semibold hover:underline"
+                  >
+                    Sign up
+                  </button>
+                </>
               ) : (
                 <>
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path
-                      fill="currentColor"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="currentColor"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="currentColor"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
-                    />
-                    <path
-                      fill="currentColor"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                    />
-                  </svg>
-                  <span>Continue with Google</span>
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => switchMode('signin')}
+                    className="text-primary font-semibold hover:underline"
+                  >
+                    Sign in
+                  </button>
                 </>
               )}
-            </Button>
-            
-            <div className="relative py-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground font-medium">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 opacity-50 grayscale pointer-events-none">
-              <Button variant="outline" className="py-5 border-border text-muted-foreground">Email</Button>
             </div>
           </CardContent>
-          <div className="p-6 text-center text-xs text-muted-foreground border-t border-border mt-4">
-            By signing in, you agree to our Terms of Service and Privacy Policy.
+
+          <div className="p-6 text-center text-xs text-muted-foreground border-t border-border">
+            By continuing, you agree to our Terms of Service and Privacy Policy.
           </div>
         </Card>
       </motion.div>

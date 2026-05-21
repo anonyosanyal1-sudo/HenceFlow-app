@@ -30,16 +30,6 @@ export function toAppUser(user: {
   };
 }
 
-export const signInWithGoogle = async () => {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
-    },
-  });
-  if (error) throw error;
-};
-
 export const logout = async () => {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
