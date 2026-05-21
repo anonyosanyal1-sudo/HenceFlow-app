@@ -6,8 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { UserAvatar } from './UserAvatar';
 import { 
   BarChart3, 
   Users, 
@@ -409,12 +409,11 @@ export function Dashboard({
                              disabled={isOwner || (currentUserId !== company?.ownerId && !company?.adminIds?.includes(currentUserId))}
                              className="border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground shrink-0"
                            />
-                           <Avatar className="h-8 w-8 border border-border shadow-sm shrink-0">
-                             <AvatarImage src={user.photoURL || undefined} />
-                             <AvatarFallback className="text-xs bg-primary/20 text-primary font-bold">
-                               {user.displayName?.[0] || 'U'}
-                             </AvatarFallback>
-                           </Avatar>
+                           <UserAvatar
+                             photoURL={user.photoURL}
+                             displayName={user.displayName}
+                             className="h-8 w-8 text-xs shrink-0"
+                           />
                            <div className="flex flex-col flex-1 min-w-0">
                              <span className="text-sm font-medium text-foreground truncate">
                                {user.displayName || 'Anonymous User'}
@@ -529,7 +528,7 @@ export function Dashboard({
               </Button>
               <Button 
                 variant="destructive" 
-                disabled={deleteConfirmName !== projectToDelete?.name}
+                disabled={deleteConfirmName.trim() !== projectToDelete?.name}
                 onClick={() => {
                   if (projectToDelete) {
                     onDeleteProject(projectToDelete.id);

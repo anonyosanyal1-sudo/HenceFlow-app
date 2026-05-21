@@ -3,7 +3,7 @@ import {
   BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
-import { Task, Project, UserProfile } from '../types';
+import { Task, Project, UserProfile, DEFAULT_STAGES } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Clock, AlertTriangle, TrendingUp } from 'lucide-react';
@@ -58,22 +58,47 @@ const CustomTooltipStyle = {
   fontSize: '12px',
 };
 
+// Returns the last stage ID for a project (the "done" stage).
+function getClosedStageId(project?: Project) {
+  const stages = project?.stages;
+  if (stages && stages.length > 0) return stages[stages.length - 1].id;
+  return DEFAULT_STAGES[DEFAULT_STAGES.length - 1].id;
+}
+
+// Build a map of stageId → label from all projects' stages.
+function buildStageLabelMap(projects: Project[]): Map<string, string> {
+  const map = new Map<string, string>();
+  const allStages = projects.flatMap(p => p.stages || DEFAULT_STAGES);
+  // Use DEFAULT_STAGES as fallback baseline
+  DEFAULT_STAGES.forEach(s => map.set(s.id, s.label));
+  allStages.forEach(s => map.set(s.id, s.label));
+  return map;
+}
+
 export function AnalyticsDashboard({ tasks, projects, users, currentUserId }: AnalyticsDashboardProps) {
+  const stageLabelMap = buildStageLabelMap(projects);
+
+  // Build per-project closed stage lookup
+  const projectClosedStage = new Map(projects.map(p => [p.id, getClosedStageId(p)]));
+
+  const isTaskClosed = (t: Task) => t.status === (projectClosedStage.get(t.projectId) ?? 'closed');
+
   const totalTasks = tasks.length;
-  const closedTasks = tasks.filter(t => t.status === 'closed').length;
+  const closedTasks = tasks.filter(isTaskClosed).length;
   const overdueTasks = tasks.filter(t => {
     if (!t.dueDate) return false;
-    return new Date(t.dueDate) < new Date(new Date().setHours(0, 0, 0, 0)) && t.status !== 'closed';
+    return new Date(t.dueDate) < new Date(new Date().setHours(0, 0, 0, 0)) && !isTaskClosed(t);
   }).length;
   const myTasks = tasks.filter(t => t.assigneeId === currentUserId || t.creatorId === currentUserId).length;
 
-  // Tasks by status
+  // Tasks by status — use stage labels instead of raw IDs
   const statusCounts = tasks.reduce<Record<string, number>>((acc, t) => {
-    acc[t.status] = (acc[t.status] || 0) + 1;
+    const label = stageLabelMap.get(t.status) || t.status.replace(/-/g, ' ');
+    acc[label] = (acc[label] || 0) + 1;
     return acc;
   }, {});
   const statusData = Object.entries(statusCounts)
-    .map(([status, count]) => ({ name: status.replace(/-/g, ' '), count }))
+    .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
 
   // Tasks by priority
@@ -90,7 +115,7 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId }: An
     .map(p => ({
       name: p.name.length > 14 ? p.name.slice(0, 14) + '…' : p.name,
       tasks: tasks.filter(t => t.projectId === p.id).length,
-      closed: tasks.filter(t => t.projectId === p.id && t.status === 'closed').length,
+      closed: tasks.filter(t => t.projectId === p.id && isTaskClosed(t)).length,
     }))
     .filter(p => p.tasks > 0)
     .sort((a, b) => b.tasks - a.tasks)
