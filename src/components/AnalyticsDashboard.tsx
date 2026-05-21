@@ -33,17 +33,20 @@ const PRIORITY_COLORS: Record<string, string> = {
   urgent: '#ef4444',
 };
 
-function StatCard({ label, value, sub, icon, color }: { label: string; value: number | string; sub?: string; icon: React.ReactNode; color: string }) {
+function StatCard({ label, value, sub, icon, color, glow }: { label: string; value: number | string; sub?: string; icon: React.ReactNode; color: string; glow?: string }) {
   return (
-    <Card className="bg-card border-border">
+    <Card className="bg-card border-border/50 relative overflow-hidden group hover:border-border transition-colors">
+      {glow && (
+        <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl opacity-20 pointer-events-none -translate-y-1/2 translate-x-1/2" style={{ background: glow }} />
+      )}
       <CardContent className="p-5 flex items-center gap-4">
-        <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center shrink-0", color)}>
+        <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm", color)}>
           {icon}
         </div>
         <div>
-          <p className="text-2xl font-bold text-foreground">{value}</p>
+          <p className="text-2xl font-bold text-foreground tabular-nums">{value}</p>
           <p className="text-sm text-muted-foreground">{label}</p>
-          {sub && <p className="text-xs text-muted-foreground/70 mt-0.5">{sub}</p>}
+          {sub && <p className="text-xs text-muted-foreground/60 mt-0.5 font-medium">{sub}</p>}
         </div>
       </CardContent>
     </Card>
@@ -150,26 +153,30 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId }: An
           label="Total Tasks"
           value={totalTasks}
           icon={<TrendingUp className="w-5 h-5 text-violet-300" />}
-          color="bg-violet-500/20"
+          color="bg-violet-500/20 border border-violet-500/20"
+          glow="oklch(0.67 0.30 285)"
         />
         <StatCard
           label="Completed"
           value={closedTasks}
-          sub={`${completionRate}% rate`}
+          sub={`${completionRate}% completion rate`}
           icon={<CheckCircle2 className="w-5 h-5 text-emerald-300" />}
-          color="bg-emerald-500/20"
+          color="bg-emerald-500/20 border border-emerald-500/20"
+          glow="oklch(0.74 0.21 160)"
         />
         <StatCard
           label="Overdue"
           value={overdueTasks}
           icon={<AlertTriangle className="w-5 h-5 text-amber-300" />}
-          color="bg-amber-500/20"
+          color="bg-amber-500/20 border border-amber-500/20"
+          glow="oklch(0.78 0.20 55)"
         />
         <StatCard
           label="My Tasks"
           value={myTasks}
           icon={<Clock className="w-5 h-5 text-sky-300" />}
-          color="bg-sky-500/20"
+          color="bg-sky-500/20 border border-sky-500/20"
+          glow="oklch(0.73 0.21 210)"
         />
       </div>
 

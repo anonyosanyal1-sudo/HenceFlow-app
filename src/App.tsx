@@ -348,10 +348,11 @@ function AppContent() {
     <div className="flex h-screen bg-background overflow-hidden relative">
       {/* Ambient glow layers */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-20%] left-[-10%] w-[55%] h-[55%] rounded-full bg-primary/20 blur-[140px] opacity-60" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-chart-1/18 blur-[130px] opacity-55" />
-        <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] rounded-full bg-chart-4/18 blur-[110px] opacity-45" />
-        <div className="absolute top-[60%] left-[20%] w-[25%] h-[25%] rounded-full bg-chart-3/12 blur-[100px] opacity-35" />
+        <div className="absolute top-[-25%] left-[-15%] w-[60%] h-[60%] rounded-full bg-primary/28 blur-[130px]" />
+        <div className="absolute bottom-[-25%] right-[-15%] w-[55%] h-[55%] rounded-full bg-chart-1/22 blur-[120px]" />
+        <div className="absolute top-[25%] right-[5%] w-[32%] h-[32%] rounded-full bg-chart-4/18 blur-[100px]" />
+        <div className="absolute top-[55%] left-[15%] w-[28%] h-[28%] rounded-full bg-chart-3/15 blur-[90px]" />
+        <div className="absolute top-[10%] right-[30%] w-[20%] h-[20%] rounded-full bg-sky-500/10 blur-[80px]" />
       </div>
 
       {/* Mobile Sidebar Overlay */}
@@ -533,7 +534,7 @@ function AppContent() {
         ) : (
           <>
             {/* Toolbar */}
-            <div className="h-16 border-b border-border flex items-center justify-between px-4 md:px-6 bg-card shrink-0">
+            <div className="h-16 border-b border-border/60 flex items-center justify-between px-4 md:px-6 bg-card/80 backdrop-blur-sm shrink-0">
               <div className="flex items-center space-x-2 md:space-x-4">
                 <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="lg:hidden">
                   <Menu className="w-5 h-5" />
@@ -659,8 +660,9 @@ function AppContent() {
                   )}
                 </div>
 
-                <Button 
-                  className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 px-3 md:px-4"
+                <Button
+                  className="h-9 px-3 md:px-5 font-bold text-primary-foreground shadow-lg shadow-primary/30 border-0 hover:opacity-90 transition-opacity"
+                  style={{ background: 'linear-gradient(135deg, oklch(0.67 0.30 285), oklch(0.60 0.26 310))' }}
                   onClick={() => {
                     setSelectedTask(null);
                     setDefaultStatus('todo');

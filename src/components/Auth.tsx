@@ -1,7 +1,7 @@
 import React from 'react';
 import { Logo } from './Logo';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -76,25 +76,48 @@ export function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 font-sans">
+    <div className="min-h-screen flex items-center justify-center p-4 font-sans relative overflow-hidden bg-background">
+      {/* Multi-colour ambient blobs */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-[30%] -left-[15%] w-[70%] h-[70%] rounded-full bg-primary/25 blur-[140px]" />
+        <div className="absolute -bottom-[30%] -right-[15%] w-[65%] h-[65%] rounded-full bg-chart-1/20 blur-[140px]" />
+        <div className="absolute top-[35%] right-[15%] w-[35%] h-[35%] rounded-full bg-chart-4/15 blur-[110px]" />
+        <div className="absolute bottom-[20%] left-[25%] w-[25%] h-[25%] rounded-full bg-emerald-500/10 blur-[90px]" />
+      </div>
+
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="w-full max-w-md"
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+        className="w-full max-w-md relative"
       >
-        <Card className="shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] border-zinc-800 bg-zinc-900/50 backdrop-blur-xl">
-          <CardHeader className="text-center space-y-4 pb-6">
-            <Logo
-              variant="wordmark"
-              className="mx-auto h-12 max-w-[220px]"
-            />
-            <CardDescription className="text-zinc-400 text-base">
-              {mode === 'signin' ? 'Sign in to your account to continue.' : 'Create your account to get started.'}
-            </CardDescription>
+        <Card className="shadow-[0_0_80px_-16px_oklch(0.67_0.30_285_/_0.40)] border-white/8 bg-card/60 backdrop-blur-2xl relative overflow-hidden">
+          {/* Top gradient line */}
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+          {/* Inner top glow */}
+          <div className="absolute top-0 left-0 right-0 h-28 bg-gradient-to-b from-primary/6 to-transparent pointer-events-none" />
+
+          <CardHeader className="text-center space-y-4 pb-5 pt-8 relative">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.1, duration: 0.4 }}
+            >
+              <Logo variant="wordmark" className="mx-auto h-11 max-w-[200px]" />
+            </motion.div>
+            <div className="space-y-1">
+              <h1 className="text-xl font-bold text-foreground">
+                {mode === 'signin' ? 'Welcome back' : 'Create your account'}
+              </h1>
+              <CardDescription className="text-muted-foreground text-sm">
+                {mode === 'signin'
+                  ? 'Sign in to continue to HenceFlow.'
+                  : 'Get started with your free account today.'}
+              </CardDescription>
+            </div>
           </CardHeader>
 
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-5 px-6 pb-6 relative">
             <AnimatePresence mode="wait">
               {error && (
                 <motion.div
@@ -102,7 +125,7 @@ export function Auth() {
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
-                  className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-3 text-xs text-red-400 leading-relaxed"
+                  className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 flex items-start gap-3 text-xs text-rose-400 leading-relaxed"
                 >
                   <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>{error}</span>
@@ -114,7 +137,7 @@ export function Auth() {
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
-                  className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-3 text-xs text-emerald-400 leading-relaxed"
+                  className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-3 text-xs text-emerald-400 leading-relaxed"
                 >
                   <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>{successMsg}</span>
@@ -124,9 +147,9 @@ export function Auth() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Email</label>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
                   <Input
                     type="email"
                     placeholder="you@example.com"
@@ -134,15 +157,15 @@ export function Auth() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     autoComplete="email"
-                    className="pl-10 bg-zinc-800/60 border-zinc-700 text-white placeholder:text-zinc-600 focus-visible:ring-primary h-11"
+                    className="pl-10 bg-muted/40 border-border/60 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-primary/40 focus-visible:border-primary/40 h-11 transition-all"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Password</label>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
                   <Input
                     type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
@@ -150,12 +173,12 @@ export function Auth() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                    className="pl-10 pr-10 bg-zinc-800/60 border-zinc-700 text-white placeholder:text-zinc-600 focus-visible:ring-primary h-11"
+                    className="pl-10 pr-10 bg-muted/40 border-border/60 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-primary/40 focus-visible:border-primary/40 h-11 transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
                     tabIndex={-1}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -171,9 +194,9 @@ export function Auth() {
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-1.5 overflow-hidden"
                   >
-                    <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Confirm Password</label>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Confirm Password</label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
                       <Input
                         type={showPassword ? 'text' : 'password'}
                         placeholder="••••••••"
@@ -181,7 +204,7 @@ export function Auth() {
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         required
                         autoComplete="new-password"
-                        className="pl-10 bg-zinc-800/60 border-zinc-700 text-white placeholder:text-zinc-600 focus-visible:ring-primary h-11"
+                        className="pl-10 bg-muted/40 border-border/60 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-primary/40 focus-visible:border-primary/40 h-11 transition-all"
                       />
                     </div>
                   </motion.div>
@@ -191,7 +214,10 @@ export function Auth() {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-11 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all disabled:opacity-70"
+                className="w-full h-11 text-base font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all disabled:opacity-60 mt-1 border-0"
+                style={{
+                  background: 'linear-gradient(135deg, oklch(0.67 0.30 285), oklch(0.60 0.26 310))',
+                }}
               >
                 {isLoading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -203,14 +229,14 @@ export function Auth() {
               </Button>
             </form>
 
-            <div className="text-center text-sm text-zinc-500">
+            <div className="text-center text-sm text-muted-foreground">
               {mode === 'signin' ? (
                 <>
-                  Don't have an account?{' '}
+                  Don&apos;t have an account?{' '}
                   <button
                     type="button"
                     onClick={() => switchMode('signup')}
-                    className="text-primary font-semibold hover:underline"
+                    className="text-primary font-semibold hover:underline underline-offset-4 transition-colors"
                   >
                     Sign up
                   </button>
@@ -221,7 +247,7 @@ export function Auth() {
                   <button
                     type="button"
                     onClick={() => switchMode('signin')}
-                    className="text-primary font-semibold hover:underline"
+                    className="text-primary font-semibold hover:underline underline-offset-4 transition-colors"
                   >
                     Sign in
                   </button>
@@ -230,7 +256,7 @@ export function Auth() {
             </div>
           </CardContent>
 
-          <div className="p-6 text-center text-xs text-muted-foreground border-t border-border">
+          <div className="px-6 pb-5 text-center text-xs text-muted-foreground/40 border-t border-border/30 pt-4">
             By continuing, you agree to our Terms of Service and Privacy Policy.
           </div>
         </Card>

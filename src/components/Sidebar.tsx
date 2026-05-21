@@ -59,40 +59,41 @@ export function Sidebar({
   return (
     <TooltipProvider>
     <div className={cn(
-      "h-full bg-sidebar border-r border-border flex flex-col p-4 space-y-6 transition-all duration-300 relative", 
-      isCollapsed ? "w-20" : "w-64",
+      "h-full bg-sidebar border-r border-sidebar-border flex flex-col p-3 space-y-5 transition-all duration-300 relative",
+      isCollapsed ? "w-[68px]" : "w-64",
       className
     )}>
-      {/* Collapse Toggle Button */}
+      {/* Collapse Toggle */}
       {onToggleCollapse && (
         <Button
           variant="ghost"
           size="icon"
           onClick={onToggleCollapse}
-          className="absolute -right-3 top-20 bg-sidebar border border-border rounded-full h-6 w-6 z-10 hidden lg:flex shadow-sm hover:bg-accent"
+          className="absolute -right-3 top-20 bg-sidebar border border-sidebar-border rounded-full h-6 w-6 z-10 hidden lg:flex shadow-md hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all"
         >
           {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
         </Button>
       )}
 
-      <div className={cn("flex items-center px-1 mb-2", isCollapsed ? "justify-center" : "justify-between")}>
+      {/* Company header */}
+      <div className={cn("flex items-center px-1", isCollapsed ? "justify-center" : "justify-between")}>
         <DropdownMenu>
           <DropdownMenuTrigger className="flex-1 bg-transparent border-none p-0 m-0 text-left outline-none min-w-0">
             <div className={cn(
-              "flex items-center text-foreground hover:bg-accent/50 rounded-lg transition-colors group",
-              isCollapsed ? "p-1 justify-center" : "p-2"
+              "flex items-center text-foreground hover:bg-primary/8 rounded-xl transition-colors group",
+              isCollapsed ? "p-1.5 justify-center" : "p-2 gap-2"
             )}>
               {isCollapsed ? (
-                <Logo variant="icon" className="w-10 h-10 shadow-sm" />
+                <Logo variant="icon" className="w-9 h-9 shadow-sm" />
               ) : (
                 <>
-                  <Logo variant="wordmark" className="h-8 max-w-[130px] object-left" />
-                  <div className="flex flex-col flex-1 min-w-0 justify-center ml-2">
-                    <span className="font-medium text-[11px] text-muted-foreground leading-tight truncate">
+                  <Logo variant="wordmark" className="h-7 max-w-[120px] object-left shrink-0" />
+                  <div className="flex flex-col flex-1 min-w-0 justify-center">
+                    <span className="font-semibold text-[10px] text-muted-foreground leading-tight truncate">
                       {activeCompany ? activeCompany.name : 'Select Company'}
                     </span>
                   </div>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground opacity-50 group-hover:opacity-100 shrink-0 ml-1" />
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground opacity-50 group-hover:opacity-100 shrink-0" />
                 </>
               )}
             </div>
@@ -102,53 +103,62 @@ export function Sidebar({
               <MoreVertical className="w-4 h-4 rotate-90" />
             </Button>
           )}
-          <DropdownMenuContent align="start" className="w-56 p-2 rounded-xl shadow-xl border-border bg-popover">
+          <DropdownMenuContent align="start" className="w-56 p-2 rounded-xl shadow-2xl border-border bg-popover">
             <DropdownMenuGroup>
-              <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <DropdownMenuLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-2 pb-1">
                 Companies
               </DropdownMenuLabel>
               {companies.map(c => (
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   key={c.id}
-                  className="rounded-lg h-9 cursor-pointer"
+                  className="rounded-lg h-9 cursor-pointer gap-2.5"
                   onClick={() => onCompanySelect(c)}
                 >
                   <div className={cn(
-                    "w-4 h-4 mr-3 rounded shadow-sm border border-border flex items-center justify-center",
-                    c.id === activeCompany?.id ? "bg-primary text-primary-foreground" : "bg-muted"
+                    "w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0",
+                    c.id === activeCompany?.id
+                      ? "bg-primary text-primary-foreground shadow-sm shadow-primary/30"
+                      : "bg-muted text-muted-foreground"
                   )}>
-                     {c.name.charAt(0).toUpperCase()}
+                    {c.name.charAt(0).toUpperCase()}
                   </div>
-                  <span className={cn("font-medium", c.id === activeCompany?.id ? "text-foreground" : "text-muted-foreground")}>
+                  <span className={cn("font-medium text-sm", c.id === activeCompany?.id ? "text-foreground" : "text-muted-foreground")}>
                     {c.name}
                   </span>
-                  {c.id === activeCompany?.id && <span className="ml-auto text-primary text-xs">Active</span>}
+                  {c.id === activeCompany?.id && (
+                    <span className="ml-auto text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">Active</span>
+                  )}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="rounded-lg h-10 cursor-pointer"
+            <DropdownMenuSeparator className="my-1" />
+            <DropdownMenuItem
+              className="rounded-lg h-10 cursor-pointer gap-2.5"
               onClick={() => onNewCompany()}
             >
-              <Plus className="w-4 h-4 mr-3 text-muted-foreground" />
-              <span className="font-medium text-foreground">Create Company</span>
+              <div className="w-5 h-5 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                <Plus className="w-3 h-3 text-primary" />
+              </div>
+              <span className="font-medium text-foreground text-sm">Create Company</span>
             </DropdownMenuItem>
             {activeCompany && activeCompany.adminIds?.includes(user?.uid) && onCompanySettings && (
-              <DropdownMenuItem 
-                className="rounded-lg h-10 cursor-pointer"
+              <DropdownMenuItem
+                className="rounded-lg h-10 cursor-pointer gap-2.5"
                 onClick={onCompanySettings}
               >
-                <Building className="w-4 h-4 mr-3 text-muted-foreground" />
-                <span className="font-medium text-foreground">Company Settings</span>
+                <div className="w-5 h-5 rounded-md bg-muted flex items-center justify-center shrink-0">
+                  <Building className="w-3 h-3 text-muted-foreground" />
+                </div>
+                <span className="font-medium text-foreground text-sm">Company Settings</span>
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
+      {/* Nav links */}
       <div className="flex-1 space-y-1 overflow-hidden">
-        <div className={cn("space-y-1 mb-4", isCollapsed ? "px-0" : "px-2")}>
+        <div className={cn("space-y-0.5 mb-3", isCollapsed ? "px-0" : "px-1")}>
           {isCollapsed ? (
             <>
               <Tooltip>
@@ -156,12 +166,17 @@ export function Sidebar({
                   <Button
                     variant="ghost"
                     className={cn(
-                      "w-full font-medium transition-all justify-center px-0",
-                      !activeProject && activeView === 'board' ? "bg-card shadow-sm text-primary border border-border" : "text-muted-foreground"
+                      "w-full font-medium transition-all justify-center px-0 relative h-9",
+                      !activeProject && activeView === 'board'
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     )}
                     onClick={() => onProjectSelect(null)}
                   >
-                    <Layout className="w-4 h-4 shrink-0 transition-all m-0" />
+                    <Layout className="w-4 h-4 shrink-0 m-0" />
+                    {!activeProject && activeView === 'board' && (
+                      <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-primary" />
+                    )}
                   </Button>
                 } />
                 <TooltipContent side="right" sideOffset={10}>Dashboard</TooltipContent>
@@ -171,12 +186,17 @@ export function Sidebar({
                   <Button
                     variant="ghost"
                     className={cn(
-                      "w-full font-medium transition-all justify-center px-0",
-                      activeView === 'analytics' ? "bg-card shadow-sm text-primary border border-border" : "text-muted-foreground"
+                      "w-full font-medium transition-all justify-center px-0 relative h-9",
+                      activeView === 'analytics'
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     )}
                     onClick={onAnalyticsSelect}
                   >
-                    <BarChart3 className="w-4 h-4 shrink-0 transition-all m-0" />
+                    <BarChart3 className="w-4 h-4 shrink-0 m-0" />
+                    {activeView === 'analytics' && (
+                      <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-primary" />
+                    )}
                   </Button>
                 } />
                 <TooltipContent side="right" sideOffset={10}>Analytics</TooltipContent>
@@ -187,23 +207,33 @@ export function Sidebar({
               <Button
                 variant="ghost"
                 className={cn(
-                  "w-full font-medium transition-all justify-start px-4",
-                  !activeProject && activeView === 'board' ? "bg-card shadow-sm text-primary border border-border" : "text-muted-foreground"
+                  "w-full font-semibold transition-all justify-start px-3 h-9 relative overflow-hidden rounded-xl",
+                  !activeProject && activeView === 'board'
+                    ? "text-primary bg-gradient-to-r from-primary/20 to-primary/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
                 onClick={() => onProjectSelect(null)}
               >
-                <Layout className="w-4 h-4 shrink-0 transition-all mr-3" />
+                {!activeProject && activeView === 'board' && (
+                  <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-primary" />
+                )}
+                <Layout className="w-4 h-4 shrink-0 mr-2.5" />
                 <span>Dashboard</span>
               </Button>
               <Button
                 variant="ghost"
                 className={cn(
-                  "w-full font-medium transition-all justify-start px-4",
-                  activeView === 'analytics' ? "bg-card shadow-sm text-primary border border-border" : "text-muted-foreground"
+                  "w-full font-semibold transition-all justify-start px-3 h-9 relative overflow-hidden rounded-xl",
+                  activeView === 'analytics'
+                    ? "text-primary bg-gradient-to-r from-primary/20 to-primary/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
                 onClick={onAnalyticsSelect}
               >
-                <BarChart3 className="w-4 h-4 shrink-0 transition-all mr-3" />
+                {activeView === 'analytics' && (
+                  <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-primary" />
+                )}
+                <BarChart3 className="w-4 h-4 shrink-0 mr-2.5" />
                 <span>Analytics</span>
               </Button>
             </>
@@ -211,29 +241,29 @@ export function Sidebar({
         </div>
 
         {!isCollapsed && (
-          <div className="px-2 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          <div className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">
             Workspaces
           </div>
         )}
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {projects.map((project) => (
-            <div 
-              key={project.id}
-              className="group relative"
-            >
+            <div key={project.id} className="group relative">
               {isCollapsed ? (
                 <Tooltip>
                   <TooltipTrigger render={
                     <div
                       onClick={() => onProjectSelect(project)}
                       className={cn(
-                        "w-full flex items-center justify-center rounded-md cursor-pointer transition-all p-2",
-                        activeProject?.id === project.id 
-                          ? "bg-card shadow-sm text-primary font-medium border border-border" 
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        "w-full flex items-center justify-center rounded-xl cursor-pointer transition-all p-2 h-9 relative",
+                        activeProject?.id === project.id
+                          ? "bg-primary/15 text-primary"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                       )}
                     >
-                      <Hash className="w-4 h-4 opacity-50 shrink-0 m-0" />
+                      <Hash className="w-4 h-4 shrink-0" />
+                      {activeProject?.id === project.id && (
+                        <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-primary" />
+                      )}
                     </div>
                   } />
                   <TooltipContent side="right" sideOffset={10}>{project.name}</TooltipContent>
@@ -242,38 +272,41 @@ export function Sidebar({
                 <div
                   onClick={() => onProjectSelect(project)}
                   className={cn(
-                    "w-full flex items-center px-2 py-2 text-sm rounded-md cursor-pointer transition-all",
-                    activeProject?.id === project.id 
-                      ? "bg-card shadow-sm text-primary font-medium border border-border" 
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    "w-full flex items-center px-3 py-2 text-sm rounded-xl cursor-pointer transition-all relative overflow-hidden",
+                    activeProject?.id === project.id
+                      ? "bg-gradient-to-r from-primary/20 to-primary/5 text-primary font-semibold"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                   )}
                 >
-                  <Hash className="w-4 h-4 mr-3 opacity-50 shrink-0" />
+                  {activeProject?.id === project.id && (
+                    <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-primary" />
+                  )}
+                  <Hash className="w-3.5 h-3.5 mr-2.5 opacity-60 shrink-0" />
                   <span className="truncate flex-1 text-left">{project.name}</span>
-                  
+
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       className={cn(
                         buttonVariants({ variant: "ghost", size: "icon" }),
-                        "h-8 w-8 ml-1 transition-opacity",
-                        "lg:opacity-0 lg:group-hover:opacity-100 group-hover:bg-muted font-normal",
+                        "h-7 w-7 ml-1 transition-opacity shrink-0",
+                        "lg:opacity-0 lg:group-hover:opacity-100 hover:bg-muted font-normal",
                         activeProject?.id === project.id ? "lg:opacity-100 opacity-100" : "opacity-100 lg:opacity-0"
                       )}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                      <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48 p-2 rounded-xl shadow-xl border-border bg-popover">
-                      <DropdownMenuItem 
+                    <DropdownMenuContent align="end" className="w-48 p-2 rounded-xl shadow-2xl border-border bg-popover">
+                      <DropdownMenuItem
                         className="rounded-lg h-10 cursor-pointer"
                         onClick={() => onNewProject(project)}
                       >
                         <Edit2 className="w-4 h-4 mr-3 text-muted-foreground" />
                         <span className="font-medium text-foreground">Workspace Settings</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem 
+                      <DropdownMenuItem
                         className="rounded-lg h-10 cursor-pointer text-red-400 focus:text-red-500 focus:bg-red-500/10"
-                        onClick={() => onNewProject(project)} 
+                        onClick={() => onNewProject(project)}
                       >
                         <Trash2 className="w-4 h-4 mr-3" />
                         <span className="font-medium">Delete Workspace</span>
@@ -284,41 +317,42 @@ export function Sidebar({
               )}
             </div>
           ))}
-          
+
           {isCollapsed ? (
             <Tooltip>
               <TooltipTrigger render={
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="w-full transition-all text-muted-foreground hover:text-primary hover:bg-primary/10 justify-center px-0 h-10"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full transition-all text-muted-foreground hover:text-primary hover:bg-primary/10 justify-center px-0 h-9 rounded-xl"
                   onClick={() => onNewProject()}
                 >
-                  <Plus className="w-4 h-4 m-0" />
+                  <Plus className="w-4 h-4" />
                 </Button>
               } />
               <TooltipContent side="right" sideOffset={10}>Add Workspace</TooltipContent>
             </Tooltip>
           ) : (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="w-full transition-all text-muted-foreground hover:text-primary hover:bg-primary/10 justify-start px-2 py-2"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full transition-all text-muted-foreground hover:text-primary hover:bg-primary/10 justify-start px-3 py-2 h-9 rounded-xl"
               onClick={() => onNewProject()}
             >
-              <Plus className="w-4 h-4 mr-3" />
-              <span>Add Workspace</span>
+              <Plus className="w-4 h-4 mr-2.5" />
+              <span className="text-sm">Add Workspace</span>
             </Button>
           )}
         </div>
       </div>
 
-      <div className="pt-4 mt-auto">
+      {/* User profile */}
+      <div className="pt-2 mt-auto border-t border-sidebar-border">
         <DropdownMenu>
           <DropdownMenuTrigger className="w-full bg-transparent border-none p-0 outline-none">
             <div className={cn(
-              "flex items-center rounded-lg hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer group",
-              isCollapsed ? "p-1 justify-center" : "space-x-3 px-2 py-2"
+              "flex items-center rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group",
+              isCollapsed ? "p-1.5 justify-center" : "gap-2.5 px-2 py-2"
             )}>
               {isCollapsed ? (
                 <Tooltip>
@@ -339,15 +373,15 @@ export function Sidebar({
                     className="w-8 h-8 text-sm shadow-sm shrink-0"
                   />
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-sm font-medium text-foreground truncate">{user?.displayName}</p>
-                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                    <p className="text-sm font-semibold text-foreground truncate leading-tight">{user?.displayName || 'You'}</p>
+                    <p className="text-[11px] text-muted-foreground truncate leading-tight">{user?.email}</p>
                   </div>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground opacity-50 group-hover:opacity-100" />
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0 transition-colors" />
                 </>
               )}
             </div>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align={isCollapsed ? "start" : "end"} side={isCollapsed ? "right" : "top"} className="w-56 p-2 rounded-xl shadow-xl border-border bg-popover">
+          <DropdownMenuContent align={isCollapsed ? "start" : "end"} side={isCollapsed ? "right" : "top"} className="w-56 p-2 rounded-xl shadow-2xl border-border bg-popover">
             {onEditProfile && (
               <>
                 <DropdownMenuItem
@@ -361,7 +395,7 @@ export function Sidebar({
               </>
             )}
             <DropdownMenuItem
-              className="rounded-lg h-10 cursor-pointer text-red-500 focus:text-red-600 focus:bg-red-500/10"
+              className="rounded-lg h-10 cursor-pointer text-red-400 focus:text-red-500 focus:bg-red-500/10"
               onClick={onLogout}
             >
               <LogOut className="w-4 h-4 mr-3" />
