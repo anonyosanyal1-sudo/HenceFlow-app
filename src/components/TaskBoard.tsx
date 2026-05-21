@@ -18,10 +18,10 @@ interface TaskBoardProps {
 }
 
 const PRIORITY_STYLES: Record<TaskPriority, string> = {
-  low: 'bg-muted text-muted-foreground',
-  medium: 'bg-primary/20 text-primary',
-  high: 'bg-chart-3/20 text-chart-3',
-  urgent: 'bg-destructive/20 text-destructive animate-pulse',
+  low:    'bg-muted/60 text-muted-foreground border border-border/60',
+  medium: 'bg-chart-4/20 text-chart-4 border border-chart-4/40',
+  high:   'bg-chart-2/20 text-chart-2 border border-chart-2/40',
+  urgent: 'bg-destructive/25 text-destructive border border-destructive/40 animate-pulse',
 };
 
 export function TaskBoard({ tasks, stages, onTaskClick, onAddTask, onStatusChange }: TaskBoardProps) {
@@ -80,8 +80,8 @@ export function TaskBoard({ tasks, stages, onTaskClick, onAddTask, onStatusChang
                     {...provided.droppableProps}
                     ref={provided.innerRef}
                     className={cn(
-                      "flex-1 space-y-3 pb-4 transition-colors rounded-lg px-1",
-                      snapshot.isDraggingOver ? "bg-muted/10 ring-1 ring-primary/20" : ""
+                      "flex-1 space-y-3 pb-4 transition-colors rounded-xl px-1",
+                      snapshot.isDraggingOver ? "bg-primary/8 ring-1 ring-primary/30" : ""
                     )}
                   >
                     <AnimatePresence>
@@ -111,8 +111,10 @@ export function TaskBoard({ tasks, stages, onTaskClick, onAddTask, onStatusChang
                                 layout
                               >
                                 <Card className={cn(
-                                  "bg-card border-border hover:border-primary/40 transition-all duration-200 shadow-sm group cursor-pointer",
-                                  snapshot.isDragging ? "shadow-xl border-primary ring-2 ring-primary/10 scale-105" : "hover:shadow-lg hover:bg-accent/5"
+                                  "bg-card border-border hover:border-primary/50 transition-all duration-200 shadow-sm group cursor-pointer",
+                                  snapshot.isDragging
+                                    ? "shadow-[0_0_30px_-4px_oklch(0.65_0.27_285_/_0.35)] border-primary ring-2 ring-primary/20 scale-105"
+                                    : "hover:shadow-[0_4px_20px_-4px_oklch(0.65_0.27_285_/_0.2)] hover:bg-primary/[0.04]"
                                 )}>
                                   <CardContent className="p-4 space-y-3">
                                     <div className="flex items-start justify-between">
