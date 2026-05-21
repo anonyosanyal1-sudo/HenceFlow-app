@@ -119,7 +119,9 @@ export const ensureUserProfile = async () => {
 export const updateUserProfile = async (displayName: string, photoURL?: string | null) => {
   const user = await getUser();
   if (!user) return;
-  await supabase.auth.updateUser({ data: { full_name: displayName } });
+  const metaData: Record<string, any> = { full_name: displayName };
+  if (photoURL !== undefined) metaData.avatar_url = photoURL;
+  await supabase.auth.updateUser({ data: metaData });
   const updates: Record<string, any> = {
     display_name: displayName,
     updated_at: new Date().toISOString(),
