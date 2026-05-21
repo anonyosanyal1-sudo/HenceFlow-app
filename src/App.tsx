@@ -25,6 +25,8 @@ import { Auth } from './components/Auth';
 import { TaskDialog } from './components/TaskDialog';
 import { ProjectDialog } from './components/ProjectDialog';
 import { CompanyDialog } from './components/CompanyDialog';
+import { ProfileSetup } from './components/ProfileSetup';
+import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { Logo } from './components/Logo';
 import { Layout, Filter, Search, Users, Menu, X, Settings, Monitor } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -101,6 +103,9 @@ function AppContent() {
   const [filterPriority, setFilterPriority] = React.useState<string | null>(null);
   const [filterDueDate, setFilterDueDate] = React.useState<string | null>(null);
   
+  // View state
+  const [activeView, setActiveView] = React.useState<'board' | 'analytics'>('board');
+
   // Dialog States
   const [taskDialogOpen, setTaskDialogOpen] = React.useState(false);
   const [selectedTask, setSelectedTask] = React.useState<Task | null>(null);
@@ -109,13 +114,20 @@ function AppContent() {
   const [selectedProjectForEdit, setSelectedProjectForEdit] = React.useState<Project | null>(null);
   const [companyDialogOpen, setCompanyDialogOpen] = React.useState(false);
   const [selectedCompanyForEdit, setSelectedCompanyForEdit] = React.useState<Company | null>(null);
+  const [profileSetupOpen, setProfileSetupOpen] = React.useState(false);
 
   React.useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const appUser = session?.user ? toAppUser(session.user) : null;
       setUser(appUser);
       setLoading(false);
-      if (appUser) ensureUserProfile();
+      if (appUser) {
+        ensureUserProfile();
+        // Show profile setup for new sign-ups that haven't set a name yet
+        if (event === 'SIGNED_IN' && !session?.user?.user_metadata?.full_name) {
+          setProfileSetupOpen(true);
+        }
+      }
     });
 
     // Fallback timer to prevent stuck loading if auth takes too long or fails silently
@@ -349,11 +361,12 @@ function AppContent() {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="fixed inset-y-0 left-0 z-50 lg:hidden"
             >
-              <Sidebar 
+              <Sidebar
                 companies={companies}
                 projects={projects}
                 activeProject={activeProject}
                 activeCompany={activeCompany}
+                activeView={activeView}
                 onCompanySelect={(c) => {
                   setActiveCompany(c);
                   setSidebarOpen(false);
@@ -370,11 +383,21 @@ function AppContent() {
                 }}
                 onProjectSelect={(p) => {
                   setActiveProject(p);
+                  setActiveView('board');
                   setSidebarOpen(false);
                 }}
                 onNewProject={(proj) => {
                   setSelectedProjectForEdit(proj || null);
                   setProjectDialogOpen(true);
+                  setSidebarOpen(false);
+                }}
+                onAnalyticsSelect={() => {
+                  setActiveProject(null);
+                  setActiveView('analytics');
+                  setSidebarOpen(false);
+                }}
+                onEditProfile={() => {
+                  setProfileSetupOpen(true);
                   setSidebarOpen(false);
                 }}
                 onLogout={logout}
@@ -386,7 +409,7 @@ function AppContent() {
         )}
       </AnimatePresence>
 
-      <Sidebar 
+      <Sidebar
         className="hidden lg:flex"
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -394,6 +417,7 @@ function AppContent() {
         projects={projects}
         activeProject={activeProject}
         activeCompany={activeCompany}
+        activeView={activeView}
         onCompanySelect={setActiveCompany}
         onNewCompany={() => {
           setSelectedCompanyForEdit(null);
@@ -403,11 +427,19 @@ function AppContent() {
           setSelectedCompanyForEdit(activeCompany);
           setCompanyDialogOpen(true);
         }}
-        onProjectSelect={setActiveProject}
+        onProjectSelect={(p) => {
+          setActiveProject(p);
+          setActiveView('board');
+        }}
         onNewProject={(proj) => {
           setSelectedProjectForEdit(proj || null);
           setProjectDialogOpen(true);
         }}
+        onAnalyticsSelect={() => {
+          setActiveProject(null);
+          setActiveView('analytics');
+        }}
+        onEditProfile={() => setProfileSetupOpen(true)}
         onLogout={logout}
         user={user}
       />
@@ -438,6 +470,21 @@ function AppContent() {
               Set up Company
             </Button>
           </div>
+        ) : activeView === 'analytics' ? (
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="lg:hidden h-16 border-b border-border flex items-center px-6 bg-card shrink-0">
+              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="mr-4">
+                <Menu className="w-5 h-5" />
+              </Button>
+              <h2 className="text-lg font-bold tracking-tight text-foreground">Analytics</h2>
+            </div>
+            <AnalyticsDashboard
+              tasks={allTasks}
+              projects={projects}
+              users={users}
+              currentUserId={user.uid}
+            />
+          </div>
         ) : !activeProject ? (
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {/* Mobile Only Header for Dashboard */}
@@ -449,13 +496,16 @@ function AppContent() {
                 Dashboard
               </h2>
             </div>
-            <Dashboard 
+            <Dashboard
               company={activeCompany}
               projects={projects}
               tasks={allTasks}
               users={users}
               currentUserId={user.uid}
-              onProjectSelect={setActiveProject}
+              onProjectSelect={(p) => {
+                setActiveProject(p);
+                setActiveView('board');
+              }}
               onEditProject={(proj) => {
                 setSelectedProjectForEdit(proj);
                 setProjectDialogOpen(true);
@@ -654,7 +704,7 @@ function AppContent() {
           onDelete={handleDeleteProject}
         />
 
-        <CompanyDialog 
+        <CompanyDialog
           open={companyDialogOpen}
           onOpenChange={setCompanyDialogOpen}
           company={selectedCompanyForEdit}
@@ -662,6 +712,16 @@ function AppContent() {
           currentUserId={user.uid}
           onSave={handleSaveCompany}
           onDelete={handleDeleteCompany}
+        />
+
+        <ProfileSetup
+          open={profileSetupOpen}
+          onOpenChange={setProfileSetupOpen}
+          currentDisplayName={user.displayName}
+          currentPhotoURL={user.photoURL}
+          onSaved={(displayName, photoURL) => {
+            setUser(prev => prev ? { ...prev, displayName, photoURL } : prev);
+          }}
         />
       </main>
     </div>

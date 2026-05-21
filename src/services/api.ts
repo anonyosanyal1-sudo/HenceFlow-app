@@ -116,6 +116,19 @@ export const ensureUserProfile = async () => {
   );
 };
 
+export const updateUserProfile = async (displayName: string, photoURL?: string | null) => {
+  const user = await getUser();
+  if (!user) return;
+  await supabase.auth.updateUser({ data: { full_name: displayName } });
+  const updates: Record<string, any> = {
+    display_name: displayName,
+    updated_at: new Date().toISOString(),
+  };
+  if (photoURL !== undefined) updates.photo_url = photoURL;
+  const { error } = await supabase.from('users').update(updates).eq('id', user.id);
+  if (error) await handleError(error, 'update', `users/${user.id}`);
+};
+
 // ── Companies ────────────────────────────────────────────────────────────────
 
 export const createCompany = async (companyData: Partial<Company>) => {
