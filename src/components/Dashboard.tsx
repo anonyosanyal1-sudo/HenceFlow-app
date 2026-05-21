@@ -184,86 +184,99 @@ export function Dashboard({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {projects.map((project) => {
               const stats = getProjectStats(project.id);
+              const accentColor = project.color || 'oklch(0.67 0.30 285)';
               return (
                 <motion.div
                   key={project.id}
-                  whileHover={{ y: -2 }}
-                  transition={{ duration: 0.2 }}
+                  whileHover={{ y: -3, scale: 1.005 }}
+                  transition={{ duration: 0.18 }}
                 >
-                  <Card 
-                    className="bg-card/40 border-border/40 shadow-none hover:bg-card/80 transition-colors group h-full flex flex-col rounded-2xl cursor-pointer"
+                  <Card
+                    className="bg-card/50 border-border/40 shadow-none hover:bg-card/90 hover:border-border/70 hover:shadow-[0_8px_30px_-8px_rgba(0,0,0,0.4)] transition-all group h-full flex flex-col rounded-2xl cursor-pointer relative overflow-hidden"
                     onClick={() => onProjectSelect(project)}
                   >
-                    <CardHeader className="p-5 pb-0 border-none">
+                    {/* Colored top accent */}
+                    <div
+                      className="absolute top-0 left-0 right-0 h-[3px]"
+                      style={{ background: accentColor }}
+                    />
+                    {/* Subtle top glow */}
+                    <div
+                      className="absolute top-0 left-0 right-0 h-16 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                      style={{ background: `linear-gradient(to bottom, ${accentColor}10, transparent)` }}
+                    />
+
+                    <CardHeader className="p-5 pb-0 border-none pt-6">
                       <div className="flex items-start justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div 
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: project.color || 'var(--primary)' }}
+                        <div className="flex items-center space-x-2.5 min-w-0">
+                          <div
+                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                            style={{ backgroundColor: accentColor, boxShadow: `0 0 6px ${accentColor}60` }}
                           />
-                          <CardTitle className="text-base font-medium text-foreground">{project.name}</CardTitle>
+                          <CardTitle className="text-sm font-semibold text-foreground truncate">{project.name}</CardTitle>
                         </div>
-                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
+                        <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
                             onClick={(e) => {
                               e.stopPropagation();
                               onEditProject(project);
                             }}
                           >
-                            <Settings className="w-4 h-4" />
+                            <Settings className="w-3.5 h-3.5" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-full text-muted-foreground hover:text-red-400 hover:bg-red-400/10"
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-full text-muted-foreground hover:text-rose-400 hover:bg-rose-400/10"
                             onClick={(e) => {
                               e.stopPropagation();
                               setProjectToDelete(project);
                             }}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>
                       </div>
                       {project.description && (
-                        <CardDescription className="line-clamp-2 mt-2 text-xs text-muted-foreground min-h-[2rem]">
+                        <CardDescription className="line-clamp-2 mt-2 text-xs text-muted-foreground/70 min-h-[2rem]">
                           {project.description}
                         </CardDescription>
                       )}
                     </CardHeader>
                     
                     <CardContent className="flex-1 p-5 pt-4 border-none flex flex-col justify-end">
-                      <div className="w-full bg-border/40 h-[2px] rounded-full overflow-hidden mb-4">
-                        <motion.div 
+                      {/* Progress bar — colored with project accent */}
+                      <div className="w-full bg-border/30 h-[3px] rounded-full overflow-hidden mb-3">
+                        <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${stats.progress}%` }}
-                          className="bg-foreground/40 h-full"
+                          className="h-full rounded-full"
+                          style={{ background: accentColor }}
                         />
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground w-full">
-                        <div className="flex items-center space-x-4">
-                          <span className="flex items-center gap-1.5" title="Tasks completed">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            {stats.completed}/{stats.total}
+                        <div className="flex items-center gap-3">
+                          <span className="flex items-center gap-1" title="Tasks completed">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span className="font-medium text-foreground/70">{stats.completed}</span>
+                            <span className="text-muted-foreground/50">/{stats.total}</span>
                           </span>
-                          <span className="flex items-center gap-1.5" title="Tasks in progress">
-                            <Clock className="w-3.5 h-3.5" />
-                            {stats.inProgress}
-                          </span>
+                          {stats.inProgress > 0 && (
+                            <span className="flex items-center gap-1" title="In progress">
+                              <Clock className="w-3 h-3" />
+                              <span>{stats.inProgress}</span>
+                            </span>
+                          )}
                         </div>
-                        <div className="flex items-center -space-x-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                          {project.members?.slice(0, 3).map((member, i) => (
-                            <div 
-                              key={i} 
-                              className="w-5 h-5 rounded-full border border-card bg-muted flex items-center justify-center text-[8px] font-medium text-foreground"
-                            >
-                              <Users className="w-2.5 h-2.5" />
-                            </div>
-                          ))}
-                        </div>
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                          style={{ color: accentColor, background: `${accentColor}18` }}
+                        >
+                          {stats.progress}%
+                        </span>
                       </div>
                     </CardContent>
                   </Card>
