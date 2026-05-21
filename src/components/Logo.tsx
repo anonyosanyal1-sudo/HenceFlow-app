@@ -1,19 +1,45 @@
 import { cn } from "@/lib/utils";
 
-export const Logo = ({ className }: { className?: string }) => (
-  <svg 
-    viewBox="0 0 100 100" 
-    className={cn("shrink-0", className)} 
-    fill="none" 
-  >
-    <rect width="100" height="100" rx="22" className="fill-primary text-primary" />
-    <g stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" className="stroke-primary-foreground text-primary-foreground">
-      <path d="M 32 25 L 32 65" />
-      <circle cx="32" cy="80" r="5" fill="currentColor" stroke="none" />
-      <path d="M 68 80 L 68 45" />
-      <path d="M 53 35 L 68 50 L 82 20" />
-      <path d="M 32 50 C 45 50 55 40 65 35" />
-      <path d="M 55 30 L 65 35 L 59 43" />
-    </g>
-  </svg>
-);
+/**
+ * Renders the HenceFlow logo.
+ * - `variant="icon"` (default): square crop focused on the magnifying glass icon
+ * - `variant="wordmark"`: full-width brand image including the "HenceFlow" text
+ */
+export const Logo = ({
+  className,
+  variant = 'icon',
+}: {
+  className?: string;
+  variant?: 'icon' | 'wordmark';
+}) => {
+  if (variant === 'wordmark') {
+    return (
+      <img
+        src="/logo.png"
+        alt="HenceFlow"
+        className={cn("shrink-0 object-contain", className)}
+        draggable={false}
+      />
+    );
+  }
+
+  // Icon variant: overflow-clip so only the magnifying-glass portion is visible
+  return (
+    <div className={cn("shrink-0 overflow-hidden rounded-xl relative bg-black", className)}>
+      <img
+        src="/logo.png"
+        alt="HenceFlow"
+        draggable={false}
+        style={{
+          position: 'absolute',
+          // Scale image so its height is ~3.8× the container height.
+          // That narrows the visible width to ~26% of original = just the icon.
+          height: '380%',
+          width: 'auto',
+          top: '-140%',   // centre vertically on the icon area
+          left: '-4%',    // slight left nudge onto the magnifying glass
+        }}
+      />
+    </div>
+  );
+};
