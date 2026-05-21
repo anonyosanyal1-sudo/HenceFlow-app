@@ -28,7 +28,7 @@ import { CompanyDialog } from './components/CompanyDialog';
 import { ProfileSetup } from './components/ProfileSetup';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { Logo } from './components/Logo';
-import { Layout, Filter, Search, Users, Menu, X, Settings, Monitor } from 'lucide-react';
+import { Hash, Filter, Search, Users, Menu, Settings } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -534,62 +534,78 @@ function AppContent() {
         ) : (
           <>
             {/* Toolbar */}
-            <div className="h-16 border-b border-border/60 flex items-center justify-between px-4 md:px-6 bg-card/80 backdrop-blur-sm shrink-0">
-              <div className="flex items-center space-x-2 md:space-x-4">
-                <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="lg:hidden">
-                  <Menu className="w-5 h-5" />
-                </Button>
-                <h2 className="text-sm md:text-lg font-bold tracking-tight text-foreground group flex items-center truncate">
-                  <Layout className="w-4 h-4 md:w-5 md:h-5 mr-2 md:mr-3 text-primary shrink-0" />
-                  <span className="truncate">{activeProject.name}</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 ml-1 text-muted-foreground hover:text-primary transition-colors"
-                    onClick={() => {
-                      setSelectedProjectForEdit(activeProject);
-                      setProjectDialogOpen(true);
-                    }}
-                  >
-                    <Settings className="w-3.5 h-3.5" />
-                  </Button>
-                </h2>
-                <div className="h-4 w-[1px] bg-border hidden sm:block" />
-                <div className="flex items-center space-x-1 hidden sm:flex">
-                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">
-                    <Users className="w-4 h-4 mr-2" />
-                    <span className="text-xs font-semibold">{activeProject.members?.length || 1} Members</span>
-                  </Button>
-                </div>
-              </div>
+            <div className="border-b border-border/50 px-4 md:px-6 py-3 bg-card/60 backdrop-blur-sm shrink-0">
+              <div className="flex items-center justify-between gap-3">
 
-              <div className="flex items-center space-x-2 md:space-x-3 overflow-x-auto pb-1 no-scrollbar">
-                <div className="relative w-40 md:w-64 hidden sm:block shrink-0">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Search tasks..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-9 bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary placeholder:text-muted-foreground text-sm"
-                  />
+                {/* Left: workspace icon + name + meta */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="lg:hidden shrink-0 h-8 w-8">
+                    <Menu className="w-4 h-4" />
+                  </Button>
+                  {/* # Icon box */}
+                  <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
+                    <Hash className="w-4 h-4 text-primary" />
+                  </div>
+                  {/* Name + subtitle */}
+                  <div className="flex flex-col min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-bold text-foreground text-sm md:text-base truncate leading-tight">
+                        {activeProject.name}
+                      </span>
+                      <button
+                        className="text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0"
+                        onClick={() => { setSelectedProjectForEdit(activeProject); setProjectDialogOpen(true); }}
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground/60 font-medium mt-0.5">
+                      <Users className="w-3 h-3" />
+                      <span>{activeProject.members?.length || 1} members</span>
+                      <span className="opacity-40">·</span>
+                      <span>{tasks.length} tasks</span>
+                      <span className="opacity-40">·</span>
+                      <span className="flex items-center gap-1 text-emerald-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Live
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                
-                {/* Advanced Filters */}
-                <div className="flex items-center space-x-2 shrink-0">
+
+                {/* Right: search + filters + view toggle + new task */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Search */}
+                  <div className="relative hidden md:block">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
+                    <Input
+                      placeholder="Search tasks…"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 pr-10 h-9 w-52 bg-muted/40 border-border/40 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-primary/40 focus-visible:border-primary/40"
+                    />
+                    <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground/30 font-mono pointer-events-none">⌘K</kbd>
+                  </div>
+
+                  {/* Filters */}
                   <Popover>
-                    <PopoverTrigger className={buttonVariants({ variant: "outline", size: "sm", className: "h-9 gap-2" })}>
-                      <Filter className="w-4 h-4" />
-                      <span className="hidden sm:inline">Filters</span>
-                      {(filterPriority || filterAssignee || filterCreator || filterDueDate) && (
-                        <span className="bg-primary text-primary-foreground w-4 h-4 rounded-full text-[10px] flex items-center justify-center">
+                    <PopoverTrigger className={buttonVariants({
+                      variant: "outline",
+                      size: "sm",
+                      className: "h-9 gap-2 border-border/50 bg-muted/30 hover:bg-muted/60 font-medium text-muted-foreground hover:text-foreground"
+                    })}>
+                      <Filter className="w-3.5 h-3.5" />
+                      <span>Filters</span>
+                      {[filterPriority, filterAssignee, filterCreator, filterDueDate].filter(Boolean).length > 0 && (
+                        <span className="bg-primary text-primary-foreground min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1">
                           {[filterPriority, filterAssignee, filterCreator, filterDueDate].filter(Boolean).length}
                         </span>
                       )}
                     </PopoverTrigger>
                     <PopoverContent align="end" className="w-64 p-4 space-y-4">
                       <div className="space-y-2">
-                        <h4 className="font-medium text-sm text-foreground">Priority</h4>
-                        <select 
+                        <h4 className="font-semibold text-sm text-foreground">Priority</h4>
+                        <select
                           className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                           value={filterPriority || ''}
                           onChange={(e) => setFilterPriority(e.target.value || null)}
@@ -601,8 +617,8 @@ function AppContent() {
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <h4 className="font-medium text-sm text-foreground">Assignee</h4>
-                        <select 
+                        <h4 className="font-semibold text-sm text-foreground">Assignee</h4>
+                        <select
                           className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                           value={filterAssignee || ''}
                           onChange={(e) => setFilterAssignee(e.target.value || null)}
@@ -614,8 +630,8 @@ function AppContent() {
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <h4 className="font-medium text-sm text-foreground">Creator</h4>
-                        <select 
+                        <h4 className="font-semibold text-sm text-foreground">Creator</h4>
+                        <select
                           className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                           value={filterCreator || ''}
                           onChange={(e) => setFilterCreator(e.target.value || null)}
@@ -627,8 +643,8 @@ function AppContent() {
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <h4 className="font-medium text-sm text-foreground">Date</h4>
-                        <select 
+                        <h4 className="font-semibold text-sm text-foreground">Date</h4>
+                        <select
                           className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                           value={filterDueDate || ''}
                           onChange={(e) => setFilterDueDate(e.target.value || null)}
@@ -639,39 +655,57 @@ function AppContent() {
                           <option value="overdue">Overdue</option>
                         </select>
                       </div>
+                      {(filterPriority || filterAssignee || filterCreator || searchQuery || filterDueDate) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            setSearchQuery('');
+                            setFilterPriority(null);
+                            setFilterAssignee(null);
+                            setFilterCreator(null);
+                            setFilterDueDate(null);
+                          }}
+                        >
+                          Clear all filters
+                        </Button>
+                      )}
                     </PopoverContent>
                   </Popover>
 
-                  {(filterPriority || filterAssignee || filterCreator || searchQuery || filterDueDate) && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-9 text-primary text-[10px] md:text-xs font-semibold hover:bg-primary/10 shrink-0"
-                      onClick={() => {
-                        setSearchQuery('');
-                        setFilterPriority(null);
-                        setFilterAssignee(null);
-                        setFilterCreator(null);
-                        setFilterDueDate(null);
-                      }}
-                    >
-                      Clear
-                    </Button>
-                  )}
-                </div>
+                  {/* View toggle: Board / List / Timeline (Board is always active) */}
+                  <div className="hidden md:flex items-center bg-muted/40 border border-border/40 rounded-xl p-1 gap-0.5">
+                    {['Board', 'List', 'Timeline'].map((v) => (
+                      <button
+                        key={v}
+                        className={cn(
+                          "px-3 h-7 rounded-lg text-xs font-semibold transition-all",
+                          v === 'Board'
+                            ? "bg-card text-foreground shadow-sm"
+                            : "text-muted-foreground/50 hover:text-muted-foreground"
+                        )}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
 
-                <Button
-                  className="h-9 px-3 md:px-5 font-bold text-primary-foreground shadow-lg shadow-primary/30 border-0 hover:opacity-90 transition-opacity"
-                  style={{ background: 'linear-gradient(135deg, oklch(0.67 0.30 285), oklch(0.60 0.26 310))' }}
-                  onClick={() => {
-                    setSelectedTask(null);
-                    setDefaultStatus('todo');
-                    setTaskDialogOpen(true);
-                  }}
-                >
-                  <span className="hidden md:inline">New Task</span>
-                  <span className="md:hidden">New</span>
-                </Button>
+                  {/* New task */}
+                  <Button
+                    className="h-9 px-4 font-bold text-primary-foreground shadow-md shadow-primary/25 border-0 hover:opacity-90 transition-opacity gap-1.5"
+                    style={{ background: 'linear-gradient(135deg, oklch(0.67 0.30 285), oklch(0.60 0.26 310))' }}
+                    onClick={() => {
+                      setSelectedTask(null);
+                      setDefaultStatus('todo');
+                      setTaskDialogOpen(true);
+                    }}
+                  >
+                    <span className="text-base leading-none font-light">+</span>
+                    <span className="hidden md:inline">New task</span>
+                    <span className="md:hidden">New</span>
+                  </Button>
+                </div>
               </div>
             </div>
 

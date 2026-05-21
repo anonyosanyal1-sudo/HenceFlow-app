@@ -1,7 +1,6 @@
 import React from 'react';
 import { Task, TaskStatus, TaskPriority, Stage, UserProfile } from '../types';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { CardContent } from '@/components/ui/card';
 import { Plus, MoreHorizontal, Clock, Calendar } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -18,12 +17,16 @@ interface TaskBoardProps {
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
 }
 
-const PRIORITY_CONFIG: Record<TaskPriority, { badge: string; dot: string; label: string }> = {
-  low:    { badge: 'bg-slate-700/50 text-slate-300 border border-slate-600/40', dot: 'bg-slate-400', label: 'Low' },
-  medium: { badge: 'bg-sky-500/15 text-sky-300 border border-sky-500/35',       dot: 'bg-sky-400',   label: 'Medium' },
-  high:   { badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/35', dot: 'bg-amber-400', label: 'High' },
-  urgent: { badge: 'bg-rose-500/20 text-rose-300 border border-rose-500/45 shadow-[0_0_8px_oklch(0.63_0.24_25_/_0.35)]', dot: 'bg-rose-400', label: 'Urgent' },
+const PRIORITY_CONFIG: Record<TaskPriority, { text: string; dot: string; label: string }> = {
+  low:    { text: 'text-slate-400',   dot: 'bg-slate-400',   label: 'LOW' },
+  medium: { text: 'text-sky-400',     dot: 'bg-sky-400',     label: 'MEDIUM' },
+  high:   { text: 'text-amber-400',   dot: 'bg-amber-400',   label: 'HIGH' },
+  urgent: { text: 'text-rose-400',    dot: 'bg-rose-500',    label: 'URGENT' },
 };
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
 
 export function TaskBoard({ tasks, stages, users = [], onTaskClick, onAddTask, onStatusChange }: TaskBoardProps) {
   const getTasksByStatus = (status: TaskStatus) => tasks.filter(t => t.status === status);
@@ -39,109 +42,106 @@ export function TaskBoard({ tasks, stages, users = [], onTaskClick, onAddTask, o
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="flex-1 overflow-x-auto p-4 md:p-6 bg-transparent relative z-10">
-        <div className="flex space-x-4 md:space-x-5 min-h-full">
+      <div className="flex-1 overflow-x-auto px-4 md:px-6 py-5 bg-transparent relative z-10">
+        <div className="flex gap-4 min-h-full items-start">
           {stages.map((col) => {
             const bgColorRaw = col.color.split(' ').find(c => c.startsWith('bg-'));
             const bgColor = bgColorRaw ? bgColorRaw.split('/')[0] : 'bg-violet-500';
-            const borderColorRaw = col.color.split(' ').find(c => c.startsWith('border-'));
-            const borderSolid = borderColorRaw
-              ? borderColorRaw.split('/')[0].replace('border-', 'bg-')
-              : bgColor;
             const colTasks = getTasksByStatus(col.id);
 
             return (
-              <div key={col.id} className="w-72 md:w-80 flex-shrink-0 flex flex-col">
+              <div key={col.id} className="w-[320px] flex-shrink-0 flex flex-col rounded-2xl bg-card/50 border border-border/30">
                 {/* Column header */}
-                <div className="flex items-center justify-between mb-3 px-1">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className={cn("px-3 py-1 text-xs font-bold rounded-full border tracking-wide truncate max-w-[160px]", col.color)}>
-                      {col.label}
-                    </div>
-                    <span className={cn(
-                      "text-xs font-bold tabular-nums w-5 h-5 rounded-full flex items-center justify-center",
-                      colTasks.length > 0 ? bgColor + ' text-white/90' : 'bg-muted text-muted-foreground'
-                    )}>
+                <div className="flex items-center justify-between px-4 pt-4 pb-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", bgColor)} />
+                    <span className="text-sm font-semibold text-foreground truncate">{col.label}</span>
+                    <span className="text-xs font-bold text-muted-foreground/60 bg-muted/60 px-2 py-0.5 rounded-full tabular-nums shrink-0">
                       {colTasks.length}
                     </span>
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10 shrink-0 transition-colors"
-                    onClick={() => onAddTask(col.id)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 rounded-lg"
+                      onClick={() => onAddTask(col.id)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 rounded-lg"
+                    >
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
 
+                {/* Droppable area */}
                 <Droppable droppableId={col.id}>
                   {(provided, snapshot) => (
                     <div
                       {...provided.droppableProps}
                       ref={provided.innerRef}
                       className={cn(
-                        "flex-1 space-y-3 pb-4 rounded-xl px-1 pt-1 transition-all duration-200 min-h-[80px]",
-                        snapshot.isDraggingOver
-                          ? "bg-primary/8 ring-1 ring-primary/25 ring-inset"
-                          : "bg-transparent"
+                        "flex-1 flex flex-col gap-2.5 px-3 min-h-[60px] transition-all duration-150",
+                        snapshot.isDraggingOver ? "bg-primary/5 rounded-xl" : ""
                       )}
                     >
-                      {colTasks.map((task, index) => (
-                        <Draggable key={task.id} draggableId={task.id} index={index}>
-                          {(provided, snapshot) => {
-                            const pCfg = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
-                            const u = users.find(u => u.uid === (task.assigneeId || task.creatorId));
-                            const isOverdue = task.dueDate && new Date(task.dueDate) < new Date(new Date().setHours(0, 0, 0, 0));
-                            const isToday = task.dueDate === new Date().toISOString().split('T')[0];
+                      {colTasks.map((task, index) => {
+                        const pCfg = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
+                        const isOverdue = task.dueDate &&
+                          new Date(task.dueDate) < new Date(new Date().setHours(0, 0, 0, 0));
+                        const isToday = task.dueDate === new Date().toISOString().split('T')[0];
 
-                            return (
+                        // Collect unique users to show (assignee first, then creator, max 3)
+                        const seenIds = new Set<string>();
+                        const taskUserIds = [task.assigneeId, task.creatorId]
+                          .filter((id): id is string => !!id && !seenIds.has(id) && !!seenIds.add(id))
+                          .slice(0, 3);
+                        const taskUsers = taskUserIds
+                          .map(id => users.find(u => u.uid === id))
+                          .filter((u): u is UserProfile => !!u);
+
+                        return (
+                          <Draggable key={task.id} draggableId={task.id} index={index}>
+                            {(provided, snapshot) => (
                               <div
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
-                                className={cn(
-                                  "cursor-grab active:cursor-grabbing outline-none",
-                                  snapshot.isDragging ? "z-50" : ""
-                                )}
-                                onClick={() => {
-                                  if (!snapshot.isDragging) onTaskClick(task);
-                                }}
+                                className={cn("cursor-grab active:cursor-grabbing outline-none", snapshot.isDragging ? "z-50" : "")}
+                                onClick={() => { if (!snapshot.isDragging) onTaskClick(task); }}
                               >
                                 <motion.div
-                                  initial={{ opacity: 0, y: 8 }}
+                                  initial={{ opacity: 0, y: 6 }}
                                   animate={{ opacity: 1, y: 0 }}
                                   exit={{ opacity: 0 }}
-                                  whileHover={snapshot.isDragging ? undefined : { y: -2, scale: 1.005 }}
-                                  transition={{ duration: 0.15 }}
+                                  whileHover={snapshot.isDragging ? undefined : { y: -1 }}
+                                  transition={{ duration: 0.12 }}
                                 >
-                                  <Card className={cn(
-                                    "relative overflow-hidden border-border/40 transition-all duration-200 group cursor-pointer select-none",
+                                  <div className={cn(
+                                    "rounded-xl border transition-all duration-150 select-none",
                                     snapshot.isDragging
-                                      ? "shadow-[0_16px_48px_-8px_oklch(0.67_0.30_285_/_0.50)] border-primary/60 scale-[1.03] bg-card"
-                                      : "bg-card/70 hover:bg-card hover:border-border/70 hover:shadow-[0_4px_20px_-4px_oklch(0.67_0.30_285_/_0.18)]"
+                                      ? "bg-card border-primary/50 shadow-[0_12px_40px_-8px_oklch(0.67_0.30_285_/_0.45)] scale-[1.02]"
+                                      : "bg-card border-border/30 hover:border-border/70 hover:shadow-md cursor-pointer"
                                   )}>
-                                    {/* Left accent bar */}
-                                    <div className={cn("absolute inset-y-0 left-0 w-[3px]", bgColor)} />
-
-                                    <CardContent className="p-4 pl-5 space-y-3">
-                                      {/* Priority + menu */}
+                                    <CardContent className="p-4 space-y-2.5">
+                                      {/* Priority + tags */}
                                       <div className="flex items-center justify-between gap-2">
-                                        <Badge className={cn(
-                                          "text-[10px] uppercase tracking-wider font-bold border-none rounded-full px-2 py-0.5",
-                                          pCfg.badge,
-                                          task.priority === 'urgent' && 'animate-pulse'
-                                        )}>
-                                          <span className={cn("inline-block w-1 h-1 rounded-full mr-1.5 shrink-0", pCfg.dot)} />
+                                        <div className={cn("flex items-center gap-1.5 text-[10px] font-bold tracking-widest uppercase", pCfg.text)}>
+                                          <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", pCfg.dot,
+                                            task.priority === 'urgent' ? 'animate-pulse' : ''
+                                          )} />
                                           {pCfg.label}
-                                        </Badge>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                                        >
-                                          <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-                                        </Button>
+                                        </div>
+                                        {task.tags && task.tags.length > 0 && (
+                                          <span className="text-[10px] text-muted-foreground/50 truncate max-w-[120px]">
+                                            {task.tags.slice(0, 2).join(' · ')}
+                                          </span>
+                                        )}
                                       </div>
 
                                       {/* Title */}
@@ -149,62 +149,75 @@ export function TaskBoard({ tasks, stages, users = [], onTaskClick, onAddTask, o
                                         {task.title}
                                       </h4>
 
-                                      {/* Description preview */}
+                                      {/* Description */}
                                       {task.description && (
-                                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                                        <p className="text-xs text-muted-foreground/60 line-clamp-2 leading-relaxed">
                                           {task.description}
                                         </p>
                                       )}
 
-                                      {/* Footer */}
-                                      <div className="flex items-center justify-between pt-2 border-t border-border/40 mt-1">
-                                        <div className="flex flex-col gap-1">
-                                          <div className="flex items-center text-[10px] text-muted-foreground/70 font-medium gap-1">
-                                            <Clock className="w-3 h-3" />
-                                            {task.createdAt
-                                              ? new Date(task.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-                                              : 'Just now'}
-                                          </div>
+                                      {/* Footer: dates + avatars */}
+                                      <div className="flex items-center justify-between pt-1.5 border-t border-border/30">
+                                        <div className="flex items-center gap-3">
+                                          {task.createdAt && (
+                                            <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50 font-medium">
+                                              <Clock className="w-3 h-3" />
+                                              {formatDate(task.createdAt)}
+                                            </span>
+                                          )}
                                           {task.dueDate && (
-                                            <div className={cn(
-                                              "flex items-center text-[10px] font-bold gap-1",
-                                              isOverdue ? "text-rose-400" : isToday ? "text-amber-400" : "text-emerald-400"
+                                            <span className={cn(
+                                              "flex items-center gap-1 text-[10px] font-semibold",
+                                              isOverdue ? "text-rose-400" : isToday ? "text-amber-400" : "text-muted-foreground/60"
                                             )}>
                                               <Calendar className="w-3 h-3" />
-                                              {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                            </div>
+                                              {isToday ? (
+                                                <span className={cn(isToday ? "text-amber-400 font-bold" : "")}>
+                                                  {formatDate(task.dueDate)}
+                                                </span>
+                                              ) : formatDate(task.dueDate)}
+                                            </span>
                                           )}
                                         </div>
-                                        <UserAvatar
-                                          photoURL={u?.photoURL}
-                                          displayName={u?.displayName}
-                                          className="h-6 w-6 text-[10px] ring-2 ring-background shadow-sm shrink-0"
-                                        />
+
+                                        {/* Stacked avatars */}
+                                        {taskUsers.length > 0 && (
+                                          <div className="flex items-center -space-x-2">
+                                            {taskUsers.map((u, i) => (
+                                              <UserAvatar
+                                                key={u.uid}
+                                                photoURL={u.photoURL}
+                                                displayName={u.displayName}
+                                                className={cn(
+                                                  "h-6 w-6 text-[9px] ring-2 ring-card shadow-sm shrink-0",
+                                                  i > 0 ? "relative" : ""
+                                                )}
+                                              />
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
                                     </CardContent>
-                                  </Card>
+                                  </div>
                                 </motion.div>
                               </div>
-                            );
-                          }}
-                        </Draggable>
-                      ))}
+                            )}
+                          </Draggable>
+                        );
+                      })}
                       {provided.placeholder}
-
-                      {colTasks.length === 0 && !snapshot.isDraggingOver && (
-                        <div
-                          className="border border-dashed border-border/30 rounded-xl p-6 flex flex-col items-center justify-center text-center gap-2 cursor-pointer group/empty hover:border-primary/30 hover:bg-primary/[0.03] transition-all"
-                          onClick={() => onAddTask(col.id)}
-                        >
-                          <div className={cn("w-7 h-7 rounded-full flex items-center justify-center opacity-40 group-hover/empty:opacity-70 transition-opacity", bgColor + '/20')}>
-                            <Plus className={cn("w-3.5 h-3.5", bgColor.replace('bg-', 'text-').replace('-500', '-400'))} />
-                          </div>
-                          <span className="text-xs text-muted-foreground/50 group-hover/empty:text-muted-foreground/70 transition-colors">Add a task</span>
-                        </div>
-                      )}
                     </div>
                   )}
                 </Droppable>
+
+                {/* Add task footer */}
+                <button
+                  className="flex items-center justify-center gap-1.5 mx-3 my-3 py-2 text-xs text-muted-foreground/40 hover:text-muted-foreground/80 transition-colors rounded-lg hover:bg-muted/30 font-medium"
+                  onClick={() => onAddTask(col.id)}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add task
+                </button>
               </div>
             );
           })}
