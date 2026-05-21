@@ -49,7 +49,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   render() {
     if (this.state.hasError) {
       return (
-        <div className="h-screen w-full flex flex-col items-center justify-center bg-[#0a0a0b] text-white p-6 text-center">
+        <div className="h-screen w-full flex flex-col items-center justify-center bg-background text-foreground p-6 text-center">
           <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center text-red-500 mb-6 font-bold text-2xl">!</div>
           <h1 className="text-2xl font-bold mb-2">Something went wrong</h1>
           <p className="text-zinc-400 max-w-md mb-6 font-mono text-xs overflow-auto max-h-40 bg-black/40 p-4 rounded-lg">
@@ -323,11 +323,12 @@ function AppContent() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden relative">
-      {/* Ambient Colorful Background */}
+      {/* Ambient glow layers */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-secondary/30 blur-[120px] opacity-70" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-chart-1/10 blur-[120px] opacity-70" />
-        <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] rounded-full bg-chart-4/10 blur-[100px] opacity-50" />
+        <div className="absolute top-[-20%] left-[-10%] w-[55%] h-[55%] rounded-full bg-primary/20 blur-[140px] opacity-60" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-chart-1/18 blur-[130px] opacity-55" />
+        <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] rounded-full bg-chart-4/18 blur-[110px] opacity-45" />
+        <div className="absolute top-[60%] left-[20%] w-[25%] h-[25%] rounded-full bg-chart-3/12 blur-[100px] opacity-35" />
       </div>
 
       {/* Mobile Sidebar Overlay */}

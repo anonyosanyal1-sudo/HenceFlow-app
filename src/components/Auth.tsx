@@ -75,7 +75,7 @@ export function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0b] p-4 font-sans">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 font-sans">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
