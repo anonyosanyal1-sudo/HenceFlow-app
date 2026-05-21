@@ -11,9 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, X } from 'lucide-react';
+import { UserAvatar } from './UserAvatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -180,12 +180,11 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
                            disabled={isOwner}
                            className="border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
                          />
-                         <Avatar className="h-8 w-8 border border-border shadow-sm">
-                           <AvatarImage src={user.photoURL || undefined} />
-                           <AvatarFallback className="text-xs bg-primary/20 text-primary font-bold">
-                             {user.displayName?.[0] || 'U'}
-                           </AvatarFallback>
-                         </Avatar>
+                         <UserAvatar
+                           photoURL={user.photoURL}
+                           displayName={user.displayName}
+                           className="h-8 w-8 text-xs shadow-sm shrink-0"
+                         />
                          <div className="flex flex-col flex-1 min-w-0">
                            <span className="text-sm font-medium text-foreground truncate">
                              {user.displayName || 'Anonymous User'}
