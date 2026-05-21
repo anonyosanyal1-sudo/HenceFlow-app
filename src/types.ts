@@ -28,15 +28,19 @@ export interface Stage {
 }
 
 export const DEFAULT_STAGES: Stage[] = [
-  { id: 'todo',                 label: 'To Do',               color: 'bg-muted/70 text-muted-foreground border-border' },
-  { id: 'analysis-in-progress', label: 'Analysis',            color: 'bg-primary/20 text-primary border-primary/40' },
-  { id: 'dev-in-progress',      label: 'Development',         color: 'bg-chart-5/20 text-chart-5 border-chart-5/40' },
-  { id: 'dev-complete',         label: 'Dev Complete',        color: 'bg-chart-4/20 text-chart-4 border-chart-4/40' },
-  { id: 'test-in-progress',     label: 'Testing',             color: 'bg-chart-2/20 text-chart-2 border-chart-2/40' },
-  { id: 'test-passed',          label: 'Test Passed',         color: 'bg-chart-3/20 text-chart-3 border-chart-3/40' },
-  { id: 'ready-for-migration',  label: 'Ready for Migration', color: 'bg-chart-1/20 text-chart-1 border-chart-1/40' },
-  { id: 'closed',               label: 'Closed',              color: 'bg-chart-3/30 text-chart-3 border-chart-3/50' },
+  { id: 'todo',                 label: 'To Do',               color: 'bg-zinc-500/20 text-zinc-300 border-zinc-500/40' },
+  { id: 'analysis-in-progress', label: 'Analysis',            color: 'bg-violet-500/20 text-violet-300 border-violet-500/40' },
+  { id: 'dev-in-progress',      label: 'Development',         color: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
+  { id: 'dev-complete',         label: 'Dev Complete',        color: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
+  { id: 'test-in-progress',     label: 'Testing',             color: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+  { id: 'test-passed',          label: 'Test Passed',         color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+  { id: 'ready-for-migration',  label: 'Ready for Migration', color: 'bg-rose-500/20 text-rose-300 border-rose-500/40' },
+  { id: 'closed',               label: 'Closed',              color: 'bg-green-500/20 text-green-300 border-green-500/40' },
 ];
+
+// Tailwind safelist — these solid bg classes are dynamically constructed in TaskBoard.tsx
+// by stripping the opacity suffix. Keep them here so Tailwind's JIT scanner generates them.
+const _STAGE_ACCENT_SAFELIST = 'bg-zinc-500 bg-violet-500 bg-blue-500 bg-sky-500 bg-amber-500 bg-emerald-500 bg-rose-500 bg-green-500';
 
 export interface Project {
   id: string;

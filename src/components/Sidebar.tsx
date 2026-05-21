@@ -1,4 +1,4 @@
-import { Layout, CheckSquare, Settings, LogOut, ChevronRight, Hash, Plus, MoreVertical, Edit2, Trash2, Building, ChevronDown, ChevronLeft } from 'lucide-react';
+import { Layout, LogOut, ChevronRight, Hash, Plus, MoreVertical, Edit2, Trash2, Building, ChevronDown, ChevronLeft, BarChart3, UserCircle } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Project, Company } from '../types';
 import { cn } from '@/lib/utils';
@@ -19,12 +19,15 @@ interface SidebarProps {
   projects: Project[];
   activeProject: Project | null;
   activeCompany?: Company | null;
+  activeView?: 'board' | 'analytics';
   onProjectSelect: (project: Project | null) => void;
   onNewProject: (project?: Project) => void;
   onLogout: () => void;
   onCompanySettings?: () => void;
   onCompanySelect: (company: Company) => void;
   onNewCompany: () => void;
+  onAnalyticsSelect?: () => void;
+  onEditProfile?: () => void;
   user: any;
   onClose?: () => void;
   className?: string;
@@ -32,19 +35,22 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ 
-  companies, 
-  projects, 
-  activeProject, 
-  activeCompany, 
-  onProjectSelect, 
-  onNewProject, 
-  onLogout, 
-  onCompanySettings, 
-  onCompanySelect, 
-  onNewCompany, 
-  user, 
-  onClose, 
+export function Sidebar({
+  companies,
+  projects,
+  activeProject,
+  activeCompany,
+  activeView = 'board',
+  onProjectSelect,
+  onNewProject,
+  onLogout,
+  onCompanySettings,
+  onCompanySelect,
+  onNewCompany,
+  onAnalyticsSelect,
+  onEditProfile,
+  user,
+  onClose,
   className,
   isCollapsed = false,
   onToggleCollapse
@@ -144,33 +150,63 @@ export function Sidebar({
       <div className="flex-1 space-y-1 overflow-hidden">
         <div className={cn("space-y-1 mb-4", isCollapsed ? "px-0" : "px-2")}>
           {isCollapsed ? (
-            <Tooltip>
-              <TooltipTrigger render={
-                <Button 
-                  variant="ghost" 
-                  className={cn(
-                    "w-full font-medium transition-all justify-center px-0",
-                    !activeProject ? "bg-card shadow-sm text-primary border border-border" : "text-muted-foreground"
-                  )}
-                  onClick={() => onProjectSelect(null)}
-                >
-                  <Layout className="w-4 h-4 shrink-0 transition-all m-0" />
-                </Button>
-              } />
-              <TooltipContent side="right" sideOffset={10}>Dashboard</TooltipContent>
-            </Tooltip>
+            <>
+              <Tooltip>
+                <TooltipTrigger render={
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full font-medium transition-all justify-center px-0",
+                      !activeProject && activeView === 'board' ? "bg-card shadow-sm text-primary border border-border" : "text-muted-foreground"
+                    )}
+                    onClick={() => onProjectSelect(null)}
+                  >
+                    <Layout className="w-4 h-4 shrink-0 transition-all m-0" />
+                  </Button>
+                } />
+                <TooltipContent side="right" sideOffset={10}>Dashboard</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger render={
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full font-medium transition-all justify-center px-0",
+                      activeView === 'analytics' ? "bg-card shadow-sm text-primary border border-border" : "text-muted-foreground"
+                    )}
+                    onClick={onAnalyticsSelect}
+                  >
+                    <BarChart3 className="w-4 h-4 shrink-0 transition-all m-0" />
+                  </Button>
+                } />
+                <TooltipContent side="right" sideOffset={10}>Analytics</TooltipContent>
+              </Tooltip>
+            </>
           ) : (
-            <Button 
-              variant="ghost" 
-              className={cn(
-                "w-full font-medium transition-all justify-start px-4",
-                !activeProject ? "bg-card shadow-sm text-primary border border-border" : "text-muted-foreground"
-              )}
-              onClick={() => onProjectSelect(null)}
-            >
-              <Layout className="w-4 h-4 shrink-0 transition-all mr-3" />
-              <span>Dashboard</span>
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full font-medium transition-all justify-start px-4",
+                  !activeProject && activeView === 'board' ? "bg-card shadow-sm text-primary border border-border" : "text-muted-foreground"
+                )}
+                onClick={() => onProjectSelect(null)}
+              >
+                <Layout className="w-4 h-4 shrink-0 transition-all mr-3" />
+                <span>Dashboard</span>
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full font-medium transition-all justify-start px-4",
+                  activeView === 'analytics' ? "bg-card shadow-sm text-primary border border-border" : "text-muted-foreground"
+                )}
+                onClick={onAnalyticsSelect}
+              >
+                <BarChart3 className="w-4 h-4 shrink-0 transition-all mr-3" />
+                <span>Analytics</span>
+              </Button>
+            </>
           )}
         </div>
 
@@ -316,8 +352,20 @@ export function Sidebar({
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent align={isCollapsed ? "start" : "end"} side={isCollapsed ? "right" : "top"} className="w-56 p-2 rounded-xl shadow-xl border-border bg-popover">
-            <DropdownMenuItem 
-              className="rounded-lg h-10 cursor-pointer text-red-500 focus:text-red-600 focus:bg-red-500/10" 
+            {onEditProfile && (
+              <>
+                <DropdownMenuItem
+                  className="rounded-lg h-10 cursor-pointer"
+                  onClick={onEditProfile}
+                >
+                  <UserCircle className="w-4 h-4 mr-3 text-muted-foreground" />
+                  <span className="font-medium text-foreground">Edit Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <DropdownMenuItem
+              className="rounded-lg h-10 cursor-pointer text-red-500 focus:text-red-600 focus:bg-red-500/10"
               onClick={onLogout}
             >
               <LogOut className="w-4 h-4 mr-3" />
