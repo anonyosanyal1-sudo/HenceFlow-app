@@ -2,9 +2,11 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { updateUserProfile } from '../services/api';
-import { Loader2, User, Check } from 'lucide-react';
+import { Loader2, Check } from 'lucide-react';
+import { UserAvatar } from './UserAvatar';
 
 interface ProfileSetupProps {
   open: boolean;
@@ -14,28 +16,44 @@ interface ProfileSetupProps {
   onSaved: (displayName: string, photoURL: string | null) => void;
 }
 
-const AVATAR_SEEDS = [
-  'Felix', 'Zoe', 'Max', 'Luna', 'Kai', 'Aria',
-  'Liam', 'Nova', 'Jax', 'Ivy', 'Ace', 'Mia',
+const ANIMAL_EMOJIS = [
+  // Big cats & predators
+  '🦁', '🐯', '🐆', '🐅', '🐊', '🐻', '🐼', '🐨', '🦊', '🦝',
+  // Canines & wolves
+  '🐺', '🐶', '🦮', '🐕',
+  // Horses & hooved
+  '🐴', '🦄', '🦌', '🦙', '🐐', '🐏', '🐑', '🦬', '🐄', '🐃',
+  // Primates
+  '🐵', '🦍', '🦧',
+  // Large animals
+  '🐘', '🦛', '🦏', '🦒', '🦓', '🦘',
+  // Small mammals
+  '🐰', '🐹', '🐭', '🐱', '🐇', '🦔', '🦥', '🦦', '🦨', '🦡',
+  // Birds
+  '🦅', '🦆', '🦉', '🦜', '🦢', '🦩', '🦚', '🦤', '🐧', '🦃', '🕊',
+  // Ocean & sea
+  '🐬', '🐋', '🦈', '🐙', '🦑', '🦭', '🐠', '🐟', '🐡', '🦞', '🦀',
+  // Reptiles & insects
+  '🐢', '🦎', '🐍', '🦋', '🐛', '🐌', '🐝', '🐞',
 ];
 
 export function ProfileSetup({ open, onOpenChange, currentDisplayName, currentPhotoURL, onSaved }: ProfileSetupProps) {
   const [name, setName] = React.useState(currentDisplayName || '');
-  const [selectedSeed, setSelectedSeed] = React.useState<string | null>(null);
+  const [selectedEmoji, setSelectedEmoji] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (open) {
       setName(currentDisplayName || '');
-      setSelectedSeed(null);
+      setSelectedEmoji(
+        currentPhotoURL?.startsWith('emoji:') ? currentPhotoURL.slice(6) : null
+      );
       setError(null);
     }
-  }, [open, currentDisplayName]);
+  }, [open, currentDisplayName, currentPhotoURL]);
 
-  const selectedPhotoURL = selectedSeed
-    ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedSeed}`
-    : currentPhotoURL || null;
+  const photoURL = selectedEmoji ? `emoji:${selectedEmoji}` : (currentPhotoURL?.startsWith('emoji:') ? currentPhotoURL : null);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -45,8 +63,8 @@ export function ProfileSetup({ open, onOpenChange, currentDisplayName, currentPh
     setIsLoading(true);
     setError(null);
     try {
-      await updateUserProfile(name.trim(), selectedPhotoURL);
-      onSaved(name.trim(), selectedPhotoURL);
+      await updateUserProfile(name.trim(), photoURL);
+      onSaved(name.trim(), photoURL);
       onOpenChange(false);
     } catch (err: any) {
       setError(err?.message || 'Failed to save profile.');
@@ -57,24 +75,22 @@ export function ProfileSetup({ open, onOpenChange, currentDisplayName, currentPh
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border sm:max-w-[420px]">
+      <DialogContent className="bg-card border-border sm:max-w-[460px]">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-foreground">Set Up Your Profile</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Add your name and choose an avatar so teammates can identify you.
+            Add your name and pick an animal avatar so teammates can identify you.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-2">
-          {/* Current / selected avatar preview */}
+        <div className="space-y-5 py-1">
+          {/* Preview */}
           <div className="flex justify-center">
-            <div className="w-20 h-20 rounded-full bg-primary/20 border-2 border-primary/40 overflow-hidden flex items-center justify-center shadow-lg shadow-primary/10">
-              {selectedPhotoURL ? (
-                <img src={selectedPhotoURL} alt="Avatar preview" className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-8 h-8 text-primary/60" />
-              )}
-            </div>
+            <UserAvatar
+              photoURL={photoURL}
+              displayName={name || currentDisplayName}
+              className="w-20 h-20 text-4xl shadow-lg shadow-primary/10 ring-2 ring-primary/30"
+            />
           </div>
 
           {/* Name */}
@@ -88,35 +104,48 @@ export function ProfileSetup({ open, onOpenChange, currentDisplayName, currentPh
             />
           </div>
 
-          {/* Avatar grid */}
+          {/* Animal avatar grid */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Choose Avatar</label>
-            <div className="grid grid-cols-6 gap-2">
-              {AVATAR_SEEDS.map((seed) => {
-                const url = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
-                const isSelected = selectedSeed === seed;
-                return (
-                  <button
-                    key={seed}
-                    type="button"
-                    onClick={() => setSelectedSeed(isSelected ? null : seed)}
-                    className={cn(
-                      "relative w-full aspect-square rounded-full overflow-hidden border-2 transition-all hover:scale-110",
-                      isSelected
-                        ? "border-primary shadow-md shadow-primary/30 scale-110"
-                        : "border-zinc-700 hover:border-zinc-500"
-                    )}
-                  >
-                    <img src={url} alt={seed} className="w-full h-full object-cover" />
-                    {isSelected && (
-                      <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                        <Check className="w-3 h-3 text-primary" />
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+              Choose Animal Avatar
+              {selectedEmoji && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedEmoji(null)}
+                  className="ml-2 text-primary hover:underline normal-case font-normal"
+                >
+                  Clear
+                </button>
+              )}
+            </label>
+            <ScrollArea className="h-52 rounded-lg border border-zinc-700/50 bg-zinc-900/30 p-2">
+              <div className="grid grid-cols-8 gap-1.5 p-1">
+                {ANIMAL_EMOJIS.map((emoji) => {
+                  const isSelected = selectedEmoji === emoji;
+                  return (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => setSelectedEmoji(isSelected ? null : emoji)}
+                      className={cn(
+                        "relative w-full aspect-square rounded-lg flex items-center justify-center text-2xl transition-all hover:scale-110 hover:bg-zinc-700/60",
+                        isSelected
+                          ? "bg-primary/20 ring-2 ring-primary scale-110 shadow-md shadow-primary/20"
+                          : "bg-zinc-800/40"
+                      )}
+                      title={emoji}
+                    >
+                      {emoji}
+                      {isSelected && (
+                        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </ScrollArea>
           </div>
 
           {error && (

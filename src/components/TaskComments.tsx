@@ -96,11 +96,10 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
   };
 
   const handleDelete = async (commentId: string) => {
-    try {
-      await deleteComment(projectId, taskId, commentId);
-    } catch (error) {
+    setComments(prev => prev.filter(c => c.id !== commentId));
+    deleteComment(projectId, taskId, commentId).catch(error => {
       console.error('Error deleting comment:', error);
-    }
+    });
   };
 
   const handleLike = async (comment: Comment) => {

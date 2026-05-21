@@ -1,17 +1,18 @@
 import React from 'react';
-import { Task, TaskStatus, TaskPriority, Stage } from '../types';
+import { Task, TaskStatus, TaskPriority, Stage, UserProfile } from '../types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Plus, MoreHorizontal, Clock, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { UserAvatar } from './UserAvatar';
 
 interface TaskBoardProps {
   tasks: Task[];
   stages: Stage[];
+  users?: UserProfile[];
   onTaskClick: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
@@ -24,7 +25,7 @@ const PRIORITY_STYLES: Record<TaskPriority, string> = {
   urgent: 'bg-destructive/25 text-destructive border border-destructive/40 animate-pulse',
 };
 
-export function TaskBoard({ tasks, stages, onTaskClick, onAddTask, onStatusChange }: TaskBoardProps) {
+export function TaskBoard({ tasks, stages, users = [], onTaskClick, onAddTask, onStatusChange }: TaskBoardProps) {
   const getTasksByStatus = (status: TaskStatus) => tasks.filter(t => t.status === status);
 
   const onDragEnd = (result: DropResult) => {
@@ -158,10 +159,16 @@ export function TaskBoard({ tasks, stages, onTaskClick, onAddTask, onStatusChang
                                           </div>
                                         )}
                                       </div>
-                                      <Avatar className="h-6 w-6 ring-2 ring-card shadow-sm">
-                                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${task.assigneeId || task.creatorId}`} />
-                                        <AvatarFallback className="bg-muted text-muted-foreground font-bold text-[8px]">U</AvatarFallback>
-                                      </Avatar>
+                                      {(() => {
+                                        const u = users.find(u => u.uid === (task.assigneeId || task.creatorId));
+                                        return (
+                                          <UserAvatar
+                                            photoURL={u?.photoURL}
+                                            displayName={u?.displayName}
+                                            className="h-6 w-6 text-[10px] ring-2 ring-card shadow-sm shrink-0"
+                                          />
+                                        );
+                                      })()}
                                     </div>
                                   </CardContent>
                                 </Card>

@@ -1,4 +1,5 @@
 import { Layout, LogOut, ChevronRight, Hash, Plus, MoreVertical, Edit2, Trash2, Building, ChevronDown, ChevronLeft, BarChart3, UserCircle } from 'lucide-react';
+import { UserAvatar } from './UserAvatar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Project, Company } from '../types';
 import { cn } from '@/lib/utils';
@@ -323,25 +324,21 @@ export function Sidebar({
               {isCollapsed ? (
                 <Tooltip>
                   <TooltipTrigger render={
-                    user?.photoURL ? (
-                      <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full border border-border shadow-sm shrink-0" referrerPolicy="no-referrer" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold text-sm shadow-sm shrink-0">
-                        {user?.displayName?.[0] || 'U'}
-                      </div>
-                    )
+                    <UserAvatar
+                      photoURL={user?.photoURL}
+                      displayName={user?.displayName}
+                      className="w-8 h-8 text-sm shadow-sm shrink-0"
+                    />
                   } />
                   <TooltipContent side="right" sideOffset={10}>{user?.displayName}</TooltipContent>
                 </Tooltip>
               ) : (
                 <>
-                  {user?.photoURL ? (
-                    <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full border border-border shadow-sm shrink-0" referrerPolicy="no-referrer" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold text-sm shadow-sm shrink-0">
-                      {user?.displayName?.[0] || 'U'}
-                    </div>
-                  )}
+                  <UserAvatar
+                    photoURL={user?.photoURL}
+                    displayName={user?.displayName}
+                    className="w-8 h-8 text-sm shadow-sm shrink-0"
+                  />
                   <div className="flex-1 min-w-0 text-left">
                     <p className="text-sm font-medium text-foreground truncate">{user?.displayName}</p>
                     <p className="text-xs text-muted-foreground truncate">{user?.email}</p>

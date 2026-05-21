@@ -235,10 +235,9 @@ function AppContent() {
   };
 
   const handleDeleteCompany = async (companyId: string) => {
-    await deleteCompany(companyId);
-    if (activeCompany?.id === companyId) {
-      setActiveCompany(null);
-    }
+    setCompanies(prev => prev.filter(c => c.id !== companyId));
+    if (activeCompany?.id === companyId) setActiveCompany(null);
+    deleteCompany(companyId).catch(() => {});
   };
 
   const handleSaveProject = async (data: { name: string; description: string; members: string[]; stages: Stage[] }) => {
@@ -255,10 +254,10 @@ function AppContent() {
   }, [users, activeCompany]);
 
   const handleDeleteProject = async (projectId: string) => {
-    await deleteProject(projectId);
-    if (activeProject?.id === projectId) {
-      setActiveProject(null);
-    }
+    setProjects(prev => prev.filter(p => p.id !== projectId));
+    setAllTasks(prev => prev.filter(t => t.projectId !== projectId));
+    if (activeProject?.id === projectId) setActiveProject(null);
+    deleteProject(projectId).catch(() => {});
   };
 
   const handleSaveTask = async (taskData: Partial<Task>) => {
@@ -275,7 +274,9 @@ function AppContent() {
   const handleDeleteTask = async (taskId: string) => {
     const targetProjectId = selectedTask?.projectId || activeProject?.id;
     if (!targetProjectId) return;
-    await deleteTask(targetProjectId, taskId);
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    setAllTasks(prev => prev.filter(t => t.id !== taskId));
+    deleteTask(targetProjectId, taskId).catch(() => {});
   };
 
   const filteredTasks = React.useMemo(() => {
@@ -663,9 +664,10 @@ function AppContent() {
             </div>
 
             {/* Board */}
-            <TaskBoard 
+            <TaskBoard
               tasks={filteredTasks}
               stages={activeProject.stages || DEFAULT_STAGES}
+              users={companyUsers}
               onTaskClick={(task) => {
                 setSelectedTask(task);
                 setTaskDialogOpen(true);
