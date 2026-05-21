@@ -453,8 +453,8 @@ function AppContent() {
                 <Menu className="w-5 h-5" />
               </Button>
             </div>
-            <div className="w-20 h-20 bg-primary/20 rounded-3xl flex items-center justify-center text-primary mb-6 shadow-sm border border-primary/20">
-              <Logo className="w-10 h-10" />
+            <div className="w-20 h-20 bg-black rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-primary/20 overflow-hidden">
+              <Logo variant="icon" className="w-full h-full" />
             </div>
             <h2 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Create your company</h2>
             <p className="text-muted-foreground max-w-sm mb-8">

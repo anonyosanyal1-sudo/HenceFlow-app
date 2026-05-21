@@ -1,4 +1,5 @@
 import React from 'react';
+import { Logo } from './Logo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -83,11 +84,11 @@ export function Auth() {
         className="w-full max-w-md"
       >
         <Card className="shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] border-zinc-800 bg-zinc-900/50 backdrop-blur-xl">
-          <CardHeader className="text-center space-y-2 pb-6">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-2xl mb-4 shadow-[0_0_20px_rgba(var(--primary),0.3)]">
-              HF
-            </div>
-            <CardTitle className="text-3xl font-extrabold tracking-tight text-white">HenceFlow</CardTitle>
+          <CardHeader className="text-center space-y-4 pb-6">
+            <Logo
+              variant="wordmark"
+              className="mx-auto h-12 max-w-[220px]"
+            />
             <CardDescription className="text-zinc-400 text-base">
               {mode === 'signin' ? 'Sign in to your account to continue.' : 'Create your account to get started.'}
             </CardDescription>

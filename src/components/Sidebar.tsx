@@ -82,18 +82,17 @@ export function Sidebar({
               "flex items-center text-foreground hover:bg-accent/50 rounded-lg transition-colors group",
               isCollapsed ? "p-1 justify-center" : "p-2"
             )}>
-              <Logo className={cn("rounded-lg shadow-sm shrink-0", isCollapsed ? "w-10 h-10" : "w-8 h-8 mr-3")} />
-              {!isCollapsed && (
+              {isCollapsed ? (
+                <Logo variant="icon" className="w-10 h-10 shadow-sm" />
+              ) : (
                 <>
-                  <div className="flex flex-col flex-1 min-w-0 justify-center">
-                    <span className="font-bold text-[15px] tracking-tight leading-tight truncate">
-                      HenceFlow
-                    </span>
+                  <Logo variant="wordmark" className="h-8 max-w-[130px] object-left" />
+                  <div className="flex flex-col flex-1 min-w-0 justify-center ml-2">
                     <span className="font-medium text-[11px] text-muted-foreground leading-tight truncate">
                       {activeCompany ? activeCompany.name : 'Select Company'}
                     </span>
                   </div>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground opacity-50 group-hover:opacity-100 shrink-0 ml-2" />
+                  <ChevronDown className="w-4 h-4 text-muted-foreground opacity-50 group-hover:opacity-100 shrink-0 ml-1" />
                 </>
               )}
             </div>
