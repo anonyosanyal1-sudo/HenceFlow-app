@@ -219,16 +219,20 @@ function AppContent() {
     return () => unsubscribe();
   }, [user]);
 
-  const handleSaveCompany = async (data: { 
-    name: string; 
-    location?: string; 
-    website?: string; 
-    industry?: string; 
-    memberIds?: string[]; 
-    adminIds?: string[] 
+  const handleSaveCompany = async (data: {
+    name: string;
+    location?: string;
+    website?: string;
+    industry?: string;
+    memberIds?: string[];
+    adminIds?: string[]
   }) => {
-    if (selectedCompanyForEdit) {
-      await updateCompany(selectedCompanyForEdit.id, data);
+    // selectedCompanyForEdit is set when opening the CompanyDialog for editing.
+    // Dashboard's inline form calls this directly without opening the dialog,
+    // so fall back to activeCompany as the update target.
+    const targetId = selectedCompanyForEdit?.id ?? activeCompany?.id;
+    if (targetId) {
+      await updateCompany(targetId, data);
     } else {
       await createCompany(data);
     }
@@ -254,10 +258,16 @@ function AppContent() {
   }, [users, activeCompany]);
 
   const handleDeleteProject = async (projectId: string) => {
+    const prevProjects = projects;
+    const prevAllTasks = allTasks;
     setProjects(prev => prev.filter(p => p.id !== projectId));
     setAllTasks(prev => prev.filter(t => t.projectId !== projectId));
     if (activeProject?.id === projectId) setActiveProject(null);
-    deleteProject(projectId).catch(() => {});
+    deleteProject(projectId).catch((err) => {
+      console.error('Failed to delete workspace:', err);
+      setProjects(prevProjects);
+      setAllTasks(prevAllTasks);
+    });
   };
 
   const handleSaveTask = async (taskData: Partial<Task>) => {
