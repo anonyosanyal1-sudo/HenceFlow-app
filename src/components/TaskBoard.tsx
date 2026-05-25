@@ -112,7 +112,7 @@ function TaskCard({ task, index, users, milestones, selected, selectionMode, onC
                   </div>
                   <div className="flex items-center gap-1.5">
                     {task.recurrenceRule && (
-                      <RefreshCw className="w-3 h-3 text-muted-foreground/40" title={`Recurring ${task.recurrenceRule}`} />
+                      <span title={`Recurring ${task.recurrenceRule}`}><RefreshCw className="w-3 h-3 text-muted-foreground/40" /></span>
                     )}
                     {task.tags && task.tags.length > 0 && (
                       <span className="text-[10px] text-muted-foreground/50 truncate max-w-[100px]">

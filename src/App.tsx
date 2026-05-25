@@ -2,29 +2,34 @@ import React from 'react';
 import { supabase, logout, toAppUser } from './lib/supabase';
 import type { AppUser } from './types';
 import {
-  subscribeToCompanies,
+  fetchCompanies,
+  fetchProjects,
+  fetchTasks,
+  fetchUsers,
+  fetchMilestones,
+  fetchCustomFieldDefinitions,
+  fetchTaskTemplates,
   createCompany,
   updateCompany,
   deleteCompany,
-  subscribeToProjects,
-  subscribeToTasks,
   createProject,
   updateProject,
   deleteProject,
-  subscribeToUsers,
   createTask,
   updateTask,
   deleteTask,
   bulkUpdateTasks,
   bulkDeleteTasks,
   ensureUserProfile,
-  subscribeToMilestones,
-  addActivityLog,
-  subscribeToCustomFieldDefinitions,
-  subscribeToTaskTemplates,
-  createRecurringInstance,
 } from './services/api';
+import { useServerEvents } from './hooks/useServerEvents';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 import { Project, Task, TaskStatus, TaskPriority, UserProfile, Company, DEFAULT_STAGES, Stage, Milestone, CustomFieldDefinition, TaskTemplate } from './types';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 import { Sidebar } from './components/Sidebar';
 import { TaskBoard, SwimlaneBy } from './components/TaskBoard';
 import { Dashboard } from './components/Dashboard';
@@ -156,96 +161,104 @@ function AppContent() {
     };
   }, []);
 
-  React.useEffect(() => {
-    if (!user) {
-      setCompanies([]);
+  const loadCompanies = React.useCallback(async () => {
+    if (!user) return;
+    const comps = await fetchCompanies().catch(() => [] as Company[]);
+    setCompanies(comps);
+    if (comps.length > 0) {
+      setActiveCompany(prev => {
+        if (!prev) return comps[0];
+        return comps.find(c => c.id === prev.id) || comps[0];
+      });
+    } else {
       setActiveCompany(null);
-      return;
     }
-    const unsubscribe = subscribeToCompanies((comps) => {
-      setCompanies(comps);
-      if (comps.length > 0) {
-        setActiveCompany(prev => {
-          if (!prev) return comps[0];
-          const stillExists = comps.find(c => c.id === prev.id);
-          return stillExists || comps[0];
-        });
-      } else {
-        setActiveCompany(null);
-      }
-    });
-    return () => unsubscribe();
   }, [user]);
 
-  React.useEffect(() => {
-    if (!user || !activeCompany) {
-      setProjects([]);
+  const loadProjects = React.useCallback(async () => {
+    if (!user || !activeCompany) return;
+    const projs = await fetchProjects(activeCompany.id).catch(() => [] as Project[]);
+    setProjects(projs);
+    if (activeProject && !projs.find(p => p.id === activeProject.id)) {
       setActiveProject(null);
-      return;
     }
+  }, [user, activeCompany, activeProject]);
 
-    const unsubscribe = subscribeToProjects(activeCompany.id, (projs) => {
-      setProjects(projs);
-      setProjects(currProjs => {
-        if (currProjs.length > 0 && activeProject) {
-          const stillExists = projs.find(p => p.id === activeProject.id);
-          if (!stillExists) setActiveProject(null);
-        }
-        return projs;
-      });
-    });
-    return () => unsubscribe();
-  }, [user, activeCompany]);
+  const loadProjectData = React.useCallback(async (projectId: string) => {
+    const [taskList, milestoneList, fieldDefs, templates] = await Promise.all([
+      fetchTasks(projectId).catch(() => [] as Task[]),
+      fetchMilestones(projectId).catch(() => [] as Milestone[]),
+      fetchCustomFieldDefinitions(projectId).catch(() => [] as CustomFieldDefinition[]),
+      fetchTaskTemplates(projectId).catch(() => [] as TaskTemplate[]),
+    ]);
+    setTasks(taskList);
+    setMilestones(milestoneList);
+    setCustomFieldDefs(fieldDefs);
+    setTaskTemplates(templates);
+  }, []);
 
-  React.useEffect(() => {
-    if (!activeProject) {
-      setTasks([]);
-      setMilestones([]);
-      setCustomFieldDefs([]);
-      setTaskTemplates([]);
-      setSelectedTaskIds(new Set());
-      return;
-    }
-
-    const unsubTasks = subscribeToTasks(activeProject.id, setTasks);
-    const unsubMilestones = subscribeToMilestones(activeProject.id, setMilestones);
-    const unsubFields = subscribeToCustomFieldDefinitions(activeProject.id, setCustomFieldDefs);
-    const unsubTemplates = subscribeToTaskTemplates(activeProject.id, setTaskTemplates);
-
-    return () => {
-      unsubTasks();
-      unsubMilestones();
-      unsubFields();
-      unsubTemplates();
-    };
-  }, [activeProject]);
-
-  // Subscribe to all tasks for the dashboard
-  React.useEffect(() => {
-    if (projects.length === 0) {
-      setAllTasks([]);
-      return;
-    }
-
-    const unsubs = projects.map(p => 
-      subscribeToTasks(p.id, (projectTasks) => {
-        setAllTasks(prev => {
-          const filtered = prev.filter(t => t.projectId !== p.id);
-          return [...filtered, ...projectTasks];
-        });
-      })
-    );
-
-    return () => unsubs.forEach(u => u());
+  const loadAllTasks = React.useCallback(async () => {
+    if (projects.length === 0) { setAllTasks([]); return; }
+    const results = await Promise.all(projects.map(p => fetchTasks(p.id).catch(() => [] as Task[])));
+    setAllTasks(results.flat());
   }, [projects]);
 
   React.useEffect(() => {
+    if (!user) { setCompanies([]); setActiveCompany(null); return; }
+    loadCompanies();
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  React.useEffect(() => {
+    if (!user || !activeCompany) { setProjects([]); setActiveProject(null); return; }
+    loadProjects();
+  }, [user, activeCompany]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  React.useEffect(() => {
+    if (!activeProject) {
+      setTasks([]); setMilestones([]); setCustomFieldDefs([]); setTaskTemplates([]);
+      setSelectedTaskIds(new Set());
+      return;
+    }
+    loadProjectData(activeProject.id);
+  }, [activeProject]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  React.useEffect(() => { loadAllTasks(); }, [projects]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  React.useEffect(() => {
     if (!user) return;
-    const unsubscribe = subscribeToUsers((u) => {
-      setUsers(u);
-    });
-    return () => unsubscribe();
+    fetchUsers().then(setUsers).catch(() => {});
   }, [user]);
+
+  // SSE: listen for server-side changes and refetch affected data
+  const activeProjectId = activeProject?.id;
+  const projectIdsForSSE = React.useMemo(
+    () => projects.map(p => p.id),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [projects.map(p => p.id).join(',')]
+  );
+
+  useServerEvents(projectIdsForSSE, React.useCallback((type: string, data: Record<string, unknown>) => {
+    const pid = (data.projectId as string | undefined) ?? (data.taskId ? undefined : undefined);
+    if (type === 'tasks:changed') {
+      if (activeProjectId) loadProjectData(activeProjectId);
+      loadAllTasks();
+    } else if (type === 'milestones:changed') {
+      if (pid === activeProjectId && activeProjectId) {
+        fetchMilestones(activeProjectId).then(setMilestones).catch(() => {});
+      }
+    } else if (type === 'comments:changed' || type === 'time_entries:changed') {
+      // Handled by TaskDialog's own fetch
+    } else if (type === 'custom_fields:changed') {
+      if (activeProjectId) fetchCustomFieldDefinitions(activeProjectId).then(setCustomFieldDefs).catch(() => {});
+    } else if (type === 'templates:changed') {
+      if (activeProjectId) fetchTaskTemplates(activeProjectId).then(setTaskTemplates).catch(() => {});
+    } else if (type === 'projects:changed') {
+      loadProjects();
+    } else if (type === 'companies:changed') {
+      loadCompanies();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProjectId]));
 
   const handleSaveCompany = async (data: {
     name: string;
@@ -301,38 +314,10 @@ function AppContent() {
   const handleSaveTask = async (taskData: Partial<Task>) => {
     const targetProjectId = selectedTask?.projectId || activeProject?.id;
     if (!targetProjectId) return;
-
     if (selectedTask) {
-      // Log activity for meaningful field changes
-      const logChanges: Array<[string, string, string | undefined, string | undefined]> = [];
-      if (taskData.status !== undefined && taskData.status !== selectedTask.status) {
-        logChanges.push(['status_changed', 'status', selectedTask.status, taskData.status]);
-      }
-      if (taskData.priority !== undefined && taskData.priority !== selectedTask.priority) {
-        logChanges.push(['priority_changed', 'priority', selectedTask.priority, taskData.priority]);
-      }
-      if (taskData.assigneeId !== selectedTask.assigneeId) {
-        const oldName = companyUsers.find(u => u.uid === selectedTask.assigneeId)?.displayName;
-        const newName = companyUsers.find(u => u.uid === taskData.assigneeId)?.displayName;
-        logChanges.push(['assignee_changed', 'assignee', oldName, newName]);
-      }
-      if (taskData.milestoneId !== selectedTask.milestoneId) {
-        const oldM = milestones.find(m => m.id === selectedTask.milestoneId)?.name;
-        const newM = milestones.find(m => m.id === taskData.milestoneId)?.name;
-        logChanges.push(['milestone_changed', 'milestone', oldM, newM]);
-      }
-      if (taskData.recurrenceRule !== selectedTask.recurrenceRule) {
-        logChanges.push(['recurrence_changed', 'recurrence', selectedTask.recurrenceRule, taskData.recurrenceRule]);
-      }
       await updateTask(targetProjectId, selectedTask.id, taskData);
-      for (const [action, field, oldV, newV] of logChanges) {
-        addActivityLog(selectedTask.id, targetProjectId, action, field, oldV, newV).catch(() => {});
-      }
     } else {
-      const id = await createTask(targetProjectId, taskData);
-      if (id) {
-        addActivityLog(id, targetProjectId, 'task_created').catch(() => {});
-      }
+      await createTask(targetProjectId, taskData);
     }
   };
 
@@ -346,9 +331,9 @@ function AppContent() {
 
   const filteredTasks = React.useMemo(() => {
     return tasks.filter(task => {
-      const matchesSearch = 
+      const matchesSearch =
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.description.toLowerCase().includes(searchQuery.toLowerCase());
+        (task.description ?? '').toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesAssignee = !filterAssignee || task.assigneeId === filterAssignee;
       const matchesCreator = !filterCreator || task.creatorId === filterCreator;
@@ -819,16 +804,6 @@ function AppContent() {
                 };
                 applyStatus(newStatus);
                 updateTask(activeProject.id, taskId, { status: newStatus })
-                  .then(() => {
-                    if (task) {
-                      addActivityLog(taskId, activeProject.id, 'status_changed', 'status', prevStatus, newStatus).catch(() => {});
-                      // Spawn next recurrence when closed
-                      const closedStageId = (activeProject.stages || DEFAULT_STAGES).find(s => s.id === 'closed')?.id ?? 'closed';
-                      if (newStatus === closedStageId && task.recurrenceRule) {
-                        createRecurringInstance(activeProject.id, task).catch(() => {});
-                      }
-                    }
-                  })
                   .catch(() => {
                     if (prevStatus !== undefined) applyStatus(prevStatus);
                   });

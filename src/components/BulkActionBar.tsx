@@ -60,7 +60,7 @@ export function BulkActionBar({
             </Select>
 
             {/* Assign */}
-            <Select onValueChange={v => onAssign(v === 'unassigned' ? null : v)}>
+            <Select onValueChange={(v: string) => onAssign(v === 'unassigned' ? null : v)}>
               <SelectTrigger className="h-8 text-xs bg-muted/50 border-none w-32">
                 <div className="flex items-center gap-1.5">
                   <User className="w-3 h-3 text-muted-foreground" />
@@ -100,7 +100,7 @@ export function BulkActionBar({
 
             {/* Milestone */}
             {milestones.length > 0 && (
-              <Select onValueChange={v => onSetMilestone(v === 'none' ? null : v)}>
+              <Select onValueChange={(v: string) => onSetMilestone(v === 'none' ? null : v)}>
                 <SelectTrigger className="h-8 text-xs bg-muted/50 border-none w-36">
                   <div className="flex items-center gap-1.5">
                     <MilestoneIcon className="w-3 h-3 text-muted-foreground" />
