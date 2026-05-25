@@ -21,6 +21,7 @@ interface TaskBoardProps {
   onAddTask: (status: TaskStatus) => void;
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
   onSelectionChange?: (ids: Set<string>) => void;
+  onInlineEdit?: (taskId: string, newTitle: string) => void;
 }
 
 const PRIORITY_CONFIG: Record<TaskPriority, { text: string; dot: string; label: string }> = {
@@ -49,15 +50,22 @@ interface TaskCardProps {
   selectionMode: boolean;
   onClick: (task: Task) => void;
   onToggleSelect: (id: string) => void;
+  onInlineEdit?: (taskId: string, newTitle: string) => void;
 }
 
-function TaskCard({ task, index, users, milestones, selected, selectionMode, onClick, onToggleSelect }: TaskCardProps) {
+function TaskCard({ task, index, users, milestones, selected, selectionMode, onClick, onToggleSelect, onInlineEdit }: TaskCardProps) {
   const pCfg = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date(new Date().setHours(0, 0, 0, 0));
   const isToday = task.dueDate === new Date().toISOString().split('T')[0];
   const milestone = task.milestoneId ? milestones.find(m => m.id === task.milestoneId) : undefined;
   const completedSubtasks = (task.subtasks ?? []).filter(s => s.completed).length;
   const totalSubtasks = (task.subtasks ?? []).length;
+
+  const [editing, setEditing] = React.useState(false);
+  const [editTitle, setEditTitle] = React.useState(task.title);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
 
   const seenIds = new Set<string>();
   const taskUserIds = [task.assigneeId, task.creatorId]
@@ -122,7 +130,31 @@ function TaskCard({ task, index, users, milestones, selected, selectionMode, onC
                   </div>
                 </div>
 
-                <h4 className="text-sm font-semibold text-foreground leading-snug">{task.title}</h4>
+                {editing ? (
+                  <input
+                    ref={inputRef}
+                    className="text-sm font-semibold text-foreground leading-snug w-full bg-transparent border-b border-primary outline-none"
+                    value={editTitle}
+                    onChange={e => setEditTitle(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        setEditing(false);
+                        if (editTitle.trim() && editTitle !== task.title) onInlineEdit?.(task.id, editTitle.trim());
+                      }
+                      if (e.key === 'Escape') { setEditing(false); setEditTitle(task.title); }
+                    }}
+                    onBlur={() => {
+                      setEditing(false);
+                      if (editTitle.trim() && editTitle !== task.title) onInlineEdit?.(task.id, editTitle.trim());
+                    }}
+                    onClick={e => e.stopPropagation()}
+                  />
+                ) : (
+                  <h4
+                    className="text-sm font-semibold text-foreground leading-snug cursor-pointer"
+                    onDoubleClick={e => { e.stopPropagation(); setEditing(true); setEditTitle(task.title); }}
+                  >{task.title}</h4>
+                )}
 
                 {task.description && (
                   <p className="text-xs text-muted-foreground/60 line-clamp-2 leading-relaxed">{task.description}</p>
@@ -199,9 +231,10 @@ interface ColumnProps {
   onTaskClick: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
   onToggleSelect: (id: string) => void;
+  onInlineEdit?: (taskId: string, newTitle: string) => void;
 }
 
-function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode, onTaskClick, onAddTask, onToggleSelect }: ColumnProps) {
+function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode, onTaskClick, onAddTask, onToggleSelect, onInlineEdit }: ColumnProps) {
   const bgColorRaw = col.color.split(' ').find(c => c.startsWith('bg-'));
   const bgColor = bgColorRaw ? bgColorRaw.split('/')[0] : 'bg-violet-500';
 
@@ -246,6 +279,7 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
                 selectionMode={selectionMode}
                 onClick={onTaskClick}
                 onToggleSelect={onToggleSelect}
+                onInlineEdit={onInlineEdit}
               />
             ))}
             {provided.placeholder}
@@ -267,7 +301,7 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
 export function TaskBoard({
   tasks, stages, users = [], milestones = [],
   selectedTaskIds = new Set(), swimlaneBy = null,
-  onTaskClick, onAddTask, onStatusChange, onSelectionChange,
+  onTaskClick, onAddTask, onStatusChange, onSelectionChange, onInlineEdit,
 }: TaskBoardProps) {
   const selectionMode = onSelectionChange !== undefined && selectedTaskIds !== undefined;
 
@@ -307,6 +341,7 @@ export function TaskBoard({
                 onTaskClick={onTaskClick}
                 onAddTask={onAddTask}
                 onToggleSelect={handleToggleSelect}
+                onInlineEdit={onInlineEdit}
               />
             ))}
           </div>
@@ -377,6 +412,7 @@ export function TaskBoard({
                   onTaskClick={onTaskClick}
                   onAddTask={onAddTask}
                   onToggleSelect={handleToggleSelect}
+                  onInlineEdit={onInlineEdit}
                 />
               ))}
             </div>

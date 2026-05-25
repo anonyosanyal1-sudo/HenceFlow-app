@@ -59,6 +59,55 @@ def _log_activity(task_id: str, project_id: str, user_id: str, action: str,
     }).execute()
 
 
+def _create_notification(user_id: str, type_: str, title: str, message: str,
+                          task_id: str = None, project_id: str = None):
+    try:
+        db.table("notifications").insert({
+            "user_id": user_id,
+            "type": type_,
+            "title": title,
+            "message": message,
+            "task_id": task_id,
+            "project_id": project_id,
+            "is_read": False,
+        }).execute()
+    except Exception:
+        pass
+
+
+def _notify_watchers(task_id: str, project_id: str, actor_id: str, title: str, message: str):
+    try:
+        watchers = db.table("task_watchers").select("user_id").eq("task_id", task_id).execute().data or []
+        for w in watchers:
+            if w["user_id"] != actor_id:
+                _create_notification(w["user_id"], "task_update", title, message, task_id, project_id)
+    except Exception:
+        pass
+
+
+def _run_automations(project_id: str, task: dict, trigger_type: str, trigger_value: str, actor_id: str):
+    try:
+        rules = db.table("automation_rules").select("*").eq("project_id", project_id).eq("is_active", True).eq("trigger_type", trigger_type).execute().data or []
+        for rule in rules:
+            rule_trigger_val = rule.get("trigger_value")
+            if rule_trigger_val and rule_trigger_val != trigger_value:
+                continue
+            action_type = rule.get("action_type")
+            action_value = rule.get("action_value")
+            task_id = task["id"]
+            if action_type == "set_assignee" and action_value:
+                db.table("tasks").update({"assignee_id": action_value, "updated_at": "now()"}).eq("id", task_id).execute()
+                _create_notification(action_value, "task_assigned", "Task assigned to you (automation)", f"Task '{task.get('title')}' was assigned to you by an automation rule.", task_id, project_id)
+            elif action_type == "set_priority" and action_value:
+                db.table("tasks").update({"priority": action_value, "updated_at": "now()"}).eq("id", task_id).execute()
+            elif action_type == "set_status" and action_value:
+                db.table("tasks").update({"status": action_value, "updated_at": "now()"}).eq("id", task_id).execute()
+            elif action_type == "notify_watchers":
+                _notify_watchers(task_id, project_id, actor_id, "Task update", f"Task '{task.get('title')}' was updated.")
+    except Exception:
+        pass
+
+
 def _spawn_recurrence(task: dict, project_id: str, user_id: str):
     """Create the next recurring instance when a task is closed."""
     rule = task.get("recurrence_rule")
@@ -127,6 +176,9 @@ async def create_task(project_id: str, body: CreateTaskIn, user=Depends(get_curr
         raise HTTPException(500, "Failed to create task")
     out = _map(res.data)
     _log_activity(out.id, project_id, user["id"], "task_created")
+    if body.assigneeId and body.assigneeId != user["id"]:
+        _create_notification(body.assigneeId, "task_assigned", "New task assigned to you",
+                              f"You were assigned to '{body.title}'", out.id, project_id)
     await manager.notify_project(project_id, "tasks:changed", {"projectId": project_id})
     return out
 
@@ -171,11 +223,27 @@ async def update_task(task_id: str, body: UpdateTaskIn, user=Depends(get_current
     res = db.table("tasks").update(updates).eq("id", task_id).select().single().execute()
     out = _map(res.data)
 
-    # Log each field change
     for (action, field, old_v, new_v) in activity:
         _log_activity(task_id, project_id, user["id"], action, field, str(old_v or ""), str(new_v or ""))
 
-    # Spawn recurring instance when task is closed
+    # Notify assignee
+    if body.assigneeId and body.assigneeId != user["id"] and body.assigneeId != existing.data.get("assignee_id"):
+        _create_notification(body.assigneeId, "task_assigned", "Task assigned to you",
+                              f"You were assigned to '{existing.data['title']}'", task_id, project_id)
+
+    # Notify watchers on status change
+    if body.status and body.status != existing.data["status"]:
+        _notify_watchers(task_id, project_id, user["id"], "Task status changed",
+                         f"'{existing.data['title']}' moved to {body.status}")
+
+    # Run automations
+    if body.status and body.status != existing.data["status"]:
+        _run_automations(project_id, existing.data, "status_changed", body.status, user["id"])
+    if body.priority and body.priority != existing.data["priority"]:
+        _run_automations(project_id, existing.data, "priority_changed", body.priority, user["id"])
+    if body.assigneeId and body.assigneeId != existing.data.get("assignee_id"):
+        _run_automations(project_id, existing.data, "assignee_changed", body.assigneeId or "", user["id"])
+
     if body.status and _is_closed_status(body.status, project_id) and existing.data.get("recurrence_rule"):
         _spawn_recurrence(existing.data, project_id, user["id"])
 
@@ -184,7 +252,6 @@ async def update_task(task_id: str, body: UpdateTaskIn, user=Depends(get_current
 
 
 def _is_closed_status(status: str, project_id: str) -> bool:
-    """A task is 'closed' if its status matches 'closed' or the last stage."""
     if status == "closed":
         return True
     proj = db.table("projects").select("stages").eq("id", project_id).single().execute()
@@ -216,7 +283,6 @@ async def delete_task(task_id: str, user=Depends(get_current_user)):
 async def bulk_update(body: BulkUpdateTasksIn, user=Depends(get_current_user)):
     if not body.ids:
         return {"updated": 0}
-    # Verify access via first task's project
     first = db.table("tasks").select("project_id").eq("id", body.ids[0]).single().execute()
     if not first.data:
         raise HTTPException(404, "Task not found")
