@@ -1,6 +1,6 @@
 import React from 'react';
 import { supabase } from '../lib/supabase';
-import { addComment, subscribeToComments, deleteComment, updateComment } from '../services/api';
+import { addComment, fetchComments, deleteComment, updateComment, reactToComment } from '../services/api';
 import { Comment, UserProfile } from '../types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -39,16 +39,14 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
     return () => subscription.unsubscribe();
   }, []);
 
-  React.useEffect(() => {
-    const unsubscribe = subscribeToComments(projectId, taskId, (data) => {
+  const refetchComments = React.useCallback(() => {
+    fetchComments(taskId).then(data => {
       setComments(data);
-      // Automatically scroll to bottom on initial load or when new comments arrive
-      setTimeout(() => {
-        scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-    });
-    return () => unsubscribe();
-  }, [projectId, taskId]);
+      setTimeout(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
+    }).catch(() => {});
+  }, [taskId]);
+
+  React.useEffect(() => { refetchComments(); }, [refetchComments]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -80,13 +78,10 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
-      await addComment(projectId, taskId, newComment.trim(), attachments);
+      await addComment(projectId, taskId, newComment.trim());
       setNewComment('');
       setAttachments([]);
-      // Scroll to bottom after adding
-      setTimeout(() => {
-        scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      refetchComments();
     } catch (error) {
       console.error('Error adding comment:', error);
       setErrorMsg(error instanceof Error ? error.message : String(error));
@@ -97,53 +92,28 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
 
   const handleDelete = async (commentId: string) => {
     setComments(prev => prev.filter(c => c.id !== commentId));
-    deleteComment(projectId, taskId, commentId).catch(error => {
-      console.error('Error deleting comment:', error);
-    });
+    deleteComment(projectId, taskId, commentId).catch(() => { refetchComments(); });
   };
 
   const handleLike = async (comment: Comment) => {
     if (!currentUserId) return;
-    const uid = currentUserId;
-    const likes = comment.likes || [];
-    const dislikes = comment.dislikes || [];
-    
-    let newLikes = [...likes];
-    let newDislikes = dislikes.filter(id => id !== uid);
-    
-    if (newLikes.includes(uid)) {
-      newLikes = newLikes.filter(id => id !== uid);
-    } else {
-      newLikes.push(uid);
-    }
-    
-    await updateComment(projectId, taskId, comment.id, { likes: newLikes, dislikes: newDislikes });
+    const updated = await reactToComment(comment.id, 'like').catch(() => null);
+    if (updated) setComments(prev => prev.map(c => c.id === comment.id ? updated : c));
   };
 
   const handleDislike = async (comment: Comment) => {
     if (!currentUserId) return;
-    const uid = currentUserId;
-    const likes = comment.likes || [];
-    const dislikes = comment.dislikes || [];
-    
-    let newDislikes = [...dislikes];
-    let newLikes = likes.filter(id => id !== uid);
-    
-    if (newDislikes.includes(uid)) {
-      newDislikes = newDislikes.filter(id => id !== uid);
-    } else {
-      newDislikes.push(uid);
-    }
-    
-    await updateComment(projectId, taskId, comment.id, { likes: newLikes, dislikes: newDislikes });
+    const updated = await reactToComment(comment.id, 'dislike').catch(() => null);
+    if (updated) setComments(prev => prev.map(c => c.id === comment.id ? updated : c));
   };
 
   const saveEdit = async (commentId: string) => {
     if (!editContent.trim()) return;
     try {
-      await updateComment(projectId, taskId, commentId, { content: editContent.trim(), isEdited: true });
+      await updateComment(projectId, taskId, commentId, { content: editContent.trim() });
       setEditingId(null);
       setEditContent('');
+      refetchComments();
     } catch (error) {
       console.error('Error updating comment:', error);
     }
