@@ -1,5 +1,6 @@
 export type TaskStatus = string;
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type RecurrenceRule = 'daily' | 'weekly' | 'monthly';
 
 export interface UserProfile {
   uid: string;
@@ -39,7 +40,6 @@ export const DEFAULT_STAGES: Stage[] = [
 ];
 
 // Tailwind safelist — solid bg classes dynamically constructed in TaskBoard.tsx (accent bars).
-// List every color used in ProjectDialog's STAGE_COLORS + the defaults.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _STAGE_ACCENT_SAFELIST =
   'bg-slate-500 bg-gray-500 bg-zinc-500 bg-neutral-500 bg-stone-500 ' +
@@ -56,8 +56,14 @@ export interface Project {
   ownerId: string;
   members: string[];
   color: string;
-  stages?: Stage[]; // Custom stages for the project
+  stages?: Stage[];
   createdAt: string;
+}
+
+export interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
 }
 
 export interface Task {
@@ -71,6 +77,10 @@ export interface Task {
   creatorId: string;
   dueDate?: string;
   tags?: string[];
+  subtasks?: Subtask[];
+  recurrenceRule?: RecurrenceRule;
+  recurrenceParentId?: string;
+  milestoneId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -81,11 +91,72 @@ export interface Comment {
   projectId: string;
   userId: string;
   content: string;
-  attachments?: string[]; // Array of data URLs or URLs
-  createdAt: any; // Using any for Timestamp/ServerTimestamp flexibility
-  likes?: string[]; // Array of userIds
-  dislikes?: string[]; // Array of userIds
+  attachments?: string[];
+  createdAt: any;
+  likes?: string[];
+  dislikes?: string[];
   isEdited?: boolean;
+}
+
+export interface TaskDependency {
+  id: string;
+  taskId: string;
+  dependsOnId: string;
+  createdAt: string;
+}
+
+export interface TimeEntry {
+  id: string;
+  taskId: string;
+  projectId: string;
+  userId: string;
+  minutes: number;
+  note?: string;
+  loggedAt: string;
+}
+
+export interface Milestone {
+  id: string;
+  projectId: string;
+  name: string;
+  dueDate?: string;
+  createdAt: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  taskId: string;
+  projectId: string;
+  userId: string;
+  action: string;
+  field?: string;
+  oldValue?: string;
+  newValue?: string;
+  createdAt: string;
+}
+
+export interface CustomFieldDefinition {
+  id: string;
+  projectId: string;
+  name: string;
+  fieldType: 'text' | 'number' | 'url' | 'select';
+  options?: string[];
+  createdAt: string;
+}
+
+export interface CustomFieldValue {
+  id: string;
+  taskId: string;
+  fieldId: string;
+  value: string;
+}
+
+export interface TaskTemplate {
+  id: string;
+  projectId: string;
+  name: string;
+  template: Partial<Task>;
+  createdAt: string;
 }
 
 export interface AppUser {

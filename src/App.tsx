@@ -1,25 +1,32 @@
 import React from 'react';
 import { supabase, logout, toAppUser } from './lib/supabase';
 import type { AppUser } from './types';
-import { 
+import {
   subscribeToCompanies,
   createCompany,
   updateCompany,
   deleteCompany,
-  subscribeToProjects, 
-  subscribeToTasks, 
-  createProject, 
+  subscribeToProjects,
+  subscribeToTasks,
+  createProject,
   updateProject,
   deleteProject,
   subscribeToUsers,
-  createTask, 
+  createTask,
   updateTask,
   deleteTask,
-  ensureUserProfile 
+  bulkUpdateTasks,
+  bulkDeleteTasks,
+  ensureUserProfile,
+  subscribeToMilestones,
+  addActivityLog,
+  subscribeToCustomFieldDefinitions,
+  subscribeToTaskTemplates,
+  createRecurringInstance,
 } from './services/api';
-import { Project, Task, TaskStatus, UserProfile, Company, DEFAULT_STAGES, Stage } from './types';
+import { Project, Task, TaskStatus, TaskPriority, UserProfile, Company, DEFAULT_STAGES, Stage, Milestone, CustomFieldDefinition, TaskTemplate } from './types';
 import { Sidebar } from './components/Sidebar';
-import { TaskBoard } from './components/TaskBoard';
+import { TaskBoard, SwimlaneBy } from './components/TaskBoard';
 import { Dashboard } from './components/Dashboard';
 import { Auth } from './components/Auth';
 import { TaskDialog } from './components/TaskDialog';
@@ -27,8 +34,10 @@ import { ProjectDialog } from './components/ProjectDialog';
 import { CompanyDialog } from './components/CompanyDialog';
 import { ProfileSetup } from './components/ProfileSetup';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
+import { MilestoneDialog } from './components/MilestoneDialog';
+import { BulkActionBar } from './components/BulkActionBar';
 import { Logo } from './components/Logo';
-import { Hash, Filter, Search, Users, Menu, Settings } from 'lucide-react';
+import { Hash, Filter, Search, Users, Menu, Settings, Milestone as MilestoneIcon, Layers, CheckSquare } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -102,9 +111,17 @@ function AppContent() {
   const [filterCreator, setFilterCreator] = React.useState<string | null>(null);
   const [filterPriority, setFilterPriority] = React.useState<string | null>(null);
   const [filterDueDate, setFilterDueDate] = React.useState<string | null>(null);
-  
+
   // View state
   const [activeView, setActiveView] = React.useState<'board' | 'analytics'>('board');
+
+  // New feature states
+  const [swimlaneBy, setSwimlaneBy] = React.useState<SwimlaneBy>(null);
+  const [selectedTaskIds, setSelectedTaskIds] = React.useState<Set<string>>(new Set());
+  const [milestones, setMilestones] = React.useState<Milestone[]>([]);
+  const [customFieldDefs, setCustomFieldDefs] = React.useState<CustomFieldDefinition[]>([]);
+  const [taskTemplates, setTaskTemplates] = React.useState<TaskTemplate[]>([]);
+  const [milestoneDialogOpen, setMilestoneDialogOpen] = React.useState(false);
 
   // Dialog States
   const [taskDialogOpen, setTaskDialogOpen] = React.useState(false);
@@ -183,13 +200,24 @@ function AppContent() {
   React.useEffect(() => {
     if (!activeProject) {
       setTasks([]);
+      setMilestones([]);
+      setCustomFieldDefs([]);
+      setTaskTemplates([]);
+      setSelectedTaskIds(new Set());
       return;
     }
 
-    const unsubscribe = subscribeToTasks(activeProject.id, (t) => {
-      setTasks(t);
-    });
-    return () => unsubscribe();
+    const unsubTasks = subscribeToTasks(activeProject.id, setTasks);
+    const unsubMilestones = subscribeToMilestones(activeProject.id, setMilestones);
+    const unsubFields = subscribeToCustomFieldDefinitions(activeProject.id, setCustomFieldDefs);
+    const unsubTemplates = subscribeToTaskTemplates(activeProject.id, setTaskTemplates);
+
+    return () => {
+      unsubTasks();
+      unsubMilestones();
+      unsubFields();
+      unsubTemplates();
+    };
   }, [activeProject]);
 
   // Subscribe to all tasks for the dashboard
@@ -273,11 +301,38 @@ function AppContent() {
   const handleSaveTask = async (taskData: Partial<Task>) => {
     const targetProjectId = selectedTask?.projectId || activeProject?.id;
     if (!targetProjectId) return;
-    
+
     if (selectedTask) {
+      // Log activity for meaningful field changes
+      const logChanges: Array<[string, string, string | undefined, string | undefined]> = [];
+      if (taskData.status !== undefined && taskData.status !== selectedTask.status) {
+        logChanges.push(['status_changed', 'status', selectedTask.status, taskData.status]);
+      }
+      if (taskData.priority !== undefined && taskData.priority !== selectedTask.priority) {
+        logChanges.push(['priority_changed', 'priority', selectedTask.priority, taskData.priority]);
+      }
+      if (taskData.assigneeId !== selectedTask.assigneeId) {
+        const oldName = companyUsers.find(u => u.uid === selectedTask.assigneeId)?.displayName;
+        const newName = companyUsers.find(u => u.uid === taskData.assigneeId)?.displayName;
+        logChanges.push(['assignee_changed', 'assignee', oldName, newName]);
+      }
+      if (taskData.milestoneId !== selectedTask.milestoneId) {
+        const oldM = milestones.find(m => m.id === selectedTask.milestoneId)?.name;
+        const newM = milestones.find(m => m.id === taskData.milestoneId)?.name;
+        logChanges.push(['milestone_changed', 'milestone', oldM, newM]);
+      }
+      if (taskData.recurrenceRule !== selectedTask.recurrenceRule) {
+        logChanges.push(['recurrence_changed', 'recurrence', selectedTask.recurrenceRule, taskData.recurrenceRule]);
+      }
       await updateTask(targetProjectId, selectedTask.id, taskData);
+      for (const [action, field, oldV, newV] of logChanges) {
+        addActivityLog(selectedTask.id, targetProjectId, action, field, oldV, newV).catch(() => {});
+      }
     } else {
-      await createTask(targetProjectId, taskData);
+      const id = await createTask(targetProjectId, taskData);
+      if (id) {
+        addActivityLog(id, targetProjectId, 'task_created').catch(() => {});
+      }
     }
   };
 
@@ -674,22 +729,51 @@ function AppContent() {
                     </PopoverContent>
                   </Popover>
 
-                  {/* View toggle: Board / List / Timeline (Board is always active) */}
+                  {/* Swimlane toggle */}
                   <div className="hidden md:flex items-center bg-muted/40 border border-border/40 rounded-xl p-1 gap-0.5">
-                    {['Board', 'List', 'Timeline'].map((v) => (
+                    {([['Off', null], ['Assignee', 'assignee'], ['Priority', 'priority']] as [string, SwimlaneBy][]).map(([label, val]) => (
                       <button
-                        key={v}
+                        key={label}
+                        onClick={() => setSwimlaneBy(val)}
                         className={cn(
-                          "px-3 h-7 rounded-lg text-xs font-semibold transition-all",
-                          v === 'Board'
+                          "px-2.5 h-7 rounded-lg text-xs font-semibold transition-all",
+                          swimlaneBy === val
                             ? "bg-card text-foreground shadow-sm"
                             : "text-muted-foreground/50 hover:text-muted-foreground"
                         )}
                       >
-                        {v}
+                        {val === null ? <Layers className="w-3 h-3 inline" /> : label}
                       </button>
                     ))}
                   </div>
+
+                  {/* Bulk select toggle */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "h-9 gap-1.5 border-border/50 bg-muted/30 font-medium text-xs hidden md:flex",
+                      selectedTaskIds.size > 0 ? "text-primary border-primary/40 bg-primary/10" : "text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setSelectedTaskIds(selectedTaskIds.size > 0 ? new Set() : new Set())}
+                    title="Toggle bulk select"
+                  >
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    {selectedTaskIds.size > 0 ? selectedTaskIds.size : ''}
+                  </Button>
+
+                  {/* Milestones */}
+                  {milestones.length > 0 || activeProject ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-1.5 border-border/50 bg-muted/30 hover:bg-muted/60 font-medium text-muted-foreground hover:text-foreground text-xs hidden md:flex"
+                      onClick={() => setMilestoneDialogOpen(true)}
+                    >
+                      <MilestoneIcon className="w-3.5 h-3.5" />
+                      <span>{milestones.length > 0 ? `${milestones.length}` : ''} Milestones</span>
+                    </Button>
+                  ) : null}
 
                   {/* New task */}
                   <Button
@@ -714,6 +798,9 @@ function AppContent() {
               tasks={filteredTasks}
               stages={activeProject.stages || DEFAULT_STAGES}
               users={companyUsers}
+              milestones={milestones}
+              selectedTaskIds={selectedTaskIds}
+              swimlaneBy={swimlaneBy}
               onTaskClick={(task) => {
                 setSelectedTask(task);
                 setTaskDialogOpen(true);
@@ -724,21 +811,34 @@ function AppContent() {
                 setTaskDialogOpen(true);
               }}
               onStatusChange={(taskId, newStatus) => {
-                const prevStatus = tasks.find(t => t.id === taskId)?.status;
+                const task = tasks.find(t => t.id === taskId);
+                const prevStatus = task?.status;
                 const applyStatus = (s: string) => {
                   setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: s as TaskStatus } : t));
                   setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: s as TaskStatus } : t));
                 };
                 applyStatus(newStatus);
-                updateTask(activeProject.id, taskId, { status: newStatus }).catch(() => {
-                  if (prevStatus !== undefined) applyStatus(prevStatus);
-                });
+                updateTask(activeProject.id, taskId, { status: newStatus })
+                  .then(() => {
+                    if (task) {
+                      addActivityLog(taskId, activeProject.id, 'status_changed', 'status', prevStatus, newStatus).catch(() => {});
+                      // Spawn next recurrence when closed
+                      const closedStageId = (activeProject.stages || DEFAULT_STAGES).find(s => s.id === 'closed')?.id ?? 'closed';
+                      if (newStatus === closedStageId && task.recurrenceRule) {
+                        createRecurringInstance(activeProject.id, task).catch(() => {});
+                      }
+                    }
+                  })
+                  .catch(() => {
+                    if (prevStatus !== undefined) applyStatus(prevStatus);
+                  });
               }}
+              onSelectionChange={setSelectedTaskIds}
             />
           </>
         )}
 
-        <TaskDialog 
+        <TaskDialog
           open={taskDialogOpen}
           onOpenChange={setTaskDialogOpen}
           task={selectedTask}
@@ -746,11 +846,16 @@ function AppContent() {
           defaultStatus={defaultStatus}
           users={companyUsers}
           stages={activeProject?.stages || DEFAULT_STAGES}
+          milestones={milestones}
+          customFieldDefs={customFieldDefs}
+          templates={taskTemplates}
+          allTasks={tasks}
+          currentUserId={user.uid}
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
         />
 
-        <ProjectDialog 
+        <ProjectDialog
           open={projectDialogOpen}
           onOpenChange={setProjectDialogOpen}
           project={selectedProjectForEdit}
@@ -777,6 +882,56 @@ function AppContent() {
           currentPhotoURL={user.photoURL}
           onSaved={(displayName, photoURL) => {
             setUser(prev => prev ? { ...prev, displayName, photoURL } : prev);
+          }}
+        />
+
+        {activeProject && (
+          <MilestoneDialog
+            open={milestoneDialogOpen}
+            onOpenChange={setMilestoneDialogOpen}
+            projectId={activeProject.id}
+            milestones={milestones}
+          />
+        )}
+
+        {/* Bulk action bar */}
+        <BulkActionBar
+          selectedIds={selectedTaskIds}
+          onClear={() => setSelectedTaskIds(new Set())}
+          stages={activeProject?.stages || DEFAULT_STAGES}
+          users={companyUsers}
+          milestones={milestones}
+          onMoveToStage={async (status) => {
+            const ids = Array.from(selectedTaskIds);
+            setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, status } : t));
+            await bulkUpdateTasks(ids, { status });
+            setSelectedTaskIds(new Set());
+          }}
+          onAssign={async (assigneeId) => {
+            const ids = Array.from(selectedTaskIds);
+            const update: Partial<Task> = { assigneeId: assigneeId ?? undefined };
+            setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, assigneeId: assigneeId ?? undefined } : t));
+            await bulkUpdateTasks(ids, update);
+            setSelectedTaskIds(new Set());
+          }}
+          onSetPriority={async (priority: TaskPriority) => {
+            const ids = Array.from(selectedTaskIds);
+            setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, priority } : t));
+            await bulkUpdateTasks(ids, { priority });
+            setSelectedTaskIds(new Set());
+          }}
+          onSetMilestone={async (milestoneId) => {
+            const ids = Array.from(selectedTaskIds);
+            setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, milestoneId: milestoneId ?? undefined } : t));
+            await bulkUpdateTasks(ids, { milestoneId: milestoneId ?? undefined });
+            setSelectedTaskIds(new Set());
+          }}
+          onDelete={async () => {
+            const ids = Array.from(selectedTaskIds);
+            setTasks(prev => prev.filter(t => !ids.includes(t.id)));
+            setAllTasks(prev => prev.filter(t => !ids.includes(t.id)));
+            await bulkDeleteTasks(ids);
+            setSelectedTaskIds(new Set());
           }}
         />
       </main>
