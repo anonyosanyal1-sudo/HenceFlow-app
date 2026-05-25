@@ -1,9 +1,9 @@
 import React from 'react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogFooter,
   DialogDescription
 } from '@/components/ui/dialog';
@@ -12,13 +12,21 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Trash2 } from 'lucide-react';
 import { UserAvatar } from './UserAvatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-import { Project, UserProfile, Stage, DEFAULT_STAGES } from '../types';
+import { Project, UserProfile, Stage, DEFAULT_STAGES, CustomFieldDefinition } from '../types';
+import {
+  subscribeToCustomFieldDefinitions,
+  createCustomFieldDefinition,
+  deleteCustomFieldDefinition,
+} from '../services/api';
 
 interface ProjectDialogProps {
   open: boolean;
@@ -64,6 +72,18 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
   const [members, setMembers] = React.useState<string[]>([]);
   const [stages, setStages] = React.useState<Stage[]>([]);
   const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
+
+  // Custom fields state (only for existing projects)
+  const [customFields, setCustomFields] = React.useState<CustomFieldDefinition[]>([]);
+  const [newFieldName, setNewFieldName] = React.useState('');
+  const [newFieldType, setNewFieldType] = React.useState<CustomFieldDefinition['fieldType']>('text');
+  const [newFieldOptions, setNewFieldOptions] = React.useState('');
+
+  React.useEffect(() => {
+    if (!project?.id) return;
+    const unsub = subscribeToCustomFieldDefinitions(project.id, setCustomFields);
+    return () => unsub();
+  }, [project?.id]);
 
   React.useEffect(() => {
     if (project) {
@@ -134,8 +154,9 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
 
         <Tabs defaultValue="general" className="w-full">
           <TabsList className="w-full mb-4">
-            <TabsTrigger value="general" className="flex-1">General</TabsTrigger>
-            <TabsTrigger value="stages" className="flex-1">Stages</TabsTrigger>
+            <TabsTrigger value="general" className="flex-1 text-xs">General</TabsTrigger>
+            <TabsTrigger value="stages" className="flex-1 text-xs">Stages</TabsTrigger>
+            {project && <TabsTrigger value="fields" className="flex-1 text-xs">Custom Fields</TabsTrigger>}
           </TabsList>
           
           <TabsContent value="general" className="space-y-4 focus-visible:outline-none">
@@ -261,6 +282,81 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
             </ScrollArea>
             <p className="text-xs text-muted-foreground">Adding, removing, or renaming columns applies instantly to the workspace board.</p>
           </TabsContent>
+
+          {project && (
+            <TabsContent value="fields" className="space-y-4 focus-visible:outline-none">
+              <p className="text-xs text-muted-foreground">
+                Custom fields appear in every task in this workspace. Only owners can manage them.
+              </p>
+              <div className="space-y-2">
+                {customFields.length === 0 && (
+                  <p className="text-sm text-muted-foreground/50 italic py-2">No custom fields yet.</p>
+                )}
+                {customFields.map(f => (
+                  <div key={f.id} className="flex items-center gap-2 group">
+                    <span className="text-sm font-medium text-foreground flex-1 truncate">{f.name}</span>
+                    <span className="text-xs text-muted-foreground/60 bg-muted/40 px-2 py-0.5 rounded-full capitalize shrink-0">{f.fieldType}</span>
+                    <Button
+                      size="icon" variant="ghost"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-red-400/60 hover:text-red-400"
+                      onClick={() => deleteCustomFieldDefinition(f.id).then(() => setCustomFields(prev => prev.filter(x => x.id !== f.id)))}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-border/40">
+                <p className="text-xs font-semibold text-muted-foreground">Add new field</p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newFieldName}
+                    onChange={e => setNewFieldName(e.target.value)}
+                    placeholder="Field name…"
+                    className="h-8 text-sm bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary flex-1"
+                  />
+                  <Select value={newFieldType} onValueChange={(v: CustomFieldDefinition['fieldType']) => setNewFieldType(v)}>
+                    <SelectTrigger className="h-8 text-xs bg-muted/50 border-none w-28">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="text" className="text-xs">Text</SelectItem>
+                      <SelectItem value="number" className="text-xs">Number</SelectItem>
+                      <SelectItem value="url" className="text-xs">URL</SelectItem>
+                      <SelectItem value="select" className="text-xs">Select</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {newFieldType === 'select' && (
+                  <Input
+                    value={newFieldOptions}
+                    onChange={e => setNewFieldOptions(e.target.value)}
+                    placeholder="Options (comma-separated)"
+                    className="h-8 text-sm bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary"
+                  />
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs gap-1"
+                  disabled={!newFieldName.trim()}
+                  onClick={async () => {
+                    if (!newFieldName.trim() || !project?.id) return;
+                    const options = newFieldType === 'select'
+                      ? newFieldOptions.split(',').map(s => s.trim()).filter(Boolean)
+                      : [];
+                    await createCustomFieldDefinition(project.id, { name: newFieldName.trim(), fieldType: newFieldType, options });
+                    setNewFieldName('');
+                    setNewFieldOptions('');
+                    setNewFieldType('text');
+                  }}
+                >
+                  <Plus className="w-3 h-3" /> Add Field
+                </Button>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
 
         <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t border-border mt-4">
