@@ -56,10 +56,14 @@ import { AutomationsDialog } from './components/AutomationsDialog';
 import { PodDialog } from './components/PodDialog';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { Logo } from './components/Logo';
-import { Hash, Filter, Search, Users, Menu, Settings, Milestone as MilestoneIcon, Layers, CheckSquare, Zap, Bookmark, BookmarkPlus } from 'lucide-react';
+import { Hash, Filter, Search, Users, Menu, Settings, Milestone as MilestoneIcon, Layers, CheckSquare, Zap, Bookmark, BookmarkPlus, MoreHorizontal } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { motion, AnimatePresence } from 'motion/react';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
@@ -706,38 +710,31 @@ function AppContent() {
         ) : (
           <>
             {/* Toolbar */}
-            <div className="border-b border-border/50 px-4 md:px-6 py-3 bg-card/60 backdrop-blur-sm shrink-0">
-              <div className="flex items-center justify-between gap-3">
+            <div className="border-b border-border/40 px-4 md:px-6 h-14 bg-card/50 backdrop-blur-sm shrink-0 flex items-center justify-between gap-3">
 
-                {/* Left: workspace icon + name + meta */}
+                {/* Left: workspace name + meta */}
                 <div className="flex items-center gap-3 min-w-0">
                   <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="lg:hidden shrink-0 h-8 w-8">
                     <Menu className="w-4 h-4" />
                   </Button>
-                  {/* # Icon box */}
-                  <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
-                    <Hash className="w-4 h-4 text-primary" />
-                  </div>
-                  {/* Name + subtitle */}
                   <div className="flex flex-col min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="font-bold text-foreground text-sm md:text-base truncate leading-tight">
+                      <span className="font-bold text-foreground text-sm truncate leading-tight">
                         {activeProject.name}
                       </span>
                       <button
-                        className="text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0"
+                        className="text-muted-foreground/40 hover:text-muted-foreground transition-colors shrink-0"
                         onClick={() => { setSelectedProjectForEdit(activeProject); setProjectDialogOpen(true); }}
                       >
                         <Settings className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground/60 font-medium mt-0.5">
-                      <Users className="w-3 h-3" />
+                    <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground/50 mt-0.5">
                       <span>{activeProject.members?.length || 1} members</span>
                       <span className="opacity-40">·</span>
                       <span>{tasks.length} tasks</span>
                       <span className="opacity-40">·</span>
-                      <span className="flex items-center gap-1 text-emerald-400">
+                      <span className="flex items-center gap-1 text-emerald-400/80">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         Live
                       </span>
@@ -745,9 +742,8 @@ function AppContent() {
                   </div>
                 </div>
 
-                {/* Right: search + filters + view toggle + new task */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* Notification Bell */}
+                {/* Right: controls */}
+                <div className="flex items-center gap-1.5 shrink-0">
                   <NotificationBell
                     notifications={notifications}
                     onNotificationsChange={setNotifications}
@@ -759,13 +755,13 @@ function AppContent() {
 
                   {/* Search */}
                   <div className="relative hidden md:block">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40 pointer-events-none" />
                     <Input
                       ref={searchInputRef}
                       placeholder="Search tasks…"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 pr-10 h-9 w-52 bg-muted/40 border-border/40 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-primary/40 focus-visible:border-primary/40"
+                      className="pl-9 pr-10 h-9 w-44 bg-muted/40 border-border/30 text-sm placeholder:text-muted-foreground/40 rounded-xl focus-visible:ring-primary/40"
                     />
                     <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground/30 font-mono pointer-events-none">⌘K</kbd>
                   </div>
@@ -775,12 +771,12 @@ function AppContent() {
                     <PopoverTrigger className={buttonVariants({
                       variant: "outline",
                       size: "sm",
-                      className: "h-9 gap-2 border-border/50 bg-muted/30 hover:bg-muted/60 font-medium text-muted-foreground hover:text-foreground"
+                      className: "h-9 gap-1.5 border-border/40 bg-muted/30 hover:bg-muted/60 font-medium text-muted-foreground hover:text-foreground rounded-xl"
                     })}>
                       <Filter className="w-3.5 h-3.5" />
-                      <span>Filters</span>
+                      <span className="hidden sm:inline">Filters</span>
                       {[filterPriority, filterAssignee, filterCreator, filterDueDate].filter(Boolean).length > 0 && (
-                        <span className="bg-primary text-primary-foreground min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1">
+                        <span className="bg-primary text-primary-foreground min-w-[16px] h-[16px] rounded-full text-[10px] font-bold flex items-center justify-center px-1">
                           {[filterPriority, filterAssignee, filterCreator, filterDueDate].filter(Boolean).length}
                         </span>
                       )}
@@ -788,11 +784,8 @@ function AppContent() {
                     <PopoverContent align="end" className="w-64 p-4 space-y-4">
                       <div className="space-y-2">
                         <h4 className="font-semibold text-sm text-foreground">Priority</h4>
-                        <select
-                          className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                          value={filterPriority || ''}
-                          onChange={(e) => setFilterPriority(e.target.value || null)}
-                        >
+                        <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          value={filterPriority || ''} onChange={(e) => setFilterPriority(e.target.value || null)}>
                           <option value="">All Priorities</option>
                           <option value="low">Low</option>
                           <option value="medium">Medium</option>
@@ -801,216 +794,138 @@ function AppContent() {
                       </div>
                       <div className="space-y-2">
                         <h4 className="font-semibold text-sm text-foreground">Assignee</h4>
-                        <select
-                          className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                          value={filterAssignee || ''}
-                          onChange={(e) => setFilterAssignee(e.target.value || null)}
-                        >
+                        <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          value={filterAssignee || ''} onChange={(e) => setFilterAssignee(e.target.value || null)}>
                           <option value="">Any Assignee</option>
-                          {companyUsers.map(u => (
-                            <option key={u.uid} value={u.uid}>{u.displayName}</option>
-                          ))}
+                          {companyUsers.map(u => <option key={u.uid} value={u.uid}>{u.displayName}</option>)}
                         </select>
                       </div>
                       <div className="space-y-2">
                         <h4 className="font-semibold text-sm text-foreground">Creator</h4>
-                        <select
-                          className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                          value={filterCreator || ''}
-                          onChange={(e) => setFilterCreator(e.target.value || null)}
-                        >
+                        <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          value={filterCreator || ''} onChange={(e) => setFilterCreator(e.target.value || null)}>
                           <option value="">Any Creator</option>
-                          {companyUsers.map(u => (
-                            <option key={u.uid} value={u.uid}>{u.displayName}</option>
-                          ))}
+                          {companyUsers.map(u => <option key={u.uid} value={u.uid}>{u.displayName}</option>)}
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <h4 className="font-semibold text-sm text-foreground">Date</h4>
-                        <select
-                          className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                          value={filterDueDate || ''}
-                          onChange={(e) => setFilterDueDate(e.target.value || null)}
-                        >
+                        <h4 className="font-semibold text-sm text-foreground">Due Date</h4>
+                        <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          value={filterDueDate || ''} onChange={(e) => setFilterDueDate(e.target.value || null)}>
                           <option value="">Any Date</option>
                           <option value="today">Today</option>
                           <option value="week">This Week</option>
                           <option value="overdue">Overdue</option>
                         </select>
                       </div>
+                      <div className="space-y-2 border-t border-border/40 pt-3">
+                        <h4 className="font-semibold text-sm text-foreground">Swimlane</h4>
+                        <div className="flex gap-1.5">
+                          {([['Off', null], ['Assignee', 'assignee'], ['Priority', 'priority']] as [string, SwimlaneBy][]).map(([label, val]) => (
+                            <button key={label} onClick={() => setSwimlaneBy(val)}
+                              className={cn("flex-1 px-2 h-8 rounded-lg text-xs font-semibold transition-all border",
+                                swimlaneBy === val ? "bg-primary/10 text-primary border-primary/30" : "text-muted-foreground border-border/40 hover:bg-muted/50")}>
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       {(filterPriority || filterAssignee || filterCreator || searchQuery || filterDueDate) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full text-xs text-muted-foreground hover:text-foreground"
-                          onClick={() => {
-                            setSearchQuery('');
-                            setFilterPriority(null);
-                            setFilterAssignee(null);
-                            setFilterCreator(null);
-                            setFilterDueDate(null);
-                          }}
-                        >
+                        <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => { setSearchQuery(''); setFilterPriority(null); setFilterAssignee(null); setFilterCreator(null); setFilterDueDate(null); }}>
                           Clear all filters
                         </Button>
                       )}
                     </PopoverContent>
                   </Popover>
 
-                  {/* Board / Timeline view toggle */}
-                  <div className="hidden md:flex items-center bg-muted/40 border border-border/40 rounded-xl p-1 gap-0.5">
-                    {([['Board', 'board'], ['Timeline', 'timeline']] as [string, string][]).map(([label, val]) => (
-                      <button
-                        key={label}
-                        onClick={() => setActiveView(val as 'board' | 'timeline')}
-                        className={cn(
-                          "px-2.5 h-7 rounded-lg text-xs font-semibold transition-all",
-                          activeView === val
-                            ? "bg-card text-foreground shadow-sm"
-                            : "text-muted-foreground/50 hover:text-muted-foreground"
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                  {/* Board / Timeline */}
+                  <div className="hidden md:flex items-center bg-muted/40 border border-border/30 rounded-xl p-1 gap-0.5">
+                    {(['Board', 'Timeline'] as const).map(label => {
+                      const val = label.toLowerCase() as 'board' | 'timeline';
+                      return (
+                        <button key={label} onClick={() => setActiveView(val)}
+                          className={cn("px-2.5 h-7 rounded-lg text-xs font-semibold transition-all",
+                            activeView === val ? "bg-card text-foreground shadow-sm" : "text-muted-foreground/50 hover:text-muted-foreground")}>
+                          {label}
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  {/* Swimlane toggle */}
-                  <div className="hidden md:flex items-center bg-muted/40 border border-border/40 rounded-xl p-1 gap-0.5">
-                    {([['Off', null], ['Assignee', 'assignee'], ['Priority', 'priority']] as [string, SwimlaneBy][]).map(([label, val]) => (
-                      <button
-                        key={label}
-                        onClick={() => setSwimlaneBy(val)}
-                        className={cn(
-                          "px-2.5 h-7 rounded-lg text-xs font-semibold transition-all",
-                          swimlaneBy === val
-                            ? "bg-card text-foreground shadow-sm"
-                            : "text-muted-foreground/50 hover:text-muted-foreground"
+                  {/* More: bulk select, milestones, automations, saved filters */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "sm", className: "h-9 w-9 p-0 border-border/40 bg-muted/30 hover:bg-muted/60 rounded-xl hidden md:flex items-center justify-center" })}>
+                      <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52 p-2 rounded-xl border-border bg-popover">
+                      <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5"
+                        onClick={() => { if (selectionModeActive) { setSelectionModeActive(false); setSelectedTaskIds(new Set()); } else setSelectionModeActive(true); }}>
+                        <CheckSquare className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-sm font-medium">{selectionModeActive ? 'Exit select mode' : 'Select tasks'}</span>
+                        {selectionModeActive && selectedTaskIds.size > 0 && (
+                          <span className="ml-auto text-xs text-primary font-bold">{selectedTaskIds.size}</span>
                         )}
-                      >
-                        {val === null ? <Layers className="w-3 h-3 inline" /> : label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Bulk select toggle */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      "h-9 gap-1.5 border-border/50 bg-muted/30 font-medium text-xs hidden md:flex",
-                      selectionModeActive ? "text-primary border-primary/40 bg-primary/10" : "text-muted-foreground hover:text-foreground"
-                    )}
-                    onClick={() => {
-                      if (selectionModeActive) {
-                        setSelectionModeActive(false);
-                        setSelectedTaskIds(new Set());
-                      } else {
-                        setSelectionModeActive(true);
-                      }
-                    }}
-                    title="Toggle bulk select"
-                  >
-                    <CheckSquare className="w-3.5 h-3.5" />
-                    {selectionModeActive && selectedTaskIds.size > 0 ? selectedTaskIds.size : ''}
-                  </Button>
-
-                  {/* Milestones */}
-                  {milestones.length > 0 || activeProject ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 gap-1.5 border-border/50 bg-muted/30 hover:bg-muted/60 font-medium text-muted-foreground hover:text-foreground text-xs hidden md:flex"
-                      onClick={() => setMilestoneDialogOpen(true)}
-                    >
-                      <MilestoneIcon className="w-3.5 h-3.5" />
-                      <span>{milestones.length > 0 ? `${milestones.length}` : ''} Milestones</span>
-                    </Button>
-                  ) : null}
-
-                  {/* Automations */}
-                  {activeProject && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 gap-1.5 border-border/50 bg-muted/30 hover:bg-muted/60 font-medium text-muted-foreground hover:text-foreground text-xs hidden md:flex"
-                      onClick={() => setAutomationsDialogOpen(true)}
-                    >
-                      <Zap className="w-3.5 h-3.5" />
-                      <span>Automations</span>
-                    </Button>
-                  )}
-
-                  {/* Saved Filters */}
-                  {activeProject && (
-                    <Popover>
-                      <PopoverTrigger className={buttonVariants({ variant: "outline", size: "sm", className: "h-9 gap-1.5 border-border/50 bg-muted/30 hidden md:flex" })}>
-                        <Bookmark className="w-3.5 h-3.5" />
-                        <span className="text-xs font-medium text-muted-foreground">Saved</span>
-                      </PopoverTrigger>
-                      <PopoverContent align="end" className="w-56 p-2">
-                        <div className="space-y-1">
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5" onClick={() => setMilestoneDialogOpen(true)}>
+                        <MilestoneIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-sm font-medium">Milestones</span>
+                        {milestones.length > 0 && <span className="ml-auto text-xs text-muted-foreground">{milestones.length}</span>}
+                      </DropdownMenuItem>
+                      {activeProject && (
+                        <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5" onClick={() => setAutomationsDialogOpen(true)}>
+                          <Zap className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="text-sm font-medium">Automations</span>
+                        </DropdownMenuItem>
+                      )}
+                      {savedFilters.length > 0 && (
+                        <>
+                          <DropdownMenuSeparator />
                           {savedFilters.map(sf => (
-                            <div key={sf.id} className="flex items-center gap-2">
-                              <button
-                                className="flex-1 text-left text-sm py-1.5 px-2 rounded-lg hover:bg-muted/50 text-foreground"
-                                onClick={() => {
-                                  const f = sf.filters;
-                                  if (f.searchQuery !== undefined) setSearchQuery(f.searchQuery || '');
-                                  setFilterAssignee(f.filterAssignee ?? null);
-                                  setFilterCreator(f.filterCreator ?? null);
-                                  setFilterPriority(f.filterPriority ?? null);
-                                  setFilterDueDate(f.filterDueDate ?? null);
-                                }}
-                              >{sf.name}</button>
-                              <button
-                                className="text-muted-foreground/50 hover:text-rose-400 text-xs"
-                                onClick={() => deleteSavedFilter(sf.id).then(() => setSavedFilters(prev => prev.filter(x => x.id !== sf.id)))}
-                              >✕</button>
-                            </div>
+                            <DropdownMenuItem key={sf.id} className="rounded-lg h-9 cursor-pointer gap-2.5"
+                              onClick={() => {
+                                const f = sf.filters;
+                                if (f.searchQuery !== undefined) setSearchQuery(f.searchQuery || '');
+                                setFilterAssignee(f.filterAssignee ?? null);
+                                setFilterCreator(f.filterCreator ?? null);
+                                setFilterPriority(f.filterPriority ?? null);
+                                setFilterDueDate(f.filterDueDate ?? null);
+                              }}>
+                              <Bookmark className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className="text-sm font-medium truncate">{sf.name}</span>
+                              <button className="ml-auto text-muted-foreground/50 hover:text-rose-400 text-xs p-0.5"
+                                onClick={e => { e.stopPropagation(); deleteSavedFilter(sf.id).then(() => setSavedFilters(prev => prev.filter(x => x.id !== sf.id))); }}>✕</button>
+                            </DropdownMenuItem>
                           ))}
-                          <div className="border-t border-border/50 pt-2 mt-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="w-full text-xs gap-1.5 text-muted-foreground"
-                              disabled={savingFilter}
-                              onClick={async () => {
-                                const name = prompt('Filter name:');
-                                if (!name || !activeProject) return;
-                                setSavingFilter(true);
-                                const sf = await createSavedFilter(activeProject.id, name, {
-                                  searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate,
-                                });
-                                setSavedFilters(prev => [...prev, sf]);
-                                setSavingFilter(false);
-                              }}
-                            >
-                              <BookmarkPlus className="w-3.5 h-3.5" />
-                              Save current filters
-                            </Button>
-                          </div>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  )}
+                        </>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5"
+                        disabled={savingFilter}
+                        onClick={async () => {
+                          const name = prompt('Filter name:');
+                          if (!name || !activeProject) return;
+                          setSavingFilter(true);
+                          const sf = await createSavedFilter(activeProject.id, name, { searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate });
+                          setSavedFilters(prev => [...prev, sf]);
+                          setSavingFilter(false);
+                        }}>
+                        <BookmarkPlus className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-sm font-medium">Save filters</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
                   {/* New task */}
                   <Button
-                    className="h-9 px-4 font-bold text-primary-foreground shadow-md shadow-primary/25 border-0 hover:opacity-90 transition-opacity gap-1.5"
+                    className="h-9 px-4 font-bold text-primary-foreground shadow-md shadow-primary/25 border-0 hover:opacity-90 transition-opacity gap-1.5 rounded-xl"
                     style={{ background: 'linear-gradient(135deg, oklch(0.67 0.30 285), oklch(0.60 0.26 310))' }}
-                    onClick={() => {
-                      setSelectedTask(null);
-                      setDefaultStatus('todo');
-                      setTaskDialogOpen(true);
-                    }}
+                    onClick={() => { setSelectedTask(null); setDefaultStatus('todo'); setTaskDialogOpen(true); }}
                   >
                     <span className="text-base leading-none font-light">+</span>
-                    <span className="hidden md:inline">New task</span>
-                    <span className="md:hidden">New</span>
+                    <span className="hidden sm:inline">New task</span>
                   </Button>
                 </div>
-              </div>
             </div>
 
             {/* Board or Timeline */}
