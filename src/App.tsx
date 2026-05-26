@@ -11,7 +11,10 @@ import {
   fetchTaskTemplates,
   createCompany,
   updateCompany,
-  deleteCompany,
+  createPod,
+  updatePod,
+  deletePod,
+  fetchPods,
   createProject,
   updateProject,
   deleteProject,
@@ -31,7 +34,7 @@ import { useServerEvents } from './hooks/useServerEvents';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Project, Task, TaskStatus, TaskPriority, UserProfile, Company, DEFAULT_STAGES, Stage, Milestone, CustomFieldDefinition, TaskTemplate, Notification, SavedFilter, AutomationRule } from './types';
+import { Project, Task, TaskStatus, TaskPriority, UserProfile, Company, Pod, DEFAULT_STAGES, Stage, Milestone, CustomFieldDefinition, TaskTemplate, Notification, SavedFilter, AutomationRule } from './types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -50,6 +53,7 @@ import { BulkActionBar } from './components/BulkActionBar';
 import { NotificationBell } from './components/NotificationBell';
 import { GanttView } from './components/GanttView';
 import { AutomationsDialog } from './components/AutomationsDialog';
+import { PodDialog } from './components/PodDialog';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { Logo } from './components/Logo';
 import { Hash, Filter, Search, Users, Menu, Settings, Milestone as MilestoneIcon, Layers, CheckSquare, Zap, Bookmark, BookmarkPlus } from 'lucide-react';
@@ -109,9 +113,15 @@ export default function App() {
 function AppContent() {
   const [user, setUser] = React.useState<AppUser | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [companies, setCompanies] = React.useState<Company[]>([]);
-  const [activeCompany, setActiveCompany] = React.useState<Company | null>(null);
-  
+  const [company, setCompany] = React.useState<Company | null>(null);
+  const [pods, setPods] = React.useState<Pod[]>([]);
+  const [activePod, setActivePod] = React.useState<Pod | null>(null);
+
+  // Pod dialog state
+  const [podDialogOpen, setPodDialogOpen] = React.useState(false);
+  const [selectedPodForEdit, setSelectedPodForEdit] = React.useState<Pod | null>(null);
+  const [projectDialogPodId, setProjectDialogPodId] = React.useState<string | undefined>(undefined);
+
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [activeProject, setActiveProject] = React.useState<Project | null>(null);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -183,28 +193,25 @@ function AppContent() {
     };
   }, []);
 
-  const loadCompanies = React.useCallback(async () => {
+  const loadCompany = React.useCallback(async () => {
     if (!user) return;
     const comps = await fetchCompanies().catch(() => [] as Company[]);
-    setCompanies(comps);
-    if (comps.length > 0) {
-      setActiveCompany(prev => {
-        if (!prev) return comps[0];
-        return comps.find(c => c.id === prev.id) || comps[0];
-      });
-    } else {
-      setActiveCompany(null);
-    }
+    setCompany(comps.length > 0 ? comps[0] : null);
   }, [user]);
 
+  const loadPods = React.useCallback(async (companyId: string) => {
+    const podList = await fetchPods(companyId).catch(() => [] as Pod[]);
+    setPods(podList);
+  }, []);
+
   const loadProjects = React.useCallback(async () => {
-    if (!user || !activeCompany) return;
-    const projs = await fetchProjects(activeCompany.id).catch(() => [] as Project[]);
+    if (!user || !company) return;
+    const projs = await fetchProjects(company.id).catch(() => [] as Project[]);
     setProjects(projs);
     if (activeProject && !projs.find(p => p.id === activeProject.id)) {
       setActiveProject(null);
     }
-  }, [user, activeCompany, activeProject]);
+  }, [user, company, activeProject]);
 
   const loadProjectData = React.useCallback(async (projectId: string) => {
     const [taskList, milestoneList, fieldDefs, templates] = await Promise.all([
@@ -226,14 +233,19 @@ function AppContent() {
   }, [projects]);
 
   React.useEffect(() => {
-    if (!user) { setCompanies([]); setActiveCompany(null); return; }
-    loadCompanies();
+    if (!user) { setCompany(null); setPods([]); return; }
+    loadCompany();
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
-    if (!user || !activeCompany) { setProjects([]); setActiveProject(null); return; }
+    if (!company) { setPods([]); return; }
+    loadPods(company.id);
+  }, [company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  React.useEffect(() => {
+    if (!user || !company) { setProjects([]); setActiveProject(null); return; }
     loadProjects();
-  }, [user, activeCompany]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (!activeProject) {
@@ -300,8 +312,10 @@ function AppContent() {
       if (activeProjectId) fetchTaskTemplates(activeProjectId).then(setTaskTemplates).catch(() => {});
     } else if (type === 'projects:changed') {
       loadProjects();
+    } else if (type === 'pods:changed') {
+      if (company) loadPods(company.id);
     } else if (type === 'companies:changed') {
-      loadCompanies();
+      loadCompany();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId]));
@@ -328,35 +342,44 @@ function AppContent() {
     memberIds?: string[];
     adminIds?: string[]
   }) => {
-    // selectedCompanyForEdit is set when opening the CompanyDialog for editing.
-    // Dashboard's inline form calls this directly without opening the dialog,
-    // so fall back to activeCompany as the update target.
-    const targetId = selectedCompanyForEdit?.id ?? activeCompany?.id;
+    const targetId = selectedCompanyForEdit?.id ?? company?.id;
     if (targetId) {
       await updateCompany(targetId, data);
     } else {
       await createCompany(data);
     }
+    await loadCompany();
   };
 
-  const handleDeleteCompany = async (companyId: string) => {
-    setCompanies(prev => prev.filter(c => c.id !== companyId));
-    if (activeCompany?.id === companyId) setActiveCompany(null);
-    deleteCompany(companyId).catch(() => {});
+  const handleSavePod = async (data: { name: string; description?: string; color?: string; members?: string[] }) => {
+    if (!company) return;
+    if (selectedPodForEdit) {
+      await updatePod(selectedPodForEdit.id, data);
+    } else {
+      await createPod(company.id, data);
+    }
+    await loadPods(company.id);
+  };
+
+  const handleDeletePod = async (podId: string) => {
+    if (!company) return;
+    await deletePod(podId);
+    setPods(prev => prev.filter(p => p.id !== podId));
+    if (activePod?.id === podId) setActivePod(null);
   };
 
   const handleSaveProject = async (data: { name: string; description: string; members: string[]; stages: Stage[] }) => {
     if (selectedProjectForEdit) {
       await updateProject(selectedProjectForEdit.id, data);
-    } else if (activeCompany) {
-      await createProject(activeCompany.id, data);
+    } else if (company) {
+      await createProject(company.id, { ...data, podId: projectDialogPodId });
     }
   };
 
   const companyUsers = React.useMemo(() => {
-    if (!activeCompany) return [];
-    return users.filter(u => activeCompany.memberIds?.includes(u.uid));
-  }, [users, activeCompany]);
+    if (!company) return [];
+    return users.filter(u => company.memberIds?.includes(u.uid));
+  }, [users, company]);
 
   const handleDeleteProject = async (projectId: string) => {
     const prevProjects = projects;
@@ -474,22 +497,24 @@ function AppContent() {
               className="fixed inset-y-0 left-0 z-50 lg:hidden"
             >
               <Sidebar
-                companies={companies}
+                company={company}
+                pods={pods}
+                activePod={activePod}
                 projects={projects}
                 activeProject={activeProject}
-                activeCompany={activeCompany}
                 activeView={activeView}
-                onCompanySelect={(c) => {
-                  setActiveCompany(c);
+                onNewPod={() => {
+                  setSelectedPodForEdit(null);
+                  setPodDialogOpen(true);
                   setSidebarOpen(false);
                 }}
-                onNewCompany={() => {
-                  setSelectedCompanyForEdit(null);
-                  setCompanyDialogOpen(true);
+                onEditPod={(pod) => {
+                  setSelectedPodForEdit(pod);
+                  setPodDialogOpen(true);
                   setSidebarOpen(false);
                 }}
                 onCompanySettings={() => {
-                  setSelectedCompanyForEdit(activeCompany);
+                  setSelectedCompanyForEdit(company);
                   setCompanyDialogOpen(true);
                   setSidebarOpen(false);
                 }}
@@ -498,9 +523,20 @@ function AppContent() {
                   setActiveView('board');
                   setSidebarOpen(false);
                 }}
-                onNewProject={(proj) => {
-                  setSelectedProjectForEdit(proj || null);
+                onNewProject={(pod) => {
+                  setSelectedProjectForEdit(null);
+                  setProjectDialogPodId(pod.id);
                   setProjectDialogOpen(true);
+                  setSidebarOpen(false);
+                }}
+                onEditProject={(proj) => {
+                  setSelectedProjectForEdit(proj);
+                  setProjectDialogOpen(true);
+                  setSidebarOpen(false);
+                }}
+                onDashboardSelect={() => {
+                  setActiveProject(null);
+                  setActiveView('board');
                   setSidebarOpen(false);
                 }}
                 onAnalyticsSelect={() => {
@@ -527,27 +563,40 @@ function AppContent() {
         className="hidden lg:flex"
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        companies={companies}
+        company={company}
+        pods={pods}
+        activePod={activePod}
         projects={projects}
         activeProject={activeProject}
-        activeCompany={activeCompany}
         activeView={activeView}
-        onCompanySelect={setActiveCompany}
-        onNewCompany={() => {
-          setSelectedCompanyForEdit(null);
-          setCompanyDialogOpen(true);
+        onNewPod={() => {
+          setSelectedPodForEdit(null);
+          setPodDialogOpen(true);
+        }}
+        onEditPod={(pod) => {
+          setSelectedPodForEdit(pod);
+          setPodDialogOpen(true);
         }}
         onCompanySettings={() => {
-          setSelectedCompanyForEdit(activeCompany);
+          setSelectedCompanyForEdit(company);
           setCompanyDialogOpen(true);
         }}
         onProjectSelect={(p) => {
           setActiveProject(p);
           setActiveView('board');
         }}
-        onNewProject={(proj) => {
-          setSelectedProjectForEdit(proj || null);
+        onNewProject={(pod) => {
+          setSelectedProjectForEdit(null);
+          setProjectDialogPodId(pod.id);
           setProjectDialogOpen(true);
+        }}
+        onEditProject={(proj) => {
+          setSelectedProjectForEdit(proj);
+          setProjectDialogOpen(true);
+        }}
+        onDashboardSelect={() => {
+          setActiveProject(null);
+          setActiveView('board');
         }}
         onAnalyticsSelect={() => {
           setActiveProject(null);
@@ -561,7 +610,7 @@ function AppContent() {
       />
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {!activeCompany ? (
+        {!company ? (
           <div className="relative flex-1 flex flex-col items-center justify-center p-8 text-center bg-transparent z-10">
             <div className="absolute top-4 left-4 lg:hidden">
               <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
@@ -573,10 +622,10 @@ function AppContent() {
             </div>
             <h2 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Create your company</h2>
             <p className="text-muted-foreground max-w-sm mb-8">
-              Workspaces belong to a company. Create one to get started.
+              Pods and workspaces belong to a company. Create one to get started.
             </p>
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 h-12 shadow-xl shadow-primary/20 rounded-xl font-bold"
               onClick={() => {
                 setSelectedCompanyForEdit(null);
@@ -614,7 +663,7 @@ function AppContent() {
               </h2>
             </div>
             <Dashboard
-              company={activeCompany}
+              company={company}
               projects={projects}
               tasks={allTasks}
               users={users}
@@ -630,10 +679,10 @@ function AppContent() {
               onDeleteProject={handleDeleteProject}
               onNewProject={() => {
                 setSelectedProjectForEdit(null);
+                setProjectDialogPodId(undefined);
                 setProjectDialogOpen(true);
               }}
               onUpdateCompany={handleSaveCompany}
-              onDeleteCompany={handleDeleteCompany}
             />
           </div>
         ) : (
@@ -1021,7 +1070,16 @@ function AppContent() {
           users={users}
           currentUserId={user.uid}
           onSave={handleSaveCompany}
-          onDelete={handleDeleteCompany}
+        />
+
+        <PodDialog
+          open={podDialogOpen}
+          onOpenChange={(open) => { setPodDialogOpen(open); if (!open) setSelectedPodForEdit(null); }}
+          pod={selectedPodForEdit}
+          users={companyUsers}
+          currentUserId={user.uid}
+          onSave={handleSavePod}
+          onDelete={handleDeletePod}
         />
 
         <ProfileSetup

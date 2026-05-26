@@ -34,12 +34,18 @@ def _require_admin(company: dict, user_id: str):
 @router.get("", response_model=list[CompanyOut])
 def list_companies(user=Depends(get_current_user)):
     res = db.table("companies").select("*").execute()
-    # Filter to companies where the user is a member
-    return [_map(r) for r in res.data if user["id"] in (r.get("member_ids") or [])]
+    user_companies = [_map(r) for r in res.data if user["id"] in (r.get("member_ids") or [])]
+    return user_companies[:1]  # Only return the single company
 
 
 @router.post("", response_model=CompanyOut)
 async def create_company(body: CreateCompanyIn, user=Depends(get_current_user)):
+    # Enforce one company per user — return existing if already has one
+    existing_all = db.table("companies").select("*").execute()
+    user_company = next((r for r in existing_all.data if user["id"] in (r.get("member_ids") or [])), None)
+    if user_company:
+        return _map(user_company)
+
     res = db.table("companies").insert({
         "name": body.name,
         "owner_id": user["id"],

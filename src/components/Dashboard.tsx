@@ -37,7 +37,7 @@ import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 
 interface DashboardProps {
-  company: Company;
+  company: Company | null;
   projects: Project[];
   tasks: Task[];
   users: UserProfile[];
@@ -46,15 +46,15 @@ interface DashboardProps {
   onEditProject: (project: Project) => void;
   onDeleteProject: (projectId: string) => void;
   onNewProject: () => void;
-  onUpdateCompany: (data: { 
-    name: string; 
-    location?: string; 
-    website?: string; 
-    industry?: string; 
-    memberIds?: string[]; 
-    adminIds?: string[] 
+  onUpdateCompany: (data: {
+    name: string;
+    location?: string;
+    website?: string;
+    industry?: string;
+    memberIds?: string[];
+    adminIds?: string[]
   }) => void;
-  onDeleteCompany: (companyId: string) => void;
+  onDeleteCompany?: (companyId: string) => void;
 }
 
 export function Dashboard({ 
@@ -474,7 +474,7 @@ export function Dashboard({
                         size="sm"
                         onClick={async () => {
                           try {
-                            await onDeleteCompany(company.id);
+                            await onDeleteCompany?.(company!.id);
                           } catch (err) {
                             console.error("Failed to delete company:", err);
                           } finally {
