@@ -12,7 +12,7 @@ _security = HTTPBearer()
 
 def _decode(token: str) -> dict:
     if not JWT_SECRET:
-        raise HTTPException(status_code=500, detail="JWT secret not configured")
+        raise HTTPException(status_code=500, detail="JWT secret not configured — set SUPABASE_JWT_SECRET in .env")
     try:
         return jwt.decode(
             token,
@@ -23,6 +23,8 @@ def _decode(token: str) -> dict:
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
     except jwt.InvalidTokenError as exc:
+        import logging
+        logging.getLogger("auth").error("JWT decode failed: %s | secret_len=%d | token_prefix=%s", exc, len(JWT_SECRET), token[:20])
         raise HTTPException(status_code=401, detail=f"Invalid token: {exc}")
 
 
