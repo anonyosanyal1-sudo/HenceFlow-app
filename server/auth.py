@@ -1,25 +1,39 @@
 import os
 import jwt
+from jwt import PyJWKClient
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 
 load_dotenv()
 
-JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "")
+SUPABASE_URL: str = os.getenv("VITE_SUPABASE_URL", "")
 _security = HTTPBearer()
+_jwks_client: PyJWKClient | None = None
+
+
+def _get_jwks_client() -> PyJWKClient:
+    global _jwks_client
+    if _jwks_client is None:
+        if not SUPABASE_URL:
+            raise HTTPException(status_code=500, detail="VITE_SUPABASE_URL not configured")
+        jwks_url = f"{SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
+        _jwks_client = PyJWKClient(jwks_url)
+    return _jwks_client
 
 
 def _decode(token: str) -> dict:
-    if not JWT_SECRET:
-        raise HTTPException(status_code=500, detail="JWT secret not configured")
     try:
+        client = _get_jwks_client()
+        signing_key = client.get_signing_key_from_jwt(token)
         return jwt.decode(
             token,
-            JWT_SECRET,
-            algorithms=["HS256"],
+            signing_key.key,
+            algorithms=["RS256"],
             audience="authenticated",
         )
+    except HTTPException:
+        raise
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
     except jwt.InvalidTokenError as exc:
