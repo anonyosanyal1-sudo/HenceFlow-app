@@ -299,6 +299,53 @@ export function Sidebar({
             );
           })}
 
+          {/* Projects not assigned to any pod */}
+          {(() => {
+            const unassigned = projects.filter(p => !p.podId);
+            if (unassigned.length === 0) return null;
+            return (
+              <div className="space-y-0.5">
+                {!isCollapsed && (
+                  <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+                    Unassigned
+                  </div>
+                )}
+                {unassigned.map(project => (
+                  <div key={project.id} className="group relative">
+                    {isCollapsed ? (
+                      <Tooltip>
+                        <TooltipTrigger render={
+                          <div
+                            onClick={() => onProjectSelect(project)}
+                            className={cn("w-full flex items-center justify-center rounded-xl cursor-pointer transition-all p-2 h-8 relative", activeProject?.id === project.id ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}
+                          >
+                            <Hash className="w-3.5 h-3.5" />
+                          </div>
+                        } />
+                        <TooltipContent side="right" sideOffset={10}>{project.name}</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <div
+                        onClick={() => onProjectSelect(project)}
+                        className={cn("w-full flex items-center px-2 py-1.5 text-sm rounded-xl cursor-pointer transition-all relative overflow-hidden", activeProject?.id === project.id ? "bg-gradient-to-r from-primary/20 to-primary/5 text-primary font-semibold" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}
+                      >
+                        {activeProject?.id === project.id && <span className="absolute left-0 inset-y-1.5 w-[3px] rounded-r-full bg-primary" />}
+                        <Hash className="w-3 h-3 mr-2 opacity-60 shrink-0" />
+                        <span className="truncate flex-1 text-left text-xs">{project.name}</span>
+                        <button
+                          className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-5 w-5 ml-1 lg:opacity-0 lg:group-hover:opacity-100 shrink-0")}
+                          onClick={e => { e.stopPropagation(); onEditProject(project); }}
+                        >
+                          <MoreVertical className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           {/* Add Pod button */}
           {isCollapsed ? (
             <Tooltip>
