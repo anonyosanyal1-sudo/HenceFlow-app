@@ -1,7 +1,7 @@
 import { http } from '../lib/http';
 import { supabase } from '../lib/supabase';
 import {
-  Task, Project, UserProfile, Comment, Company,
+  Task, Project, UserProfile, Comment, Company, Pod,
   TaskDependency, TimeEntry, Milestone, ActivityLog,
   CustomFieldDefinition, CustomFieldValue, TaskTemplate, Subtask,
   Notification, TaskWatcher, SavedFilter, AutomationRule,
@@ -38,6 +38,7 @@ function mapProject(r: Record<string, any>): Project {
   return {
     id: r.id,
     companyId: r.companyId,
+    podId: r.podId ?? undefined,
     name: r.name,
     description: r.description ?? undefined,
     ownerId: r.ownerId,
@@ -212,20 +213,66 @@ export const deleteCompany = async (companyId: string) => {
   await http.delete(`/api/companies/${companyId}`);
 };
 
+// ── Pods ──────────────────────────────────────────────────────────────────────
+
+function mapPod(r: Record<string, any>): Pod {
+  return {
+    id: r.id,
+    companyId: r.companyId,
+    name: r.name,
+    description: r.description ?? undefined,
+    color: r.color,
+    ownerId: r.ownerId,
+    members: r.members ?? [],
+    createdAt: r.createdAt,
+  };
+}
+
+export const fetchPods = async (companyId: string): Promise<Pod[]> => {
+  const rows = await http.get<Record<string, any>[]>('/api/pods', { company_id: companyId });
+  return rows.map(mapPod);
+};
+
+export const createPod = async (companyId: string, data: Partial<Pod>): Promise<string> => {
+  const row = await http.post<Record<string, any>>('/api/pods', {
+    name: data.name,
+    description: data.description,
+    color: data.color,
+    members: data.members,
+  }, { company_id: companyId });
+  return row.id;
+};
+
+export const updatePod = async (podId: string, updates: Partial<Pod>) => {
+  await http.patch(`/api/pods/${podId}`, {
+    name: updates.name,
+    description: updates.description,
+    color: updates.color,
+    members: updates.members,
+  });
+};
+
+export const deletePod = async (podId: string) => {
+  await http.delete(`/api/pods/${podId}`);
+};
+
 // ── Projects ──────────────────────────────────────────────────────────────────
 
-export const fetchProjects = async (companyId: string): Promise<Project[]> => {
-  const rows = await http.get<Record<string, any>[]>('/api/projects', { company_id: companyId });
+export const fetchProjects = async (companyId: string, podId?: string): Promise<Project[]> => {
+  const params: Record<string, string> = { company_id: companyId };
+  if (podId) params.pod_id = podId;
+  const rows = await http.get<Record<string, any>[]>('/api/projects', params);
   return rows.map(mapProject);
 };
 
-export const createProject = async (companyId: string, data: Partial<Project>): Promise<string> => {
+export const createProject = async (companyId: string, data: Partial<Project> & { podId?: string }): Promise<string> => {
   const row = await http.post<Record<string, any>>('/api/projects', {
     name: data.name,
     description: data.description,
     members: data.members,
     color: data.color,
     stages: data.stages,
+    podId: data.podId,
   }, { company_id: companyId });
   return row.id;
 };

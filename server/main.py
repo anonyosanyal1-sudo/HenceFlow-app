@@ -14,6 +14,7 @@ from server.routers import (
     milestones, time_entries, activity_logs, custom_fields, templates, dependencies,
 )
 from server.routers import notifications, watchers, saved_filters, automations, export
+from server.routers import pods
 
 
 def _spawn_due_recurring_tasks():
@@ -105,6 +106,7 @@ app.include_router(watchers.router,      prefix=API_PREFIX)
 app.include_router(saved_filters.router, prefix=API_PREFIX)
 app.include_router(automations.router,   prefix=API_PREFIX)
 app.include_router(export.router,        prefix=API_PREFIX)
+app.include_router(pods.router,          prefix=API_PREFIX)
 
 
 # ── SSE real-time events ──────────────────────────────────────────────────────

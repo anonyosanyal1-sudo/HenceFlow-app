@@ -60,6 +60,7 @@ class StageModel(BaseModel):
 class ProjectOut(BaseModel):
     id: str
     companyId: str
+    podId: Optional[str]
     name: str
     description: Optional[str]
     ownerId: str
@@ -75,6 +76,7 @@ class CreateProjectIn(BaseModel):
     members: Optional[list[str]] = None
     color: Optional[str] = "#6366f1"
     stages: Optional[list[StageModel]] = None
+    podId: Optional[str] = None
 
 
 class UpdateProjectIn(BaseModel):
@@ -83,6 +85,33 @@ class UpdateProjectIn(BaseModel):
     members: Optional[list[str]] = None
     color: Optional[str] = None
     stages: Optional[list[StageModel]] = None
+
+
+# ── Pods ──────────────────────────────────────────────────────────────────────
+
+class PodOut(BaseModel):
+    id: str
+    companyId: str
+    name: str
+    description: Optional[str]
+    color: str
+    ownerId: str
+    members: list[str]
+    createdAt: str
+
+
+class CreatePodIn(BaseModel):
+    name: str
+    description: Optional[str] = None
+    color: Optional[str] = "#6366f1"
+    members: Optional[list[str]] = None
+
+
+class UpdatePodIn(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    color: Optional[str] = None
+    members: Optional[list[str]] = None
 
 
 # ── Tasks ─────────────────────────────────────────────────────────────────────

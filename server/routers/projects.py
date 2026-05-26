@@ -22,6 +22,7 @@ def _map(row: dict) -> ProjectOut:
     return ProjectOut(
         id=row["id"],
         companyId=row["company_id"],
+        podId=row.get("pod_id"),
         name=row["name"],
         description=row.get("description"),
         ownerId=row["owner_id"],
@@ -38,8 +39,11 @@ def _require_member(project: dict, user_id: str):
 
 
 @router.get("", response_model=list[ProjectOut])
-def list_projects(company_id: str, user=Depends(get_current_user)):
-    res = db.table("projects").select("*").eq("company_id", company_id).execute()
+def list_projects(company_id: str, pod_id: str = None, user=Depends(get_current_user)):
+    q = db.table("projects").select("*").eq("company_id", company_id)
+    if pod_id:
+        q = q.eq("pod_id", pod_id)
+    res = q.execute()
     return [_map(r) for r in res.data if user["id"] in (r.get("members") or [])]
 
 
@@ -55,6 +59,7 @@ async def create_project(company_id: str, body: CreateProjectIn, user=Depends(ge
 
     res = db.table("projects").insert({
         "company_id": company_id,
+        "pod_id": body.podId,
         "name": body.name,
         "description": body.description,
         "owner_id": user["id"],

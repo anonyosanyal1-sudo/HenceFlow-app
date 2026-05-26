@@ -22,6 +22,17 @@ export interface Company {
   createdAt: string;
 }
 
+export interface Pod {
+  id: string;
+  companyId: string;
+  name: string;
+  description?: string;
+  color: string;
+  ownerId: string;
+  members: string[];
+  createdAt: string;
+}
+
 export interface Stage {
   id: string;
   label: string;
@@ -51,6 +62,7 @@ const _STAGE_ACCENT_SAFELIST =
 export interface Project {
   id: string;
   companyId: string;
+  podId?: string;
   name: string;
   description?: string;
   ownerId: string;
