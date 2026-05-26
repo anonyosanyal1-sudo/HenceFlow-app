@@ -1,37 +1,17 @@
 import React from 'react';
-import { Project, Task, TaskStatus, Company, UserProfile } from '../types';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Project, Task, Company, UserProfile } from '../types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserAvatar } from './UserAvatar';
-import { 
-  BarChart3, 
-  Users, 
-  Settings, 
-  Trash2, 
-  Plus, 
-  Layout, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle,
-  TrendingUp,
-  FolderOpen,
-  MapPin,
-  Briefcase,
-  Globe,
-  Monitor
+import {
+  Settings, Trash2, Plus, AlertCircle, Users, TrendingUp,
+  ArrowUpRight, Zap, ChevronRight, Search, Bell,
 } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
@@ -47,41 +27,30 @@ interface DashboardProps {
   onDeleteProject: (projectId: string) => void;
   onNewProject: () => void;
   onUpdateCompany: (data: {
-    name: string;
-    location?: string;
-    website?: string;
-    industry?: string;
-    memberIds?: string[];
-    adminIds?: string[]
+    name: string; location?: string; website?: string;
+    industry?: string; memberIds?: string[]; adminIds?: string[];
   }) => void;
   onDeleteCompany?: (companyId: string) => void;
 }
 
-export function Dashboard({ 
-  company,
-  projects, 
-  tasks, 
-  users,
-  currentUserId,
-  onProjectSelect, 
-  onEditProject, 
-  onDeleteProject,
-  onNewProject,
-  onUpdateCompany,
-  onDeleteCompany
+const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+export function Dashboard({
+  company, projects, tasks, users, currentUserId,
+  onProjectSelect, onEditProject, onDeleteProject, onNewProject,
+  onUpdateCompany, onDeleteCompany,
 }: DashboardProps) {
-  
-  const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
+
   const [projectToDelete, setProjectToDelete] = React.useState<Project | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = React.useState('');
-  
-  // Local state for company settings to avoid uncontrolled component warnings
+  const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
+  const [workspaceFilter, setWorkspaceFilter] = React.useState<'all' | 'active' | 'archived'>('all');
   const [companyName, setCompanyName] = React.useState(company?.name || '');
   const [companyLocation, setCompanyLocation] = React.useState(company?.location || '');
   const [companyIndustry, setCompanyIndustry] = React.useState(company?.industry || '');
   const [companyWebsite, setCompanyWebsite] = React.useState(company?.website || '');
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
 
-  // Sync local state when company prop changes
   React.useEffect(() => {
     setCompanyName(company?.name || '');
     setCompanyLocation(company?.location || '');
@@ -89,494 +58,522 @@ export function Dashboard({
     setCompanyWebsite(company?.website || '');
   }, [company]);
 
-  const getProjectStats = (projectId: string) => {
-    const project = projects.find(p => p.id === projectId);
-    const closedStageId = project?.stages?.[project.stages.length - 1]?.id || 'closed';
-    const todoStageId = project?.stages?.[0]?.id || 'todo';
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  const today = new Date().toISOString().split('T')[0];
 
-    const projectTasks = tasks.filter(t => t.projectId === projectId);
-    const completed = projectTasks.filter(t => t.status === closedStageId).length;
-    const inProgress = projectTasks.filter(t => t.status !== todoStageId && t.status !== closedStageId).length;
-    const total = projectTasks.length;
-    const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
-    
-    return { total, completed, inProgress, progress };
+  const isCompleted = (t: Task) => {
+    const proj = projects.find(p => p.id === t.projectId);
+    const closedId = proj?.stages?.[proj.stages.length - 1]?.id ?? 'closed';
+    return t.status === closedId;
   };
 
-  const totalTasks = tasks.length;
-  // Fallback if no project available for a task
-  const totalCompleted = tasks.filter(t => {
-    const project = projects.find(p => p.id === t.projectId);
-    const closedStageId = project?.stages?.[project.stages.length - 1]?.id || 'closed';
-    return t.status === closedStageId;
-  }).length;
-  const activeProjects = projects.length;
+  const isOverdue = (t: Task) =>
+    !!t.dueDate && t.dueDate < today && !isCompleted(t);
 
+  const totalTasks = tasks.length;
+  const completedCount = tasks.filter(isCompleted).length;
+  const overdueCount = tasks.filter(isOverdue).length;
+  const completionRate = totalTasks === 0 ? 0 : Math.round((completedCount / totalTasks) * 100);
+
+  // Velocity: tasks marked done in last 7 days ÷ 7
+  const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const recentDone = tasks.filter(t => isCompleted(t) && new Date(t.updatedAt) > sevenDaysAgo).length;
+  const velocity = (recentDone / 7).toFixed(1);
+
+  // Tasks due this week
+  const weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7);
+  const weekEndStr = weekEnd.toISOString().split('T')[0];
+  const tasksDueThisWeek = tasks.filter(
+    t => t.dueDate && t.dueDate >= today && t.dueDate <= weekEndStr && !isCompleted(t)
+  ).length;
+
+  // This-week bar chart: count tasks updated each day Mon→Sun of current week
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
+  weekStart.setHours(0, 0, 0, 0);
+  const weekBars = WEEK_DAYS.map((_, i) => {
+    const dayStart = new Date(weekStart); dayStart.setDate(weekStart.getDate() + i);
+    const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+    return tasks.filter(t => {
+      const d = new Date(t.updatedAt);
+      return isCompleted(t) && d >= dayStart && d < dayEnd;
+    }).length;
+  });
+  const maxBar = Math.max(...weekBars, 1);
+  const todayDayIndex = (new Date().getDay() + 6) % 7; // 0=Mon
+
+  // Per-project stats
+  const getProjectStats = (project: Project) => {
+    const closedId = project.stages?.[project.stages.length - 1]?.id ?? 'closed';
+    const pt = tasks.filter(t => t.projectId === project.id);
+    const completed = pt.filter(t => t.status === closedId).length;
+    const total = pt.length;
+    return { total, completed, progress: total === 0 ? 0 : Math.round((completed / total) * 100) };
+  };
+
+  // Overall progress
+  const overallProgress = completionRate;
+
+  // Greeting
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 21 ? 'Good evening' : 'Good night';
   const currentUser = users.find(u => u.uid === currentUserId);
-  const isCurrentUserOwner = company?.ownerId === currentUserId;
+  const firstName = currentUser?.displayName?.split(' ')[0] ?? currentUser?.email?.split('@')[0] ?? 'there';
+
+  // New tasks this week
+  const newThisWeek = tasks.filter(t => new Date(t.createdAt) > sevenDaysAgo).length;
+
+  const accentFor = (project: Project) => project.color || 'oklch(0.67 0.30 285)';
+
+  const filteredProjects = projects; // All/Active/Archived filter TBD by archived field when available
+
+  // ── Stats cards ─────────────────────────────────────────────────────────────
+  const stats = [
+    {
+      label: 'TOTAL TASKS',
+      value: totalTasks,
+      sub: newThisWeek > 0 ? `↑ ${newThisWeek} this week` : 'No new tasks',
+      subColor: newThisWeek > 0 ? 'text-emerald-400' : 'text-muted-foreground',
+    },
+    {
+      label: 'COMPLETED',
+      value: completedCount,
+      sub: `${completionRate}% rate`,
+      subColor: 'text-muted-foreground',
+    },
+    {
+      label: 'OVERDUE',
+      value: overdueCount,
+      sub: overdueCount === 0 ? 'All clear' : `${overdueCount} need attention`,
+      subColor: overdueCount === 0 ? 'text-muted-foreground' : 'text-rose-400',
+    },
+    {
+      label: 'VELOCITY',
+      value: velocity,
+      sub: 'tasks / day',
+      subColor: 'text-muted-foreground',
+    },
+  ];
 
   return (
-    <div className="flex-1 overflow-y-auto bg-transparent p-6 md:p-12 relative z-10">
-      <div className="max-w-5xl mx-auto space-y-10">
+    <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background">
+      {/* ── Top bar ──────────────────────────────────────────────────────────── */}
+      <div className="h-14 shrink-0 border-b border-border/30 flex items-center justify-between px-6 bg-card/30 backdrop-blur-sm">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="font-medium text-foreground/70">{company?.name}</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+          <span className="font-semibold text-foreground">Dashboard</span>
+        </div>
+        {/* Right: search + icons */}
+        <div className="flex items-center gap-2">
+          <div className="relative hidden md:block">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40 pointer-events-none" />
+            <input
+              placeholder="Search…"
+              className="pl-9 pr-10 h-9 w-52 rounded-xl bg-muted/40 border border-border/30 text-sm placeholder:text-muted-foreground/40 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+            />
+            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground/30 font-mono pointer-events-none">⌘K</kbd>
+          </div>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="h-9 w-9 flex items-center justify-center rounded-xl text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+          <button className="h-9 w-9 flex items-center justify-center rounded-xl text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors">
+            <Bell className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <UserAvatar
-                photoURL={currentUser?.photoURL ?? null}
-                displayName={currentUser?.displayName ?? null}
-                className="w-9 h-9 text-sm"
-              />
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  {isCurrentUserOwner ? 'Owner' : 'Member'} · {company.name}
-                </p>
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground leading-tight">
-                  {currentUser?.displayName ?? currentUser?.email ?? 'Dashboard'}
-                </h1>
-              </div>
+      {/* ── Main scroll area ─────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-6 md:px-10 py-8 space-y-8">
+
+          {/* ── Hero header ─────────────────────────────────────────────────── */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
+            <div>
+              <p className="text-[11px] font-bold tracking-[0.18em] text-muted-foreground/60 uppercase mb-3">
+                {[company?.name, company?.location].filter(Boolean).join(' · ')}
+              </p>
+              <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-foreground leading-none">
+                {greeting},{' '}
+                <em className="not-italic font-light italic" style={{ fontStyle: 'italic' }}>{firstName}</em>
+              </h1>
+              <p className="mt-3 text-sm text-muted-foreground">
+                You have{' '}
+                <span className="font-semibold text-foreground">{projects.length} active workspace{projects.length !== 1 ? 's' : ''}</span>
+                {tasksDueThisWeek > 0 && (
+                  <> and <span className="font-semibold text-foreground">{tasksDueThisWeek} task{tasksDueThisWeek !== 1 ? 's' : ''}</span> due this week</>
+                )}.
+              </p>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-muted-foreground pl-12">
-              {company.location && <span>{company.location}</span>}
-              {company.industry && <span>{company.industry}</span>}
-              {company.website && (
-                <a
-                  href={company.website.startsWith('http') ? company.website : `https://${company.website}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-primary transition-colors"
-                >
-                  {company.website.replace(/^https?:\/\//, '')}
-                </a>
-              )}
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" className="h-9 gap-2 border-border/50 font-medium text-muted-foreground hover:text-foreground rounded-xl">
+                <Users className="w-3.5 h-3.5" />
+                Invite
+              </Button>
+              <Button size="sm" onClick={onNewProject} className="h-9 gap-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-semibold">
+                <Plus className="w-3.5 h-3.5" />
+                New workspace
+              </Button>
             </div>
           </div>
-          <Button onClick={onNewProject} variant="outline" className="w-full md:w-auto h-9 px-4 text-xs rounded-full shadow-none hover:bg-muted font-medium border-border/40">
-            <Plus className="w-3.5 h-3.5 mr-1.5" />
-            New Workspace
-          </Button>
-        </div>
 
-        {/* Tabs for Workspaces and Setup */}
-        <Tabs defaultValue="workspaces" className="w-full">
-          <TabsList className="bg-transparent w-full justify-start border-b border-border/40 p-0 h-auto rounded-none space-x-6 mb-8 mt-4">
-            <TabsTrigger value="workspaces" className="pb-3 pt-0 px-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground data-[state=active]:text-foreground font-medium transition-none">Workspaces</TabsTrigger>
-            <TabsTrigger value="setup" className="pb-3 pt-0 px-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground data-[state=active]:text-foreground font-medium transition-none">Company Setup</TabsTrigger>
-          </TabsList>
+          {/* ── Stats row ────────────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {stats.map((s) => (
+              <div key={s.label} className="bg-card/50 border border-border/30 rounded-2xl p-5 space-y-2">
+                <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground/60">{s.label}</p>
+                <p className="text-3xl font-light text-foreground">{s.value}</p>
+                <p className={cn("text-xs font-medium", s.subColor)}>{s.sub}</p>
+              </div>
+            ))}
+          </div>
 
-          <TabsContent value="workspaces" className="space-y-6 md:space-y-8 mt-0 focus-visible:outline-none">
-            {/* Global Stats - Minimal */}
-            <div className="flex flex-wrap md:flex-nowrap gap-8 items-center text-sm mb-12">
-              <div className="flex flex-col space-y-1">
-                <span className="text-muted-foreground">Total Workspaces</span>
-                <span className="text-3xl font-light text-foreground">{activeProjects}</span>
-              </div>
-              <div className="w-px h-10 bg-border/40 hidden md:block" />
-              <div className="flex flex-col space-y-1">
-                <span className="text-muted-foreground">Completed Tasks</span>
-                <span className="text-3xl font-light text-foreground">{totalCompleted} <span className="text-lg text-muted-foreground">/ {totalTasks}</span></span>
-              </div>
-              <div className="w-px h-10 bg-border/40 hidden md:block" />
-              <div className="flex flex-col space-y-2 flex-1 max-w-xs pt-1">
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-muted-foreground">Overall Progress</span>
-                  <span className="text-sm font-medium">{totalTasks === 0 ? 0 : Math.round((totalCompleted / totalTasks) * 100)}%</span>
+          {/* ── Progress + This week ─────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-4">
+            {/* Overall progress */}
+            <div className="bg-card/50 border border-border/30 rounded-2xl p-6 space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Overall progress</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Across all workspaces</p>
                 </div>
-                <div className="w-full bg-border/40 h-[2px] rounded-full overflow-hidden">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${totalTasks === 0 ? 0 : (totalCompleted / totalTasks) * 100}%` }}
-                    className="bg-foreground h-full"
-                  />
-                </div>
+                <span className="text-4xl font-light text-foreground">{overallProgress}<span className="text-2xl text-muted-foreground">%</span></span>
               </div>
-            </div>
 
-            {/* Workspaces List */}
-            <div className="space-y-6">
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {projects.map((project) => {
-              const stats = getProjectStats(project.id);
-              const accentColor = project.color || 'oklch(0.67 0.30 285)';
-              return (
+              {/* Master bar */}
+              <div className="w-full bg-muted/40 h-1.5 rounded-full overflow-hidden">
                 <motion.div
-                  key={project.id}
-                  whileHover={{ y: -3, scale: 1.005 }}
-                  transition={{ duration: 0.18 }}
-                >
-                  <Card
-                    className="bg-card/50 border-border/40 shadow-none hover:bg-card/90 hover:border-border/70 hover:shadow-[0_8px_30px_-8px_rgba(0,0,0,0.4)] transition-all group h-full flex flex-col rounded-2xl cursor-pointer relative overflow-hidden"
-                    onClick={() => onProjectSelect(project)}
-                  >
-                    {/* Colored top accent */}
-                    <div
-                      className="absolute top-0 left-0 right-0 h-[3px]"
-                      style={{ background: accentColor }}
-                    />
-                    {/* Subtle top glow */}
-                    <div
-                      className="absolute top-0 left-0 right-0 h-16 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-                      style={{ background: `linear-gradient(to bottom, ${accentColor}10, transparent)` }}
-                    />
+                  initial={{ width: 0 }}
+                  animate={{ width: `${overallProgress}%` }}
+                  transition={{ duration: 0.8, ease: 'easeOut' }}
+                  className="h-full rounded-full bg-primary"
+                />
+              </div>
 
-                    <CardHeader className="p-5 pb-0 border-none pt-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center space-x-2.5 min-w-0">
-                          <div
-                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
-                            style={{ backgroundColor: accentColor, boxShadow: `0 0 6px ${accentColor}60` }}
-                          />
-                          <CardTitle className="text-sm font-semibold text-foreground truncate">{project.name}</CardTitle>
+              {/* Per-project breakdown */}
+              <div className="space-y-3.5">
+                {projects.slice(0, 5).map(proj => {
+                  const { total, completed, progress } = getProjectStats(proj);
+                  const accent = accentFor(proj);
+                  return (
+                    <div key={proj.id} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: accent }} />
+                          <span className="text-foreground/80 font-medium truncate max-w-[200px]">{proj.name}</span>
                         </div>
-                        <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEditProject(project);
-                            }}
-                          >
-                            <Settings className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full text-muted-foreground hover:text-rose-400 hover:bg-rose-400/10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setProjectToDelete(project);
-                            }}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
+                        <span className="text-muted-foreground/60 shrink-0">{completed}/{total}</span>
                       </div>
-                      {project.description && (
-                        <CardDescription className="line-clamp-2 mt-2 text-xs text-muted-foreground/70 min-h-[2rem]">
-                          {project.description}
-                        </CardDescription>
-                      )}
-                    </CardHeader>
-                    
-                    <CardContent className="flex-1 p-5 pt-4 border-none flex flex-col justify-end">
-                      {/* Progress bar — colored with project accent */}
-                      <div className="w-full bg-border/30 h-[3px] rounded-full overflow-hidden mb-3">
+                      <div className="w-full bg-muted/40 h-1 rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}
-                          animate={{ width: `${stats.progress}%` }}
+                          animate={{ width: `${progress}%` }}
+                          transition={{ duration: 0.7, ease: 'easeOut' }}
                           className="h-full rounded-full"
-                          style={{ background: accentColor }}
+                          style={{ background: accent }}
                         />
                       </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground w-full">
-                        <div className="flex items-center gap-3">
-                          <span className="flex items-center gap-1" title="Tasks completed">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span className="font-medium text-foreground/70">{stats.completed}</span>
-                            <span className="text-muted-foreground/50">/{stats.total}</span>
-                          </span>
-                          {stats.inProgress > 0 && (
-                            <span className="flex items-center gap-1" title="In progress">
-                              <Clock className="w-3 h-3" />
-                              <span>{stats.inProgress}</span>
-                            </span>
-                          )}
-                        </div>
-                        <span
-                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                          style={{ color: accentColor, background: `${accentColor}18` }}
-                        >
-                          {stats.progress}%
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              );
-            })}
+                    </div>
+                  );
+                })}
+                {projects.length === 0 && (
+                  <p className="text-xs text-muted-foreground/40 italic text-center py-4">No workspaces yet</p>
+                )}
+              </div>
+            </div>
 
-            {projects.length === 0 && (
-              <div className="col-span-full border border-dashed border-border/60 rounded-2xl p-10 flex flex-col items-center justify-center text-center space-y-4">
-                <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center">
-                  <Layout className="w-5 h-5 text-muted-foreground/50" />
-                </div>
+            {/* This week */}
+            <div className="bg-card/50 border border-border/30 rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-medium text-foreground">No workspaces yet</h3>
-                  <p className="text-sm text-muted-foreground max-w-xs mt-1">Create your first workspace to start organizing your projects and tasks.</p>
+                  <p className="text-sm font-semibold text-foreground">This week</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Tasks by day</p>
                 </div>
-                <Button onClick={onNewProject} variant="outline" className="mt-2 h-9 text-xs rounded-full shadow-none border-border/50 hover:bg-muted font-medium">
-                  <Plus className="w-3.5 h-3.5 mr-1.5" />
-                  New Workspace
-                </Button>
+                {recentDone > 0 && (
+                  <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    {recentDone} this week
+                  </span>
+                )}
+              </div>
+
+              {/* Bar chart */}
+              <div className="flex items-end justify-between gap-1.5 h-28 pt-2">
+                {weekBars.map((count, i) => {
+                  const isToday = i === todayDayIndex;
+                  const heightPct = maxBar === 0 ? 0 : (count / maxBar) * 100;
+                  return (
+                    <div key={i} className="flex flex-col items-center gap-1.5 flex-1">
+                      <div className="w-full flex items-end justify-center" style={{ height: '80px' }}>
+                        <motion.div
+                          initial={{ height: 0 }}
+                          animate={{ height: `${Math.max(heightPct, count > 0 ? 8 : 0)}%` }}
+                          transition={{ duration: 0.5, delay: i * 0.05 }}
+                          className={cn(
+                            "w-full rounded-t-sm",
+                            isToday ? "bg-primary" : count > 0 ? "bg-muted-foreground/25" : "bg-muted/30"
+                          )}
+                          style={{ height: `${Math.max(heightPct, count > 0 ? 8 : 4)}%` }}
+                        />
+                      </div>
+                      <span className={cn("text-[10px] font-medium", isToday ? "text-primary" : "text-muted-foreground/40")}>
+                        {WEEK_DAYS[i]}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Workspaces ──────────────────────────────────────────────────── */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Workspaces</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Active projects you're tracking</p>
+              </div>
+              {/* Filter tabs */}
+              <div className="flex items-center bg-muted/30 border border-border/30 rounded-xl p-1 gap-0.5">
+                {(['all', 'active', 'archived'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setWorkspaceFilter(f)}
+                    className={cn(
+                      "px-3 h-7 rounded-lg text-xs font-semibold capitalize transition-all",
+                      workspaceFilter === f ? "bg-card text-foreground shadow-sm" : "text-muted-foreground/50 hover:text-muted-foreground"
+                    )}
+                  >
+                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredProjects.map(project => {
+                const { total, completed, progress } = getProjectStats(project);
+                const accent = accentFor(project);
+                return (
+                  <motion.div
+                    key={project.id}
+                    whileHover={{ y: -2 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <div
+                      className="bg-card/50 border border-border/30 rounded-2xl overflow-hidden hover:border-border/60 hover:bg-card/80 transition-all cursor-pointer group relative"
+                      onClick={() => onProjectSelect(project)}
+                    >
+                      {/* Top accent */}
+                      <div className="h-[3px] w-full" style={{ background: accent }} />
+                      <div className="p-5 space-y-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: accent }} />
+                            <span className="text-sm font-semibold text-foreground truncate">{project.name}</span>
+                          </div>
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
+                            <button
+                              onClick={e => { e.stopPropagation(); onEditProject(project); }}
+                              className="h-6 w-6 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); setProjectToDelete(project); }}
+                              className="h-6 w-6 flex items-center justify-center rounded-lg text-muted-foreground hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {project.description && (
+                          <p className="text-xs text-muted-foreground/60 line-clamp-2 -mt-1">{project.description}</p>
+                        )}
+
+                        <div className="space-y-2">
+                          <div className="w-full bg-muted/30 h-1 rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${progress}%` }}
+                              transition={{ duration: 0.6 }}
+                              className="h-full rounded-full"
+                              style={{ background: accent }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{completed} / {total} tasks</span>
+                            <span className="font-semibold" style={{ color: accent }}>{progress}%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+
+              {/* Add new workspace card */}
+              <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.15 }}>
+                <button
+                  onClick={onNewProject}
+                  className="w-full h-full min-h-[140px] border border-dashed border-border/40 rounded-2xl flex flex-col items-center justify-center gap-2 text-muted-foreground/40 hover:text-muted-foreground/70 hover:border-border/60 hover:bg-muted/10 transition-all"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span className="text-xs font-medium">New workspace</span>
+                </button>
+              </motion.div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── Company Settings Dialog ─────────────────────────────────────────── */}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="sm:max-w-2xl bg-card border-border max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">Company Settings</DialogTitle>
+            <DialogDescription>Manage your company details and team.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Company Name</label>
+                <Input value={companyName} onChange={e => setCompanyName(e.target.value)}
+                  className="bg-muted/50 border-border/60 focus-visible:ring-1 focus-visible:ring-primary" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Location</label>
+                <Input value={companyLocation} onChange={e => setCompanyLocation(e.target.value)}
+                  placeholder="e.g., San Francisco"
+                  className="bg-muted/50 border-border/60 focus-visible:ring-1 focus-visible:ring-primary" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Industry</label>
+                <Input value={companyIndustry} onChange={e => setCompanyIndustry(e.target.value)}
+                  placeholder="e.g., Technology"
+                  className="bg-muted/50 border-border/60 focus-visible:ring-1 focus-visible:ring-primary" />
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Website</label>
+                <Input value={companyWebsite} onChange={e => setCompanyWebsite(e.target.value)}
+                  placeholder="e.g., https://acme.com"
+                  className="bg-muted/50 border-border/60 focus-visible:ring-1 focus-visible:ring-primary" />
+              </div>
+            </div>
+            <Button onClick={() => {
+              if (companyName.trim()) {
+                onUpdateCompany({ name: companyName.trim(), location: companyLocation.trim() || undefined, industry: companyIndustry.trim() || undefined, website: companyWebsite.trim() || undefined, memberIds: company?.memberIds, adminIds: company?.adminIds });
+              }
+            }} className="bg-primary text-primary-foreground font-semibold">
+              Save Changes
+            </Button>
+
+            {/* Team Members */}
+            <div className="space-y-3 pt-2 border-t border-border/30">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Team Members ({company?.memberIds?.length ?? 0})</p>
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {users.map(user => {
+                  const isOwner = user.uid === company?.ownerId;
+                  const isMember = company?.memberIds?.includes(user.uid) ?? false;
+                  const isAdmin = company?.adminIds?.includes(user.uid) ?? false;
+                  const canEdit = currentUserId === company?.ownerId || company?.adminIds?.includes(currentUserId);
+
+                  const toggleMember = () => {
+                    if (isOwner || !canEdit) return;
+                    let newMembers = company?.memberIds ?? [];
+                    let newAdmins = company?.adminIds ?? [];
+                    if (isMember) { newMembers = newMembers.filter(id => id !== user.uid); newAdmins = newAdmins.filter(id => id !== user.uid); }
+                    else newMembers = [...newMembers, user.uid];
+                    onUpdateCompany({ name: company!.name, memberIds: newMembers, adminIds: newAdmins });
+                  };
+                  const toggleAdmin = () => {
+                    if (isOwner || !canEdit) return;
+                    let newAdmins = company?.adminIds ?? [];
+                    let newMembers = company?.memberIds ?? [];
+                    if (isAdmin) newAdmins = newAdmins.filter(id => id !== user.uid);
+                    else { newAdmins = [...newAdmins, user.uid]; if (!isMember) newMembers = [...newMembers, user.uid]; }
+                    onUpdateCompany({ name: company!.name, memberIds: newMembers, adminIds: newAdmins });
+                  };
+
+                  return (
+                    <div key={user.uid} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/30 transition-colors">
+                      <Checkbox checked={isMember} onCheckedChange={toggleMember}
+                        disabled={isOwner || !canEdit}
+                        className="border-primary data-[state=checked]:bg-primary shrink-0" />
+                      <UserAvatar photoURL={user.photoURL} displayName={user.displayName} className="h-8 w-8 text-xs shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-medium text-foreground truncate">{user.displayName || 'Anonymous'}</span>
+                          {user.uid === currentUserId && <span className="text-[10px] text-muted-foreground/50">(You)</span>}
+                        </div>
+                        <span className="text-xs text-muted-foreground/60 truncate">{user.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                          <Checkbox checked={isAdmin} onCheckedChange={toggleAdmin}
+                            disabled={isOwner || !isMember || !canEdit} className="h-4 w-4" />
+                          Admin
+                        </label>
+                        {isOwner && <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md">Owner</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Danger zone */}
+            {company?.ownerId === currentUserId && (
+              <div className="pt-2 border-t border-border/30 flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Deleting a company is irreversible.</p>
+                <div className="flex gap-2">
+                  {isConfirmingDelete ? (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={() => setIsConfirmingDelete(false)}>Cancel</Button>
+                      <Button variant="destructive" size="sm" onClick={async () => { try { await onDeleteCompany?.(company!.id); } finally { setIsConfirmingDelete(false); } }}>Confirm Delete</Button>
+                    </>
+                  ) : (
+                    <Button variant="destructive" size="sm" onClick={() => setIsConfirmingDelete(true)}>Delete Company</Button>
+                  )}
+                </div>
               </div>
             )}
           </div>
-        </div>
-        </TabsContent>
+        </DialogContent>
+      </Dialog>
 
-        <TabsContent value="setup" className="focus-visible:outline-none">
-          <Card className="max-w-2xl mx-auto border-border shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold">Company Settings</CardTitle>
-              <CardDescription>Manage your company details and team members.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Company Name</label>
-                <div className="flex gap-2">
-                  <Input 
-                     value={companyName}
-                     onChange={(e) => setCompanyName(e.target.value)}
-                     className="bg-muted/50 border-border focus-visible:ring-1 focus-visible:ring-primary text-foreground"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Location</label>
-                  <Input 
-                     value={companyLocation}
-                     onChange={(e) => setCompanyLocation(e.target.value)}
-                     placeholder="e.g., San Francisco"
-                     className="bg-muted/50 border-border focus-visible:ring-1 focus-visible:ring-primary text-foreground"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Industry</label>
-                  <Input 
-                     value={companyIndustry}
-                     onChange={(e) => setCompanyIndustry(e.target.value)}
-                     placeholder="e.g., Technology"
-                     className="bg-muted/50 border-border focus-visible:ring-1 focus-visible:ring-primary text-foreground"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Website</label>
-                <Input 
-                   value={companyWebsite}
-                   onChange={(e) => setCompanyWebsite(e.target.value)}
-                   placeholder="e.g., https://acme.com"
-                   className="bg-muted/50 border-border focus-visible:ring-1 focus-visible:ring-primary text-foreground"
-                />
-              </div>
-
-              <div className="flex justify-end">
-                <Button 
-                  onClick={() => {
-                    if (companyName.trim()) {
-                      onUpdateCompany({ 
-                        name: companyName.trim(), 
-                        location: companyLocation.trim() || undefined,
-                        industry: companyIndustry.trim() || undefined,
-                        website: companyWebsite.trim() || undefined,
-                        memberIds: company?.memberIds, 
-                        adminIds: company?.adminIds 
-                      });
-                    }
-                  }}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6"
-                >Save Changes</Button>
-              </div>
-
-              <div className="space-y-4 pt-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-sm font-medium text-foreground">Team Members ({company?.memberIds?.length || 0})</h3>
-                </div>
-                <div className="border border-border rounded-lg bg-card overflow-hidden">
-                  <div className="max-h-[400px] overflow-y-auto w-full p-2 space-y-1">
-                    {users.map(user => {
-                      const isOwner = user.uid === company?.ownerId;
-                      const isMember = company?.memberIds?.includes(user.uid) || false;
-                      const isAdmin = company?.adminIds?.includes(user.uid) || false;
-                      
-                      const toggleMember = () => {
-                        if (isOwner) return;
-                        let newMembers = company?.memberIds || [];
-                        let newAdmins = company?.adminIds || [];
-                        
-                        if (isMember) {
-                          newMembers = newMembers.filter(id => id !== user.uid);
-                          newAdmins = newAdmins.filter(id => id !== user.uid);
-                        } else {
-                          newMembers = [...newMembers, user.uid];
-                        }
-                        onUpdateCompany({ name: company.name, memberIds: newMembers, adminIds: newAdmins });
-                      };
-
-                      const toggleAdmin = () => {
-                        if (isOwner) return;
-                        let newAdmins = company?.adminIds || [];
-                        let newMembers = company?.memberIds || [];
-                        
-                        if (isAdmin) {
-                          newAdmins = newAdmins.filter(id => id !== user.uid);
-                        } else {
-                          newAdmins = [...newAdmins, user.uid];
-                          if (!isMember) {
-                            newMembers = [...newMembers, user.uid];
-                          }
-                        }
-                        onUpdateCompany({ name: company.name, memberIds: newMembers, adminIds: newAdmins });
-                      };
-
-                      return (
-                        <div 
-                          key={user.uid} 
-                          className="flex items-center space-x-3 p-3 hover:bg-muted/50 rounded-md transition-colors w-full"
-                        >
-                           <Checkbox 
-                             checked={isMember}
-                             onCheckedChange={toggleMember}
-                             disabled={isOwner || (currentUserId !== company?.ownerId && !company?.adminIds?.includes(currentUserId))}
-                             className="border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground shrink-0"
-                           />
-                           <UserAvatar
-                             photoURL={user.photoURL}
-                             displayName={user.displayName}
-                             className="h-8 w-8 text-xs shrink-0"
-                           />
-                           <div className="flex flex-col flex-1 min-w-0">
-                             <div className="flex items-center gap-1.5">
-                               <span className="text-sm font-medium text-foreground truncate">
-                                 {user.displayName || 'Anonymous User'}
-                               </span>
-                               {user.uid === currentUserId && (
-                                 <span className="text-[10px] text-muted-foreground/60 font-medium shrink-0">(You)</span>
-                               )}
-                             </div>
-                             <span className="text-xs text-muted-foreground truncate">
-                               {user.email}
-                             </span>
-                           </div>
-                           <div className="flex items-center space-x-2 shrink-0">
-                             <label className="text-xs font-medium text-muted-foreground cursor-pointer flex items-center space-x-2">
-                               <Checkbox
-                                 checked={isAdmin}
-                                 disabled={isOwner || !isMember || (currentUserId !== company?.ownerId && !company?.adminIds?.includes(currentUserId))}
-                                 onCheckedChange={toggleAdmin}
-                                 className="h-4 w-4"
-                               />
-                               <span className="hidden sm:inline">Admin</span>
-                             </label>
-                             {isOwner && (
-                               <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 text-[10px] ml-2">Owner</Badge>
-                             )}
-                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-            {company?.ownerId === currentUserId && (
-              <CardFooter className="bg-muted/50 px-6 py-4 border-t border-border flex justify-between items-center">
-                <p className="text-xs text-muted-foreground">Deleting a company is irreversible.</p>
-                <div className="flex items-center gap-2">
-                  {isConfirmingDelete ? (
-                    <>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => setIsConfirmingDelete(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={async () => {
-                          try {
-                            await onDeleteCompany?.(company!.id);
-                          } catch (err) {
-                            console.error("Failed to delete company:", err);
-                          } finally {
-                            setIsConfirmingDelete(false);
-                          }
-                        }}
-                      >
-                        Confirm Delete
-                      </Button>
-                    </>
-                  ) : (
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={() => setIsConfirmingDelete(true)}
-                    >
-                      Delete Company
-                    </Button>
-                  )}
-                </div>
-              </CardFooter>
-            )}
-          </Card>
-        </TabsContent>
-        </Tabs>
-
-        {/* Delete Project Confirmation Dialog */}
-        <Dialog open={!!projectToDelete} onOpenChange={(open) => {
-          if (!open) {
-            setProjectToDelete(null);
-            setDeleteConfirmName('');
-          }
-        }}>
-          <DialogContent className="sm:max-w-md bg-card border-border">
-            <DialogHeader>
-              <DialogTitle className="text-red-500 font-bold flex items-center">
-                <AlertCircle className="w-5 h-5 mr-2" />
-                Delete Workspace
-              </DialogTitle>
-              <DialogDescription className="text-muted-foreground pt-2">
-                This will permanently delete the <strong>{projectToDelete?.name}</strong> workspace and all its tasks, comments, and attachments. This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              <div className="space-y-2">
-                <p className="text-sm text-foreground mb-1">
-                  To confirm, type <span className="font-bold select-none">{projectToDelete?.name}</span> in the box below:
-                </p>
-                <Input 
-                  value={deleteConfirmName} 
-                  onChange={(e) => setDeleteConfirmName(e.target.value)}
-                  placeholder="Workspace name"
-                  className="bg-muted/50 border-border focus-visible:ring-1 focus-visible:ring-red-500 text-foreground"
-                />
-              </div>
-            </div>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button 
-                variant="ghost" 
-                onClick={() => setProjectToDelete(null)}
-                className="hover:bg-muted"
-              >
-                Cancel
-              </Button>
-              <Button 
-                variant="destructive" 
-                disabled={deleteConfirmName.trim() !== projectToDelete?.name}
-                onClick={() => {
-                  if (projectToDelete) {
-                    onDeleteProject(projectToDelete.id);
-                    setProjectToDelete(null);
-                    setDeleteConfirmName('');
-                  }
-                }}
-                className="font-bold"
-              >
-                Delete Permanently
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+      {/* ── Delete Project Dialog ────────────────────────────────────────────── */}
+      <Dialog open={!!projectToDelete} onOpenChange={open => { if (!open) { setProjectToDelete(null); setDeleteConfirmName(''); } }}>
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-red-500 font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" /> Delete Workspace
+            </DialogTitle>
+            <DialogDescription className="pt-1">
+              This will permanently delete <strong>{projectToDelete?.name}</strong> and all its tasks. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-3 space-y-2">
+            <p className="text-sm text-foreground">Type <span className="font-bold">{projectToDelete?.name}</span> to confirm:</p>
+            <Input value={deleteConfirmName} onChange={e => setDeleteConfirmName(e.target.value)}
+              placeholder="Workspace name"
+              className="bg-muted/50 border-border focus-visible:ring-1 focus-visible:ring-red-500" />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setProjectToDelete(null)}>Cancel</Button>
+            <Button variant="destructive" disabled={deleteConfirmName.trim() !== projectToDelete?.name}
+              onClick={() => { if (projectToDelete) { onDeleteProject(projectToDelete.id); setProjectToDelete(null); setDeleteConfirmName(''); } }}>
+              Delete Permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

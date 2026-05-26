@@ -1,15 +1,16 @@
 import React from 'react';
-import { Layout, LogOut, ChevronRight, Hash, Plus, MoreVertical, Edit2, ChevronDown, ChevronLeft, BarChart3, UserCircle, Sun, Moon, Boxes } from 'lucide-react';
+import {
+  Layout, LogOut, ChevronRight, Plus, MoreVertical, Edit2,
+  ChevronDown, ChevronLeft, BarChart3, UserCircle, Sun, Moon,
+  Sparkles, PanelLeft,
+} from 'lucide-react';
 import { UserAvatar } from './UserAvatar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Project, Company, Pod } from '../types';
 import { cn } from '@/lib/utils';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Logo } from './Logo';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -41,134 +42,105 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  company,
-  pods,
-  projects,
-  activeProject,
-  activePod,
-  activeView = 'board',
-  onProjectSelect,
-  onNewProject,
-  onEditProject,
-  onNewPod,
-  onEditPod,
-  onLogout,
-  onAnalyticsSelect,
-  onDashboardSelect,
-  onEditProfile,
-  onCompanySettings,
-  user,
-  onClose,
-  className,
-  isCollapsed = false,
-  onToggleCollapse,
-  theme,
-  onToggleTheme,
+  company, pods, projects, activeProject, activeView = 'board',
+  onProjectSelect, onNewProject, onEditProject, onNewPod, onEditPod,
+  onLogout, onAnalyticsSelect, onDashboardSelect, onEditProfile,
+  onCompanySettings, user, onClose, className, isCollapsed = false,
+  onToggleCollapse, theme, onToggleTheme,
 }: SidebarProps) {
-  const [expandedPods, setExpandedPods] = React.useState<Set<string>>(() => {
-    const s = new Set<string>();
-    pods.forEach(p => s.add(p.id));
-    return s;
-  });
-
-  React.useEffect(() => {
-    setExpandedPods(prev => {
-      const next = new Set(prev);
-      pods.forEach(p => { if (!next.has(p.id)) next.add(p.id); });
-      return next;
-    });
-  }, [pods]);
-
-  const togglePod = (podId: string) => {
-    setExpandedPods(prev => {
-      const next = new Set(prev);
-      if (next.has(podId)) next.delete(podId);
-      else next.add(podId);
-      return next;
-    });
-  };
 
   const isDashboard = !activeProject && activeView === 'board';
   const isAnalytics = activeView === 'analytics';
 
+  // Flat list of all workspaces for the sidebar
+  const allProjects = projects;
+
   return (
     <TooltipProvider>
       <div className={cn(
-        "h-full bg-sidebar border-r border-sidebar-border flex flex-col p-3 space-y-4 transition-all duration-300 relative",
-        isCollapsed ? "w-[68px]" : "w-64",
+        "h-full bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300",
+        isCollapsed ? "w-[68px] p-2" : "w-[260px] p-3",
         className
       )}>
-        {/* Company header */}
-        <div className={cn("flex items-center px-1", isCollapsed ? "justify-center" : "justify-between")}>
-          <div className={cn(
-            "flex items-center rounded-xl transition-colors",
-            isCollapsed ? "p-1.5 justify-center" : "p-2 gap-2 flex-1 min-w-0"
-          )}>
-            {isCollapsed ? (
-              <button
-                onClick={onToggleCollapse}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                title="Expand sidebar"
-              >
-                <Logo variant="icon" className="w-9 h-9 shadow-sm" />
-              </button>
-            ) : (
-              <>
-                <Logo variant="wordmark" className="h-7 max-w-[120px] object-left shrink-0" />
-                <div className="flex flex-col flex-1 min-w-0 justify-center">
-                  <span className="font-semibold text-[10px] text-muted-foreground leading-tight truncate">
-                    {company ? company.name : 'HenceFlow'}
-                  </span>
-                </div>
-                {onCompanySettings && (
+
+        {/* ── Logo row ────────────────────────────────────────────────────── */}
+        <div className={cn("flex items-center shrink-0 mb-3", isCollapsed ? "justify-center px-0" : "justify-between px-1")}>
+          {isCollapsed ? (
+            <button onClick={onToggleCollapse} title="Expand sidebar" className="text-muted-foreground hover:text-foreground transition-colors p-1">
+              <Logo variant="icon" className="w-8 h-8" />
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <Logo variant="wordmark" className="h-6 max-w-[110px] shrink-0" />
+                <span className="text-[10px] font-semibold text-muted-foreground/50 bg-muted/50 px-1.5 py-0.5 rounded-md">v2.4</span>
+              </div>
+              <div className="flex items-center gap-0.5">
+                {onToggleCollapse && (
                   <button
-                    onClick={onCompanySettings}
-                    className="text-muted-foreground/40 hover:text-muted-foreground transition-colors shrink-0 ml-1"
-                    title="Company settings"
+                    onClick={onToggleCollapse}
+                    className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50 transition-colors hidden lg:flex"
+                    title="Collapse sidebar"
                   >
-                    <Edit2 className="w-3 h-3" />
+                    <PanelLeft className="w-4 h-4" />
                   </button>
                 )}
-              </>
-            )}
-          </div>
-          {/* Collapse toggle — desktop only */}
-          {onToggleCollapse && !isCollapsed && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggleCollapse}
-              className="hidden lg:flex h-7 w-7 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 rounded-lg shrink-0"
-              title="Collapse sidebar"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-          )}
-          {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose} className="lg:hidden text-muted-foreground shrink-0 ml-1 h-8 w-8">
-              <MoreVertical className="w-4 h-4 rotate-90" />
-            </Button>
+                {onClose && (
+                  <button onClick={onClose} className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50 transition-colors lg:hidden">
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </>
           )}
         </div>
 
-        {/* Nav links */}
-        <div className={cn("space-y-0.5", isCollapsed ? "px-0" : "px-1")}>
+        {/* ── Company card ─────────────────────────────────────────────────── */}
+        {isCollapsed ? (
+          <Tooltip>
+            <TooltipTrigger render={
+              <button onClick={onCompanySettings} className="w-full flex justify-center p-1.5 mb-3 rounded-xl hover:bg-muted/50 transition-colors">
+                <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center text-sm font-bold text-primary">
+                  {(company?.name ?? 'H').charAt(0).toUpperCase()}
+                </div>
+              </button>
+            } />
+            <TooltipContent side="right" sideOffset={10}>{company?.name ?? 'Company'}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <button
+            onClick={onCompanySettings}
+            className="w-full flex items-center gap-3 p-3 mb-2 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/20 hover:border-border/40 transition-all group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center text-sm font-bold text-primary shrink-0">
+              {(company?.name ?? 'H').slice(0, 2).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-sm font-semibold text-foreground truncate leading-tight">{company?.name ?? 'HenceFlow'}</p>
+              <p className="text-[11px] text-muted-foreground/60 truncate leading-tight">
+                {[company?.industry, company?.location].filter(Boolean).join(' · ') || 'No details'}
+              </p>
+            </div>
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 transition-colors" />
+          </button>
+        )}
+
+        {/* ── Nav ──────────────────────────────────────────────────────────── */}
+        <div className={cn("space-y-0.5 mb-3", isCollapsed ? "px-0" : "px-1")}>
           {isCollapsed ? (
             <>
               <Tooltip>
                 <TooltipTrigger render={
-                  <Button variant="ghost" className={cn("w-full justify-center px-0 h-9 relative", isDashboard ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")} onClick={onDashboardSelect}>
+                  <Button variant="ghost" className={cn("w-full justify-center px-0 h-9 relative rounded-xl", isDashboard ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")} onClick={onDashboardSelect}>
                     <Layout className="w-4 h-4" />
-                    {isDashboard && <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-primary" />}
                   </Button>
                 } />
                 <TooltipContent side="right" sideOffset={10}>Dashboard</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger render={
-                  <Button variant="ghost" className={cn("w-full justify-center px-0 h-9 relative", isAnalytics ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")} onClick={onAnalyticsSelect}>
+                  <Button variant="ghost" className={cn("w-full justify-center px-0 h-9 relative rounded-xl", isAnalytics ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")} onClick={onAnalyticsSelect}>
                     <BarChart3 className="w-4 h-4" />
-                    {isAnalytics && <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-primary" />}
                   </Button>
                 } />
                 <TooltipContent side="right" sideOffset={10}>Analytics</TooltipContent>
@@ -176,158 +148,133 @@ export function Sidebar({
             </>
           ) : (
             <>
-              <Button variant="ghost" className={cn("w-full font-semibold justify-start px-3 h-9 relative overflow-hidden rounded-xl", isDashboard ? "text-primary bg-gradient-to-r from-primary/20 to-primary/5" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")} onClick={onDashboardSelect}>
-                {isDashboard && <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-primary" />}
-                <Layout className="w-4 h-4 shrink-0 mr-2.5" />
+              <button
+                onClick={onDashboardSelect}
+                className={cn(
+                  "w-full flex items-center gap-2.5 px-3 h-9 rounded-xl text-sm font-semibold transition-all",
+                  isDashboard ? "bg-primary text-primary-foreground shadow-sm shadow-primary/30" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <Layout className="w-4 h-4 shrink-0" />
                 Dashboard
-              </Button>
-              <Button variant="ghost" className={cn("w-full font-semibold justify-start px-3 h-9 relative overflow-hidden rounded-xl", isAnalytics ? "text-primary bg-gradient-to-r from-primary/20 to-primary/5" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")} onClick={onAnalyticsSelect}>
-                {isAnalytics && <span className="absolute left-0 inset-y-2 w-[3px] rounded-r-full bg-primary" />}
-                <BarChart3 className="w-4 h-4 shrink-0 mr-2.5" />
+              </button>
+              <button
+                onClick={onAnalyticsSelect}
+                className={cn(
+                  "w-full flex items-center gap-2.5 px-3 h-9 rounded-xl text-sm font-semibold transition-all",
+                  isAnalytics ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <BarChart3 className="w-4 h-4 shrink-0" />
                 Analytics
-              </Button>
+              </button>
             </>
           )}
         </div>
 
-        {/* Pods + Workspaces */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-1 -mx-1 px-1">
+        {/* ── Workspaces list ───────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-0.5 min-h-0">
           {!isCollapsed && (
-            <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">
-              Pods
-            </div>
+            <p className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
+              Workspaces
+            </p>
           )}
 
-          {pods.map(pod => {
-            const podProjects = projects.filter(p => p.podId === pod.id);
-            const isExpanded = expandedPods.has(pod.id);
-            const hasActiveProjInPod = podProjects.some(p => p.id === activeProject?.id);
-
-            return (
-              <div key={pod.id} className="space-y-0.5">
-                {isCollapsed ? (
-                  <Tooltip>
-                    <TooltipTrigger render={
-                      <div
-                        className={cn("w-full flex items-center justify-center rounded-xl cursor-pointer transition-all p-2 h-9 relative", hasActiveProjInPod ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}
-                        onClick={() => togglePod(pod.id)}
-                      >
-                        <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-white" style={{ backgroundColor: pod.color }}>
-                          {pod.name.charAt(0).toUpperCase()}
-                        </div>
-                      </div>
-                    } />
-                    <TooltipContent side="right" sideOffset={10}>{pod.name}</TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <div className="group flex items-center gap-1">
-                    <button
-                      className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-muted/40 transition-colors text-left min-w-0"
-                      onClick={() => togglePod(pod.id)}
-                    >
-                      <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ backgroundColor: pod.color }}>
-                        {pod.name.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="text-sm font-semibold text-foreground truncate flex-1">{pod.name}</span>
-                      {isExpanded
-                        ? <ChevronDown className="w-3 h-3 text-muted-foreground/50 shrink-0" />
-                        : <ChevronRight className="w-3 h-3 text-muted-foreground/50 shrink-0" />}
-                    </button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-6 w-6 lg:opacity-0 lg:group-hover:opacity-100 shrink-0")}
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <MoreVertical className="h-3 w-3 text-muted-foreground" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44 p-2 rounded-xl shadow-2xl border-border bg-popover">
-                        <DropdownMenuItem className="rounded-lg h-9 cursor-pointer" onClick={() => onEditPod(pod)}>
-                          <Edit2 className="w-3.5 h-3.5 mr-2.5 text-muted-foreground" />
-                          <span className="font-medium text-sm">Edit Pod</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="rounded-lg h-9 cursor-pointer" onClick={() => onNewProject(pod)}>
-                          <Plus className="w-3.5 h-3.5 mr-2.5 text-muted-foreground" />
-                          <span className="font-medium text-sm">Add Workspace</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+          {allProjects.map(project => {
+            const accent = project.color || 'oklch(0.67 0.30 285)';
+            const isActive = activeProject?.id === project.id;
+            return isCollapsed ? (
+              <Tooltip key={project.id}>
+                <TooltipTrigger render={
+                  <div
+                    onClick={() => onProjectSelect(project)}
+                    className={cn("w-full flex items-center justify-center rounded-xl cursor-pointer transition-all p-2 h-9 relative", isActive ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}
+                  >
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: accent }} />
                   </div>
+                } />
+                <TooltipContent side="right" sideOffset={10}>{project.name}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <div
+                key={project.id}
+                onClick={() => onProjectSelect(project)}
+                className={cn(
+                  "group w-full flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-all",
+                  isActive ? "bg-muted/50 text-foreground" : "text-muted-foreground hover:bg-muted/30 hover:text-foreground"
                 )}
-
-                {/* Workspaces under pod */}
-                {isExpanded && (
-                  <div className={cn("space-y-0.5", !isCollapsed && "ml-3 pl-2 border-l border-border/40")}>
-                    {podProjects.map(project => (
-                      <div key={project.id} className="group relative">
-                        {isCollapsed ? (
-                          <Tooltip>
-                            <TooltipTrigger render={
-                              <div
-                                onClick={() => onProjectSelect(project)}
-                                className={cn("w-full flex items-center justify-center rounded-xl cursor-pointer transition-all p-2 h-8 relative", activeProject?.id === project.id ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}
-                              >
-                                <Hash className="w-3.5 h-3.5" />
-                                {activeProject?.id === project.id && <span className="absolute left-0 inset-y-1.5 w-[3px] rounded-r-full bg-primary" />}
-                              </div>
-                            } />
-                            <TooltipContent side="right" sideOffset={10}>{project.name}</TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <div
-                            onClick={() => onProjectSelect(project)}
-                            className={cn("w-full flex items-center px-2 py-1.5 text-sm rounded-xl cursor-pointer transition-all relative overflow-hidden", activeProject?.id === project.id ? "bg-gradient-to-r from-primary/20 to-primary/5 text-primary font-semibold" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}
-                          >
-                            {activeProject?.id === project.id && <span className="absolute left-0 inset-y-1.5 w-[3px] rounded-r-full bg-primary" />}
-                            <Hash className="w-3 h-3 mr-2 opacity-60 shrink-0" />
-                            <span className="truncate flex-1 text-left text-xs">{project.name}</span>
-                            <button
-                              className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-5 w-5 ml-1 lg:opacity-0 lg:group-hover:opacity-100 shrink-0")}
-                              onClick={e => { e.stopPropagation(); onEditProject(project); }}
-                            >
-                              <MoreVertical className="h-3 w-3 text-muted-foreground" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {!isCollapsed && (
-                      <button
-                        className="w-full flex items-center px-2 py-1 text-xs text-muted-foreground/60 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
-                        onClick={() => onNewProject(pod)}
-                      >
-                        <Plus className="w-3 h-3 mr-1.5" />
-                        Add workspace
-                      </button>
-                    )}
-                  </div>
-                )}
+              >
+                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: accent }} />
+                <span className="text-xs font-medium flex-1 truncate">{project.name}</span>
+                <button
+                  onClick={e => { e.stopPropagation(); onEditProject(project); }}
+                  className="h-5 w-5 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all shrink-0"
+                >
+                  <MoreVertical className="w-3 h-3" />
+                </button>
               </div>
             );
           })}
 
-          {/* Add Pod button */}
-          {isCollapsed ? (
+          {/* New workspace button */}
+          {!isCollapsed && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="w-full">
+                <div className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/30 transition-all cursor-pointer text-xs font-medium">
+                  <Plus className="w-3.5 h-3.5" />
+                  New workspace
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44 p-2 rounded-xl shadow-2xl border-border bg-popover">
+                {pods.map(pod => (
+                  <DropdownMenuItem key={pod.id} className="rounded-lg h-9 cursor-pointer" onClick={() => onNewProject(pod)}>
+                    <div className="w-4 h-4 rounded-md flex items-center justify-center text-[9px] font-bold text-white mr-2 shrink-0" style={{ backgroundColor: pod.color }}>
+                      {pod.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium truncate">{pod.name}</span>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="rounded-lg h-9 cursor-pointer" onClick={onNewPod}>
+                  <Plus className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                  <span className="text-sm font-medium">New pod</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {isCollapsed && (
             <Tooltip>
               <TooltipTrigger render={
                 <Button variant="ghost" size="sm" className="w-full justify-center px-0 h-9 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10" onClick={onNewPod}>
-                  <Boxes className="w-4 h-4" />
+                  <Plus className="w-4 h-4" />
                 </Button>
               } />
-              <TooltipContent side="right" sideOffset={10}>Add Pod</TooltipContent>
+              <TooltipContent side="right" sideOffset={10}>New workspace</TooltipContent>
             </Tooltip>
-          ) : (
-            <Button variant="ghost" size="sm" className="w-full justify-start px-3 py-2 h-9 rounded-xl text-muted-foreground/60 hover:text-primary hover:bg-primary/10 transition-all" onClick={onNewPod}>
-              <Plus className="w-4 h-4 mr-2.5" />
-              <span className="text-sm">Add Pod</span>
-            </Button>
           )}
         </div>
 
-        {/* User profile */}
-        <div className="pt-2 mt-auto border-t border-sidebar-border">
+        {/* ── Upgrade to Pro card ──────────────────────────────────────────── */}
+        {!isCollapsed && (
+          <div className="mt-3 mx-1 p-3.5 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border border-primary/20 space-y-2.5 shrink-0">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span className="text-xs font-bold text-foreground">Upgrade to Pro</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Unlimited workspaces, advanced analytics &amp; AI assist.
+            </p>
+            <button className="w-full text-xs font-semibold text-foreground bg-card/80 hover:bg-card border border-border/40 rounded-xl py-1.5 transition-colors">
+              See plans
+            </button>
+          </div>
+        )}
+
+        {/* ── User profile ─────────────────────────────────────────────────── */}
+        <div className="shrink-0 mt-3 border-t border-sidebar-border pt-3">
           <DropdownMenu>
             <DropdownMenuTrigger className="w-full bg-transparent border-none p-0 outline-none">
-              <div className={cn("flex items-center rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group", isCollapsed ? "p-1.5 justify-center" : "gap-2.5 px-2 py-2")}>
+              <div className={cn("flex items-center rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group", isCollapsed ? "justify-center p-1.5" : "gap-2.5 px-2 py-2")}>
                 {isCollapsed ? (
                   <Tooltip>
                     <TooltipTrigger render={<UserAvatar photoURL={user?.photoURL} displayName={user?.displayName} className="w-8 h-8 text-sm shadow-sm shrink-0" />} />
@@ -338,9 +285,9 @@ export function Sidebar({
                     <UserAvatar photoURL={user?.photoURL} displayName={user?.displayName} className="w-8 h-8 text-sm shadow-sm shrink-0" />
                     <div className="flex-1 min-w-0 text-left">
                       <p className="text-sm font-semibold text-foreground truncate leading-tight">{user?.displayName || 'You'}</p>
-                      <p className="text-[11px] text-muted-foreground truncate leading-tight">{user?.email}</p>
+                      <p className="text-[11px] text-muted-foreground/60 truncate leading-tight">{user?.email}</p>
                     </div>
-                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0 transition-colors" />
+                    <MoreVertical className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 transition-colors" />
                   </>
                 )}
               </div>
@@ -358,9 +305,7 @@ export function Sidebar({
               {onToggleTheme && (
                 <>
                   <DropdownMenuItem className="rounded-lg h-10 cursor-pointer" onClick={onToggleTheme}>
-                    {theme === 'light'
-                      ? <Moon className="w-4 h-4 mr-3 text-muted-foreground" />
-                      : <Sun className="w-4 h-4 mr-3 text-muted-foreground" />}
+                    {theme === 'light' ? <Moon className="w-4 h-4 mr-3 text-muted-foreground" /> : <Sun className="w-4 h-4 mr-3 text-muted-foreground" />}
                     <span className="font-medium text-foreground">{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
