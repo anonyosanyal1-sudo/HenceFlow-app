@@ -1,4 +1,4 @@
-import { Layout, LogOut, ChevronRight, Hash, Plus, MoreVertical, Edit2, Trash2, Building, ChevronDown, ChevronLeft, BarChart3, UserCircle } from 'lucide-react';
+import { Layout, LogOut, ChevronRight, Hash, Plus, MoreVertical, Edit2, Trash2, Building, ChevronDown, ChevronLeft, BarChart3, UserCircle, Sun, Moon } from 'lucide-react';
 import { UserAvatar } from './UserAvatar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Project, Company } from '../types';
@@ -20,7 +20,7 @@ interface SidebarProps {
   projects: Project[];
   activeProject: Project | null;
   activeCompany?: Company | null;
-  activeView?: 'board' | 'analytics';
+  activeView?: 'board' | 'analytics' | 'timeline';
   onProjectSelect: (project: Project | null) => void;
   onNewProject: (project?: Project) => void;
   onLogout: () => void;
@@ -34,6 +34,8 @@ interface SidebarProps {
   className?: string;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  theme?: 'dark' | 'light';
+  onToggleTheme?: () => void;
 }
 
 export function Sidebar({
@@ -54,7 +56,9 @@ export function Sidebar({
   onClose,
   className,
   isCollapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  theme,
+  onToggleTheme,
 }: SidebarProps) {
   return (
     <TooltipProvider>
@@ -390,6 +394,22 @@ export function Sidebar({
                 >
                   <UserCircle className="w-4 h-4 mr-3 text-muted-foreground" />
                   <span className="font-medium text-foreground">Edit Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            {onToggleTheme && (
+              <>
+                <DropdownMenuItem
+                  className="rounded-lg h-10 cursor-pointer"
+                  onClick={onToggleTheme}
+                >
+                  {theme === 'light' ? (
+                    <Moon className="w-4 h-4 mr-3 text-muted-foreground" />
+                  ) : (
+                    <Sun className="w-4 h-4 mr-3 text-muted-foreground" />
+                  )}
+                  <span className="font-medium text-foreground">{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
               </>

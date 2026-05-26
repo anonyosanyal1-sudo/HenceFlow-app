@@ -4,6 +4,7 @@ import {
   Task, Project, UserProfile, Comment, Company,
   TaskDependency, TimeEntry, Milestone, ActivityLog,
   CustomFieldDefinition, CustomFieldValue, TaskTemplate, Subtask,
+  Notification, TaskWatcher, SavedFilter, AutomationRule,
 } from '../types';
 
 // ── Row mappers ──────────────────────────────────────────────────────────────
@@ -502,4 +503,110 @@ export const subscribeToCustomFieldDefinitions = (projectId: string, callback: (
 export const subscribeToTaskTemplates = (projectId: string, callback: (templates: TaskTemplate[]) => void) => {
   fetchTaskTemplates(projectId).then(callback).catch(console.error);
   return () => {};
+};
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export const fetchNotifications = async (): Promise<Notification[]> => {
+  const rows = await http.get<Record<string, any>[]>('/api/notifications');
+  return rows.map(r => ({
+    id: r.id,
+    userId: r.userId,
+    type: r.type,
+    title: r.title,
+    message: r.message,
+    taskId: r.taskId ?? undefined,
+    projectId: r.projectId ?? undefined,
+    isRead: r.isRead,
+    createdAt: r.createdAt,
+  }));
+};
+
+export const markNotificationsRead = async (ids?: string[]) => {
+  await http.post('/api/notifications/mark-read', { ids: ids ?? null });
+};
+
+export const deleteNotification = async (id: string) => {
+  await http.delete(`/api/notifications/${id}`);
+};
+
+// ── Task Watchers ─────────────────────────────────────────────────────────────
+
+export const fetchWatchers = async (taskId: string): Promise<TaskWatcher[]> => {
+  const rows = await http.get<Record<string, any>[]>('/api/watchers', { task_id: taskId });
+  return rows.map(r => ({ id: r.id, taskId: r.taskId, userId: r.userId, createdAt: r.createdAt }));
+};
+
+export const watchTask = async (taskId: string): Promise<TaskWatcher> => {
+  const row = await http.post<Record<string, any>>('/api/watchers', {}, { task_id: taskId });
+  return { id: row.id, taskId: row.taskId, userId: row.userId, createdAt: row.createdAt };
+};
+
+export const unwatchTask = async (taskId: string) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? '';
+  await fetch(`/api/watchers?task_id=${encodeURIComponent(taskId)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+};
+
+// ── Saved Filters ─────────────────────────────────────────────────────────────
+
+export const fetchSavedFilters = async (projectId: string): Promise<SavedFilter[]> => {
+  const rows = await http.get<Record<string, any>[]>('/api/saved-filters', { project_id: projectId });
+  return rows.map(r => ({ id: r.id, projectId: r.projectId, userId: r.userId, name: r.name, filters: r.filters, createdAt: r.createdAt }));
+};
+
+export const createSavedFilter = async (projectId: string, name: string, filters: SavedFilter['filters']): Promise<SavedFilter> => {
+  const row = await http.post<Record<string, any>>('/api/saved-filters', { name, filters }, { project_id: projectId });
+  return { id: row.id, projectId: row.projectId, userId: row.userId, name: row.name, filters: row.filters, createdAt: row.createdAt };
+};
+
+export const deleteSavedFilter = async (filterId: string) => {
+  await http.delete(`/api/saved-filters/${filterId}`);
+};
+
+// ── Automation Rules ──────────────────────────────────────────────────────────
+
+export const fetchAutomations = async (projectId: string): Promise<AutomationRule[]> => {
+  const rows = await http.get<Record<string, any>[]>('/api/automations', { project_id: projectId });
+  return rows.map(r => ({
+    id: r.id, projectId: r.projectId, name: r.name,
+    triggerType: r.triggerType, triggerValue: r.triggerValue ?? undefined,
+    actionType: r.actionType, actionValue: r.actionValue ?? undefined,
+    isActive: r.isActive, createdAt: r.createdAt,
+  }));
+};
+
+export const createAutomation = async (projectId: string, rule: Omit<AutomationRule, 'id' | 'projectId' | 'createdAt'>): Promise<AutomationRule> => {
+  const row = await http.post<Record<string, any>>('/api/automations', {
+    name: rule.name, triggerType: rule.triggerType, triggerValue: rule.triggerValue,
+    actionType: rule.actionType, actionValue: rule.actionValue, isActive: rule.isActive,
+  }, { project_id: projectId });
+  return { id: row.id, projectId: row.projectId, name: row.name, triggerType: row.triggerType, triggerValue: row.triggerValue, actionType: row.actionType, actionValue: row.actionValue, isActive: row.isActive, createdAt: row.createdAt };
+};
+
+export const updateAutomation = async (ruleId: string, updates: Partial<AutomationRule>): Promise<AutomationRule> => {
+  const row = await http.patch<Record<string, any>>(`/api/automations/${ruleId}`, updates);
+  return { id: row.id, projectId: row.projectId, name: row.name, triggerType: row.triggerType, triggerValue: row.triggerValue, actionType: row.actionType, actionValue: row.actionValue, isActive: row.isActive, createdAt: row.createdAt };
+};
+
+export const deleteAutomation = async (ruleId: string) => {
+  await http.delete(`/api/automations/${ruleId}`);
+};
+
+// ── Export ────────────────────────────────────────────────────────────────────
+
+export const exportTasksCSV = async (projectId: string) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? '';
+  const url = `/api/export/tasks?project_id=${projectId}`;
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const blob = await resp.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `tasks_${projectId}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 };

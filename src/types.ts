@@ -178,3 +178,49 @@ export interface DatabaseErrorInfo {
 
 /** @deprecated Use DatabaseErrorInfo */
 export type FirestoreErrorInfo = DatabaseErrorInfo;
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: 'task_assigned' | 'mention' | 'comment' | 'task_update' | string;
+  title: string;
+  message: string;
+  taskId?: string;
+  projectId?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface TaskWatcher {
+  id: string;
+  taskId: string;
+  userId: string;
+  createdAt: string;
+}
+
+export interface SavedFilter {
+  id: string;
+  projectId: string;
+  userId: string;
+  name: string;
+  filters: {
+    searchQuery?: string;
+    filterAssignee?: string | null;
+    filterCreator?: string | null;
+    filterPriority?: string | null;
+    filterDueDate?: string | null;
+  };
+  createdAt: string;
+}
+
+export interface AutomationRule {
+  id: string;
+  projectId: string;
+  name: string;
+  triggerType: 'status_changed' | 'priority_changed' | 'assignee_changed' | 'due_date_overdue';
+  triggerValue?: string;
+  actionType: 'set_assignee' | 'set_priority' | 'set_status' | 'notify_watchers';
+  actionValue?: string;
+  isActive: boolean;
+  createdAt: string;
+}

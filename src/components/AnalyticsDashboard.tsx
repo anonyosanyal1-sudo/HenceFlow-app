@@ -6,13 +6,16 @@ import {
 import { Task, Project, UserProfile, DEFAULT_STAGES } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, Clock, AlertTriangle, TrendingUp } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, TrendingUp, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { exportTasksCSV } from '../services/api';
 
 interface AnalyticsDashboardProps {
   tasks: Task[];
   projects: Project[];
   users: UserProfile[];
   currentUserId: string;
+  activeProjectId?: string;
 }
 
 const CHART_COLORS = [
@@ -78,7 +81,7 @@ function buildStageLabelMap(projects: Project[]): Map<string, string> {
   return map;
 }
 
-export function AnalyticsDashboard({ tasks, projects, users, currentUserId }: AnalyticsDashboardProps) {
+export function AnalyticsDashboard({ tasks, projects, users, currentUserId, activeProjectId }: AnalyticsDashboardProps) {
   const stageLabelMap = buildStageLabelMap(projects);
 
   // Build per-project closed stage lookup
@@ -142,9 +145,22 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId }: An
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 relative z-10">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground tracking-tight">Analytics</h1>
-        <p className="text-muted-foreground text-sm mt-1">Overview of tasks across all workspaces</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Analytics</h1>
+          <p className="text-muted-foreground text-sm mt-1">Overview of tasks across all workspaces</p>
+        </div>
+        {activeProjectId && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-2 border-border/50"
+            onClick={() => exportTasksCSV(activeProjectId)}
+          >
+            <Download className="w-4 h-4" />
+            Export CSV
+          </Button>
+        )}
       </div>
 
       {/* Stat cards */}

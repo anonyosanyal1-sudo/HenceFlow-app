@@ -21,11 +21,17 @@ import {
   bulkUpdateTasks,
   bulkDeleteTasks,
   ensureUserProfile,
+  fetchNotifications,
+  fetchSavedFilters,
+  createSavedFilter,
+  deleteSavedFilter,
+  fetchAutomations,
 } from './services/api';
 import { useServerEvents } from './hooks/useServerEvents';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Project, Task, TaskStatus, TaskPriority, UserProfile, Company, DEFAULT_STAGES, Stage, Milestone, CustomFieldDefinition, TaskTemplate } from './types';
+import { Project, Task, TaskStatus, TaskPriority, UserProfile, Company, DEFAULT_STAGES, Stage, Milestone, CustomFieldDefinition, TaskTemplate, Notification, SavedFilter, AutomationRule } from './types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -41,8 +47,12 @@ import { ProfileSetup } from './components/ProfileSetup';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { MilestoneDialog } from './components/MilestoneDialog';
 import { BulkActionBar } from './components/BulkActionBar';
+import { NotificationBell } from './components/NotificationBell';
+import { GanttView } from './components/GanttView';
+import { AutomationsDialog } from './components/AutomationsDialog';
+import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { Logo } from './components/Logo';
-import { Hash, Filter, Search, Users, Menu, Settings, Milestone as MilestoneIcon, Layers, CheckSquare } from 'lucide-react';
+import { Hash, Filter, Search, Users, Menu, Settings, Milestone as MilestoneIcon, Layers, CheckSquare, Zap, Bookmark, BookmarkPlus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -118,7 +128,7 @@ function AppContent() {
   const [filterDueDate, setFilterDueDate] = React.useState<string | null>(null);
 
   // View state
-  const [activeView, setActiveView] = React.useState<'board' | 'analytics'>('board');
+  const [activeView, setActiveView] = React.useState<'board' | 'analytics' | 'timeline'>('board');
 
   // New feature states
   const [swimlaneBy, setSwimlaneBy] = React.useState<SwimlaneBy>(null);
@@ -127,6 +137,18 @@ function AppContent() {
   const [customFieldDefs, setCustomFieldDefs] = React.useState<CustomFieldDefinition[]>([]);
   const [taskTemplates, setTaskTemplates] = React.useState<TaskTemplate[]>([]);
   const [milestoneDialogOpen, setMilestoneDialogOpen] = React.useState(false);
+
+  // New feature states
+  const [theme, setTheme] = React.useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('hf-theme') as 'dark' | 'light') || 'dark';
+  });
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const [savedFilters, setSavedFilters] = React.useState<SavedFilter[]>([]);
+  const [automations, setAutomations] = React.useState<AutomationRule[]>([]);
+  const [automationsDialogOpen, setAutomationsDialogOpen] = React.useState(false);
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = React.useState(false);
+  const [savingFilter, setSavingFilter] = React.useState(false);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   // Dialog States
   const [taskDialogOpen, setTaskDialogOpen] = React.useState(false);
@@ -229,6 +251,30 @@ function AppContent() {
     fetchUsers().then(setUsers).catch(() => {});
   }, [user]);
 
+  React.useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light');
+    localStorage.setItem('hf-theme', theme);
+  }, [theme]);
+
+  React.useEffect(() => {
+    if (!user) return;
+    fetchNotifications().then(setNotifications).catch(() => {});
+    const interval = setInterval(() => {
+      fetchNotifications().then(setNotifications).catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  React.useEffect(() => {
+    if (!activeProject) { setSavedFilters([]); return; }
+    fetchSavedFilters(activeProject.id).then(setSavedFilters).catch(() => {});
+  }, [activeProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  React.useEffect(() => {
+    if (!activeProject) { setAutomations([]); return; }
+    fetchAutomations(activeProject.id).then(setAutomations).catch(() => {});
+  }, [activeProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // SSE: listen for server-side changes and refetch affected data
   const activeProjectId = activeProject?.id;
   const projectIdsForSSE = React.useMemo(
@@ -259,6 +305,20 @@ function AppContent() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId]));
+
+  useKeyboardShortcuts({
+    onNewTask: () => {
+      if (!activeProject) return;
+      setSelectedTask(null);
+      setDefaultStatus('todo');
+      setTaskDialogOpen(true);
+    },
+    onFocusSearch: () => searchInputRef.current?.focus(),
+    onShowShortcuts: () => setShortcutsHelpOpen(true),
+    onGoTimeline: () => { if (activeProject) setActiveView('timeline'); },
+    onGoBoard: () => setActiveView('board'),
+    onGoAnalytics: () => { setActiveProject(null); setActiveView('analytics'); },
+  }, !!user);
 
   const handleSaveCompany = async (data: {
     name: string;
@@ -455,6 +515,8 @@ function AppContent() {
                 onLogout={logout}
                 user={user}
                 onClose={() => setSidebarOpen(false)}
+                theme={theme}
+                onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
               />
             </motion.div>
           </>
@@ -494,6 +556,8 @@ function AppContent() {
         onEditProfile={() => setProfileSetupOpen(true)}
         onLogout={logout}
         user={user}
+        theme={theme}
+        onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
       />
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -535,6 +599,7 @@ function AppContent() {
               projects={projects}
               users={users}
               currentUserId={user.uid}
+              activeProjectId={activeProject?.id}
             />
           </div>
         ) : !activeProject ? (
@@ -615,10 +680,21 @@ function AppContent() {
 
                 {/* Right: search + filters + view toggle + new task */}
                 <div className="flex items-center gap-2 shrink-0">
+                  {/* Notification Bell */}
+                  <NotificationBell
+                    notifications={notifications}
+                    onNotificationsChange={setNotifications}
+                    onTaskClick={(taskId) => {
+                      const task = tasks.find(t => t.id === taskId);
+                      if (task) { setSelectedTask(task); setTaskDialogOpen(true); }
+                    }}
+                  />
+
                   {/* Search */}
                   <div className="relative hidden md:block">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
                     <Input
+                      ref={searchInputRef}
                       placeholder="Search tasks…"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -714,6 +790,24 @@ function AppContent() {
                     </PopoverContent>
                   </Popover>
 
+                  {/* Board / Timeline view toggle */}
+                  <div className="hidden md:flex items-center bg-muted/40 border border-border/40 rounded-xl p-1 gap-0.5">
+                    {([['Board', 'board'], ['Timeline', 'timeline']] as [string, string][]).map(([label, val]) => (
+                      <button
+                        key={label}
+                        onClick={() => setActiveView(val as 'board' | 'timeline')}
+                        className={cn(
+                          "px-2.5 h-7 rounded-lg text-xs font-semibold transition-all",
+                          activeView === val
+                            ? "bg-card text-foreground shadow-sm"
+                            : "text-muted-foreground/50 hover:text-muted-foreground"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
                   {/* Swimlane toggle */}
                   <div className="hidden md:flex items-center bg-muted/40 border border-border/40 rounded-xl p-1 gap-0.5">
                     {([['Off', null], ['Assignee', 'assignee'], ['Priority', 'priority']] as [string, SwimlaneBy][]).map(([label, val]) => (
@@ -760,6 +854,73 @@ function AppContent() {
                     </Button>
                   ) : null}
 
+                  {/* Automations */}
+                  {activeProject && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-1.5 border-border/50 bg-muted/30 hover:bg-muted/60 font-medium text-muted-foreground hover:text-foreground text-xs hidden md:flex"
+                      onClick={() => setAutomationsDialogOpen(true)}
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>Automations</span>
+                    </Button>
+                  )}
+
+                  {/* Saved Filters */}
+                  {activeProject && (
+                    <Popover>
+                      <PopoverTrigger className={buttonVariants({ variant: "outline", size: "sm", className: "h-9 gap-1.5 border-border/50 bg-muted/30 hidden md:flex" })}>
+                        <Bookmark className="w-3.5 h-3.5" />
+                        <span className="text-xs font-medium text-muted-foreground">Saved</span>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-56 p-2">
+                        <div className="space-y-1">
+                          {savedFilters.map(sf => (
+                            <div key={sf.id} className="flex items-center gap-2">
+                              <button
+                                className="flex-1 text-left text-sm py-1.5 px-2 rounded-lg hover:bg-muted/50 text-foreground"
+                                onClick={() => {
+                                  const f = sf.filters;
+                                  if (f.searchQuery !== undefined) setSearchQuery(f.searchQuery || '');
+                                  setFilterAssignee(f.filterAssignee ?? null);
+                                  setFilterCreator(f.filterCreator ?? null);
+                                  setFilterPriority(f.filterPriority ?? null);
+                                  setFilterDueDate(f.filterDueDate ?? null);
+                                }}
+                              >{sf.name}</button>
+                              <button
+                                className="text-muted-foreground/50 hover:text-rose-400 text-xs"
+                                onClick={() => deleteSavedFilter(sf.id).then(() => setSavedFilters(prev => prev.filter(x => x.id !== sf.id)))}
+                              >✕</button>
+                            </div>
+                          ))}
+                          <div className="border-t border-border/50 pt-2 mt-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full text-xs gap-1.5 text-muted-foreground"
+                              disabled={savingFilter}
+                              onClick={async () => {
+                                const name = prompt('Filter name:');
+                                if (!name || !activeProject) return;
+                                setSavingFilter(true);
+                                const sf = await createSavedFilter(activeProject.id, name, {
+                                  searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate,
+                                });
+                                setSavedFilters(prev => [...prev, sf]);
+                                setSavingFilter(false);
+                              }}
+                            >
+                              <BookmarkPlus className="w-3.5 h-3.5" />
+                              Save current filters
+                            </Button>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+
                   {/* New task */}
                   <Button
                     className="h-9 px-4 font-bold text-primary-foreground shadow-md shadow-primary/25 border-0 hover:opacity-90 transition-opacity gap-1.5"
@@ -778,38 +939,51 @@ function AppContent() {
               </div>
             </div>
 
-            {/* Board */}
-            <TaskBoard
-              tasks={filteredTasks}
-              stages={activeProject.stages || DEFAULT_STAGES}
-              users={companyUsers}
-              milestones={milestones}
-              selectedTaskIds={selectedTaskIds}
-              swimlaneBy={swimlaneBy}
-              onTaskClick={(task) => {
-                setSelectedTask(task);
-                setTaskDialogOpen(true);
-              }}
-              onAddTask={(status) => {
-                setSelectedTask(null);
-                setDefaultStatus(status);
-                setTaskDialogOpen(true);
-              }}
-              onStatusChange={(taskId, newStatus) => {
-                const task = tasks.find(t => t.id === taskId);
-                const prevStatus = task?.status;
-                const applyStatus = (s: string) => {
-                  setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: s as TaskStatus } : t));
-                  setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: s as TaskStatus } : t));
-                };
-                applyStatus(newStatus);
-                updateTask(activeProject.id, taskId, { status: newStatus })
-                  .catch(() => {
-                    if (prevStatus !== undefined) applyStatus(prevStatus);
-                  });
-              }}
-              onSelectionChange={setSelectedTaskIds}
-            />
+            {/* Board or Timeline */}
+            {activeView === 'timeline' ? (
+              <GanttView
+                tasks={filteredTasks}
+                stages={activeProject.stages || DEFAULT_STAGES}
+                users={companyUsers}
+                onTaskClick={(task) => { setSelectedTask(task); setTaskDialogOpen(true); }}
+              />
+            ) : (
+              <TaskBoard
+                tasks={filteredTasks}
+                stages={activeProject.stages || DEFAULT_STAGES}
+                users={companyUsers}
+                milestones={milestones}
+                selectedTaskIds={selectedTaskIds}
+                swimlaneBy={swimlaneBy}
+                onTaskClick={(task) => {
+                  setSelectedTask(task);
+                  setTaskDialogOpen(true);
+                }}
+                onAddTask={(status) => {
+                  setSelectedTask(null);
+                  setDefaultStatus(status);
+                  setTaskDialogOpen(true);
+                }}
+                onStatusChange={(taskId, newStatus) => {
+                  const task = tasks.find(t => t.id === taskId);
+                  const prevStatus = task?.status;
+                  const applyStatus = (s: string) => {
+                    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: s as TaskStatus } : t));
+                    setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: s as TaskStatus } : t));
+                  };
+                  applyStatus(newStatus);
+                  updateTask(activeProject.id, taskId, { status: newStatus })
+                    .catch(() => {
+                      if (prevStatus !== undefined) applyStatus(prevStatus);
+                    });
+                }}
+                onSelectionChange={setSelectedTaskIds}
+                onInlineEdit={async (taskId, newTitle) => {
+                  setTasks(prev => prev.map(t => t.id === taskId ? { ...t, title: newTitle } : t));
+                  await updateTask(activeProject.id, taskId, { title: newTitle });
+                }}
+              />
+            )}
           </>
         )}
 
@@ -868,6 +1042,23 @@ function AppContent() {
             milestones={milestones}
           />
         )}
+
+        {/* Automations Dialog */}
+        <AutomationsDialog
+          open={automationsDialogOpen}
+          onOpenChange={setAutomationsDialogOpen}
+          projectId={activeProject?.id ?? ''}
+          automations={automations}
+          onAutomationsChange={setAutomations}
+          users={companyUsers}
+          stages={activeProject?.stages || DEFAULT_STAGES}
+        />
+
+        {/* Keyboard Shortcuts Help */}
+        <KeyboardShortcutsHelp
+          open={shortcutsHelpOpen}
+          onOpenChange={setShortcutsHelpOpen}
+        />
 
         {/* Bulk action bar */}
         <BulkActionBar

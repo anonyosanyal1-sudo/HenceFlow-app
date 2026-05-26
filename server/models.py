@@ -283,3 +283,78 @@ class TaskTemplateOut(BaseModel):
 class CreateTaskTemplateIn(BaseModel):
     name: str
     template: dict[str, Any]
+
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+
+class NotificationOut(BaseModel):
+    id: str
+    userId: str
+    type: str
+    title: str
+    message: str
+    taskId: Optional[str]
+    projectId: Optional[str]
+    isRead: bool
+    createdAt: str
+
+
+class MarkReadIn(BaseModel):
+    ids: Optional[list[str]] = None  # None = mark all
+
+
+# ── Task Watchers ─────────────────────────────────────────────────────────────
+
+class WatcherOut(BaseModel):
+    id: str
+    taskId: str
+    userId: str
+    createdAt: str
+
+
+# ── Saved Filters ─────────────────────────────────────────────────────────────
+
+class SavedFilterOut(BaseModel):
+    id: str
+    projectId: str
+    userId: str
+    name: str
+    filters: dict[str, Any]
+    createdAt: str
+
+
+class CreateSavedFilterIn(BaseModel):
+    name: str
+    filters: dict[str, Any]
+
+
+# ── Automation Rules ──────────────────────────────────────────────────────────
+
+class AutomationRuleOut(BaseModel):
+    id: str
+    projectId: str
+    name: str
+    triggerType: str       # "status_changed" | "priority_changed" | "assignee_changed" | "due_date_overdue"
+    triggerValue: Optional[str]   # e.g. "closed"
+    actionType: str        # "set_assignee" | "set_priority" | "set_status" | "notify_watchers"
+    actionValue: Optional[str]
+    isActive: bool
+    createdAt: str
+
+
+class CreateAutomationRuleIn(BaseModel):
+    name: str
+    triggerType: str
+    triggerValue: Optional[str] = None
+    actionType: str
+    actionValue: Optional[str] = None
+    isActive: bool = True
+
+
+class UpdateAutomationRuleIn(BaseModel):
+    name: Optional[str] = None
+    triggerType: Optional[str] = None
+    triggerValue: Optional[str] = None
+    actionType: Optional[str] = None
+    actionValue: Optional[str] = None
+    isActive: Optional[bool] = None

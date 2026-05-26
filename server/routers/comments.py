@@ -41,7 +41,7 @@ def list_comments(task_id: str, user=Depends(get_current_user)):
 
 @router.post("", response_model=CommentOut)
 async def create_comment(task_id: str, body: CreateCommentIn, user=Depends(get_current_user)):
-    task = db.table("tasks").select("project_id").eq("id", task_id).single().execute()
+    task = db.table("tasks").select("project_id, title, assignee_id").eq("id", task_id).single().execute()
     if not task.data:
         raise HTTPException(404, "Task not found")
     project_id = task.data["project_id"]
@@ -56,6 +56,45 @@ async def create_comment(task_id: str, body: CreateCommentIn, user=Depends(get_c
     if not res.data:
         raise HTTPException(500, "Failed to create comment")
     out = _map(res.data)
+
+    # Extract @mentions from content and notify
+    import re
+    mentioned = re.findall(r'@(\S+)', body.content)
+    if mentioned:
+        all_users = db.table("user_profiles").select("uid, display_name, email").execute().data or []
+        for mention in mentioned:
+            matched = next((u for u in all_users if (u.get("display_name") or "").lower().replace(" ", "") == mention.lower() or u.get("email", "").split("@")[0].lower() == mention.lower()), None)
+            if matched and matched["uid"] != user["id"]:
+                try:
+                    db.table("notifications").insert({
+                        "user_id": matched["uid"],
+                        "type": "mention",
+                        "title": "You were mentioned",
+                        "message": f"You were mentioned in a comment on task '{task.data.get('title', '')}'",
+                        "task_id": task_id,
+                        "project_id": project_id,
+                        "is_read": False,
+                    }).execute()
+                except Exception:
+                    pass
+
+    # Notify watchers
+    try:
+        watchers = db.table("task_watchers").select("user_id").eq("task_id", task_id).execute().data or []
+        for w in watchers:
+            if w["user_id"] != user["id"]:
+                db.table("notifications").insert({
+                    "user_id": w["user_id"],
+                    "type": "comment",
+                    "title": "New comment on watched task",
+                    "message": f"A new comment was added to '{task.data.get('title', '')}'",
+                    "task_id": task_id,
+                    "project_id": project_id,
+                    "is_read": False,
+                }).execute()
+    except Exception:
+        pass
+
     await manager.notify_project(project_id, "comments:changed", {"taskId": task_id})
     return out
 

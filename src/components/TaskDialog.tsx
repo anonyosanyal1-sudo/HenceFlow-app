@@ -18,8 +18,10 @@ import { TimeTrackingPanel } from './TimeTrackingPanel';
 import { ActivityLogPanel } from './ActivityLogPanel';
 import { CustomFieldsPanel } from './CustomFieldsPanel';
 import { cn } from '@/lib/utils';
-import { updateSubtasks, createTaskTemplate } from '../services/api';
-import { Milestone as MilestoneIcon, RefreshCw, LayoutTemplate } from 'lucide-react';
+import { updateSubtasks, createTaskTemplate, fetchWatchers, watchTask, unwatchTask } from '../services/api';
+import { Milestone as MilestoneIcon, RefreshCw, LayoutTemplate, Eye, EyeOff } from 'lucide-react';
+import { TaskWatcher } from '../types';
+import { UserAvatar } from './UserAvatar';
 
 interface TaskDialogProps {
   open: boolean;
@@ -64,8 +66,29 @@ export function TaskDialog({
   const [templateName, setTemplateName] = React.useState('');
   const [savingTemplate, setSavingTemplate] = React.useState(false);
   const [showTemplateSave, setShowTemplateSave] = React.useState(false);
+  const [watchers, setWatchers] = React.useState<TaskWatcher[]>([]);
+  const isWatching = watchers.some(w => w.userId === currentUserId);
 
   const projectId = task?.projectId || activeProjectId || '';
+
+  React.useEffect(() => {
+    if (task?.id) {
+      fetchWatchers(task.id).then(setWatchers).catch(() => {});
+    } else {
+      setWatchers([]);
+    }
+  }, [task?.id]);
+
+  const handleToggleWatch = async () => {
+    if (!task) return;
+    if (isWatching) {
+      await unwatchTask(task.id);
+      setWatchers(prev => prev.filter(w => w.userId !== currentUserId));
+    } else {
+      const w = await watchTask(task.id);
+      setWatchers(prev => [...prev, w]);
+    }
+  };
 
   React.useEffect(() => {
     if (task) {
@@ -175,11 +198,12 @@ export function TaskDialog({
 
         {task ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-4 mb-4 bg-muted p-1 rounded-xl shrink-0">
+            <TabsList className="grid w-full grid-cols-5 mb-4 bg-muted p-1 rounded-xl shrink-0">
               <TabsTrigger value="details" className="rounded-lg text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm">Details</TabsTrigger>
               <TabsTrigger value="discussion" className="rounded-lg text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm">Discussion</TabsTrigger>
               <TabsTrigger value="time" className="rounded-lg text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm">Time</TabsTrigger>
               <TabsTrigger value="activity" className="rounded-lg text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm">Activity</TabsTrigger>
+              <TabsTrigger value="watchers" className="rounded-lg text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm">Watchers</TabsTrigger>
             </TabsList>
 
             <div className="flex-1 min-h-0">
@@ -357,6 +381,38 @@ export function TaskDialog({
               {/* ── Activity tab ─────────────────────────────────────────────── */}
               <TabsContent value="activity" className="mt-0 h-full overflow-y-auto">
                 <ActivityLogPanel taskId={task.id} users={users} />
+              </TabsContent>
+
+              {/* ── Watchers tab ─────────────────────────────────────────────── */}
+              <TabsContent value="watchers" className="flex-1 overflow-y-auto mt-0">
+                <div className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-foreground">Watchers ({watchers.length})</h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs"
+                      onClick={handleToggleWatch}
+                    >
+                      {isWatching ? <><EyeOff className="w-3.5 h-3.5" /> Unwatch</> : <><Eye className="w-3.5 h-3.5" /> Watch</>}
+                    </Button>
+                  </div>
+                  {watchers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No watchers yet. Click Watch to follow this task.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {watchers.map(w => {
+                        const u = users.find(u => u.uid === w.userId);
+                        return (
+                          <div key={w.id} className="flex items-center gap-2">
+                            <UserAvatar photoURL={u?.photoURL ?? null} displayName={u?.displayName ?? null} className="w-7 h-7 text-xs" />
+                            <span className="text-sm text-foreground">{u?.displayName || u?.email || w.userId}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </TabsContent>
             </div>
           </Tabs>
