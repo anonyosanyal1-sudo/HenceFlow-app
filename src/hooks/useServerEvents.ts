@@ -3,11 +3,27 @@ import { supabase } from '../lib/supabase';
 
 export type ServerEventHandler = (type: string, data: Record<string, unknown>) => void;
 
+// Tables scoped to a project_id
+const PROJECT_SCOPED_TABLES: { table: string; event: string }[] = [
+  { table: 'tasks',                    event: 'tasks:changed' },
+  { table: 'milestones',               event: 'milestones:changed' },
+  { table: 'comments',                 event: 'comments:changed' },
+  { table: 'time_entries',             event: 'time_entries:changed' },
+  { table: 'custom_field_definitions', event: 'custom_fields:changed' },
+  { table: 'task_templates',           event: 'templates:changed' },
+  { table: 'projects',                 event: 'projects:changed' },
+];
+
+// Tables that are global (no project_id filter)
+const GLOBAL_TABLES: { table: string; event: string }[] = [
+  { table: 'pods',      event: 'pods:changed' },
+  { table: 'companies', event: 'companies:changed' },
+];
+
 export function useServerEvents(
   projectIds: string[],
   onEvent: ServerEventHandler,
 ) {
-  const esRef = useRef<EventSource | null>(null);
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
 
@@ -16,48 +32,49 @@ export function useServerEvents(
   useEffect(() => {
     if (!key) return;
 
-    let es: EventSource | null = null;
-    let closed = false;
+    const channels: ReturnType<typeof supabase.channel>[] = [];
 
-    const connect = async () => {
-      if (closed) return;
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return;
+    // Per-project channels for project-scoped tables
+    for (const pid of projectIds) {
+      for (const { table, event } of PROJECT_SCOPED_TABLES) {
+        const channel = supabase
+          .channel(`${table}:${pid}`)
+          .on(
+            'postgres_changes' as any,
+            {
+              event: '*',
+              schema: 'public',
+              table,
+              filter: `project_id=eq.${pid}`,
+            },
+            (payload: Record<string, unknown>) => {
+              onEventRef.current(event, payload);
+            },
+          )
+          .subscribe();
+        channels.push(channel);
+      }
+    }
 
-      const url = new URL('/api/events', window.location.origin);
-      url.searchParams.set('token', token);
-      url.searchParams.set('project_ids', key);
-
-      es = new EventSource(url.toString());
-      esRef.current = es;
-
-      es.onmessage = (evt) => {
-        try {
-          const payload = JSON.parse(evt.data) as { type: string } & Record<string, unknown>;
-          const { type, ...rest } = payload;
-          if (type !== 'ping' && type !== 'connected') {
-            onEventRef.current(type, rest);
-          }
-        } catch {
-          // ignore malformed events
-        }
-      };
-
-      es.onerror = () => {
-        es?.close();
-        if (!closed) {
-          setTimeout(connect, 3000);
-        }
-      };
-    };
-
-    connect();
+    // Single channel for global tables
+    for (const { table, event } of GLOBAL_TABLES) {
+      const channel = supabase
+        .channel(`global:${table}`)
+        .on(
+          'postgres_changes' as any,
+          { event: '*', schema: 'public', table },
+          (payload: Record<string, unknown>) => {
+            onEventRef.current(event, payload);
+          },
+        )
+        .subscribe();
+      channels.push(channel);
+    }
 
     return () => {
-      closed = true;
-      es?.close();
-      esRef.current = null;
+      for (const channel of channels) {
+        supabase.removeChannel(channel);
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
