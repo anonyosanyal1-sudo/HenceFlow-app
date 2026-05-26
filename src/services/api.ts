@@ -607,8 +607,25 @@ export const getActivityLogs = async (taskId: string): Promise<ActivityLog[]> =>
   return (data ?? []).map(mapActivityLog);
 };
 
-// addActivityLog is now handled server-side; keep stub for backwards compat
-export const addActivityLog = async () => {};
+// addActivityLog writes to DB; server-side triggers also create logs automatically
+export const addActivityLog = async (
+  taskId: string,
+  projectId: string,
+  action: string,
+  opts?: { field?: string; oldValue?: string; newValue?: string }
+): Promise<void> => {
+  const userId = await getCurrentUserId();
+  const { error } = await supabase.from('activity_logs').insert({
+    task_id: taskId,
+    project_id: projectId,
+    user_id: userId,
+    action,
+    field: opts?.field ?? null,
+    old_value: opts?.oldValue ?? null,
+    new_value: opts?.newValue ?? null,
+  });
+  if (error) console.error('addActivityLog:', error.message);
+};
 
 // ── Custom Fields ─────────────────────────────────────────────────────────────
 
@@ -688,8 +705,10 @@ export const deleteTaskTemplate = async (templateId: string) => {
 
 // ── Subtasks convenience wrapper ──────────────────────────────────────────────
 
-export const updateSubtasks = async (_taskId: string, _subtasks: Subtask[]) => {
-  // Subtasks are updated via updateTask — kept for backwards compat
+export const updateSubtasks = async (taskId: string, subtasks: Subtask[], projectId?: string) => {
+  const { data: taskRow } = await supabase.from('tasks').select('project_id').eq('id', taskId).single();
+  const pid = projectId ?? taskRow?.project_id ?? '';
+  await updateTask(pid, taskId, { subtasks });
 };
 
 // ── Recurring task helpers ────────────────────────────────────────────────────

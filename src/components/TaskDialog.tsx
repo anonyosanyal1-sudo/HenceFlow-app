@@ -18,7 +18,7 @@ import { TimeTrackingPanel } from './TimeTrackingPanel';
 import { ActivityLogPanel } from './ActivityLogPanel';
 import { CustomFieldsPanel } from './CustomFieldsPanel';
 import { cn } from '@/lib/utils';
-import { updateSubtasks, createTaskTemplate, fetchWatchers, watchTask, unwatchTask } from '../services/api';
+import { updateSubtasks, createTaskTemplate, fetchWatchers, watchTask, unwatchTask, addActivityLog } from '../services/api';
 import { Milestone as MilestoneIcon, RefreshCw, LayoutTemplate, Eye, EyeOff } from 'lucide-react';
 import { TaskWatcher } from '../types';
 import { UserAvatar } from './UserAvatar';
@@ -344,8 +344,17 @@ export function TaskDialog({
 
                     <SubtasksPanel
                       subtasks={task.subtasks ?? []}
-                      onChange={subtasks => {
-                        updateSubtasks(task.id, subtasks).catch(() => {});
+                      onChange={(newSubtasks) => {
+                        const pid = task.projectId || activeProjectId || '';
+                        updateSubtasks(task.id, newSubtasks, pid).catch(() => {});
+                        const prev = task.subtasks ?? [];
+                        const added = newSubtasks.find(s => !prev.some(p => p.id === s.id));
+                        const toggled = newSubtasks.find(s => {
+                          const old = prev.find(p => p.id === s.id);
+                          return old && old.completed !== s.completed;
+                        });
+                        if (added) addActivityLog(task.id, pid, 'subtask_added', { newValue: added.title }).catch(() => {});
+                        else if (toggled) addActivityLog(task.id, pid, 'subtask_completed', { newValue: toggled.title }).catch(() => {});
                       }}
                     />
 

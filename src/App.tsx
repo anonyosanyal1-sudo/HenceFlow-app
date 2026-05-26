@@ -113,6 +113,7 @@ export default function App() {
 function AppContent() {
   const [user, setUser] = React.useState<AppUser | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [companyLoaded, setCompanyLoaded] = React.useState(false);
   const [company, setCompany] = React.useState<Company | null>(null);
   const [pods, setPods] = React.useState<Pod[]>([]);
   const [activePod, setActivePod] = React.useState<Pod | null>(null);
@@ -198,6 +199,7 @@ function AppContent() {
     if (!user) return;
     const comps = await fetchCompanies().catch(() => [] as Company[]);
     setCompany(comps.length > 0 ? comps[0] : null);
+    setCompanyLoaded(true);
   }, [user]);
 
   const loadPods = React.useCallback(async (companyId: string) => {
@@ -234,7 +236,7 @@ function AppContent() {
   }, [projects]);
 
   React.useEffect(() => {
-    if (!user) { setCompany(null); setPods([]); return; }
+    if (!user) { setCompany(null); setPods([]); setCompanyLoaded(false); return; }
     loadCompany();
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -287,6 +289,17 @@ function AppContent() {
     if (!activeProject) { setAutomations([]); return; }
     fetchAutomations(activeProject.id).then(setAutomations).catch(() => {});
   }, [activeProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh task data when tab regains focus (catches missed real-time events)
+  React.useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && activeProject) {
+        loadProjectData(activeProject.id);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [activeProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // SSE: listen for server-side changes and refetch affected data
   const activeProjectId = activeProject?.id;
@@ -611,7 +624,11 @@ function AppContent() {
       />
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {!company ? (
+        {!companyLoaded ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : !company ? (
           <div className="relative flex-1 flex flex-col items-center justify-center p-8 text-center bg-transparent z-10">
             <div className="absolute top-4 left-4 lg:hidden">
               <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>

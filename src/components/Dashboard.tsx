@@ -112,23 +112,38 @@ export function Dashboard({
   }).length;
   const activeProjects = projects.length;
 
+  const currentUser = users.find(u => u.uid === currentUserId);
+  const isCurrentUserOwner = company?.ownerId === currentUserId;
+
   return (
     <div className="flex-1 overflow-y-auto bg-transparent p-6 md:p-12 relative z-10">
       <div className="max-w-5xl mx-auto space-y-10">
-        
+
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-medium tracking-tight text-foreground">
-              {company.name}
-            </h1>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-3 mb-1">
+              <UserAvatar
+                photoURL={currentUser?.photoURL ?? null}
+                displayName={currentUser?.displayName ?? null}
+                className="w-9 h-9 text-sm"
+              />
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {isCurrentUserOwner ? 'Owner' : 'Member'} · {company.name}
+                </p>
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground leading-tight">
+                  {currentUser?.displayName ?? currentUser?.email ?? 'Dashboard'}
+                </h1>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-muted-foreground pl-12">
               {company.location && <span>{company.location}</span>}
               {company.industry && <span>{company.industry}</span>}
               {company.website && (
-                <a 
-                  href={company.website.startsWith('http') ? company.website : `https://${company.website}`} 
-                  target="_blank" 
+                <a
+                  href={company.website.startsWith('http') ? company.website : `https://${company.website}`}
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-primary transition-colors"
                 >
@@ -428,16 +443,21 @@ export function Dashboard({
                              className="h-8 w-8 text-xs shrink-0"
                            />
                            <div className="flex flex-col flex-1 min-w-0">
-                             <span className="text-sm font-medium text-foreground truncate">
-                               {user.displayName || 'Anonymous User'}
-                             </span>
+                             <div className="flex items-center gap-1.5">
+                               <span className="text-sm font-medium text-foreground truncate">
+                                 {user.displayName || 'Anonymous User'}
+                               </span>
+                               {user.uid === currentUserId && (
+                                 <span className="text-[10px] text-muted-foreground/60 font-medium shrink-0">(You)</span>
+                               )}
+                             </div>
                              <span className="text-xs text-muted-foreground truncate">
                                {user.email}
                              </span>
                            </div>
                            <div className="flex items-center space-x-2 shrink-0">
                              <label className="text-xs font-medium text-muted-foreground cursor-pointer flex items-center space-x-2">
-                               <Checkbox 
+                               <Checkbox
                                  checked={isAdmin}
                                  disabled={isOwner || !isMember || (currentUserId !== company?.ownerId && !company?.adminIds?.includes(currentUserId))}
                                  onCheckedChange={toggleAdmin}
