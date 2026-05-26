@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityLog, UserProfile } from '../types';
 import { getActivityLogs } from '../services/api';
+import { supabase } from '../lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { UserAvatar } from './UserAvatar';
 
@@ -29,13 +30,25 @@ export function ActivityLogPanel({ taskId, users }: ActivityLogPanelProps) {
   const [logs, setLogs] = React.useState<ActivityLog[]>([]);
   const [loading, setLoading] = React.useState(true);
 
-  React.useEffect(() => {
+  const fetchLogs = React.useCallback(() => {
     setLoading(true);
     getActivityLogs(taskId).then(data => {
       setLogs(data);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, [taskId]);
+
+  React.useEffect(() => {
+    fetchLogs();
+    const channel = supabase
+      .channel(`activity_logs:task:${taskId}`)
+      .on('postgres_changes' as any, {
+        event: '*', schema: 'public', table: 'activity_logs',
+        filter: `task_id=eq.${taskId}`,
+      }, () => { fetchLogs(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [taskId, fetchLogs]);
 
   const getUser = (uid: string) => users.find(u => u.uid === uid);
 

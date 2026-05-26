@@ -98,18 +98,6 @@ export function Sidebar({
         isCollapsed ? "w-[68px]" : "w-64",
         className
       )}>
-        {/* Collapse toggle */}
-        {onToggleCollapse && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggleCollapse}
-            className="absolute -right-3 top-20 bg-sidebar border border-sidebar-border rounded-full h-6 w-6 z-10 hidden lg:flex shadow-md hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all"
-          >
-            {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
-          </Button>
-        )}
-
         {/* Company header */}
         <div className={cn("flex items-center px-1", isCollapsed ? "justify-center" : "justify-between")}>
           <div className={cn(
@@ -117,7 +105,13 @@ export function Sidebar({
             isCollapsed ? "p-1.5 justify-center" : "p-2 gap-2 flex-1 min-w-0"
           )}>
             {isCollapsed ? (
-              <Logo variant="icon" className="w-9 h-9 shadow-sm" />
+              <button
+                onClick={onToggleCollapse}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                title="Expand sidebar"
+              >
+                <Logo variant="icon" className="w-9 h-9 shadow-sm" />
+              </button>
             ) : (
               <>
                 <Logo variant="wordmark" className="h-7 max-w-[120px] object-left shrink-0" />
@@ -138,6 +132,18 @@ export function Sidebar({
               </>
             )}
           </div>
+          {/* Collapse toggle — desktop only */}
+          {onToggleCollapse && !isCollapsed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggleCollapse}
+              className="hidden lg:flex h-7 w-7 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 rounded-lg shrink-0"
+              title="Collapse sidebar"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+          )}
           {onClose && (
             <Button variant="ghost" size="icon" onClick={onClose} className="lg:hidden text-muted-foreground shrink-0 ml-1 h-8 w-8">
               <MoreVertical className="w-4 h-4 rotate-90" />

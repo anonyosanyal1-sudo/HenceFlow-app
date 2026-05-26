@@ -12,6 +12,7 @@ const PROJECT_SCOPED_TABLES: { table: string; event: string }[] = [
   { table: 'custom_field_definitions', event: 'custom_fields:changed' },
   { table: 'task_templates',           event: 'templates:changed' },
   { table: 'projects',                 event: 'projects:changed' },
+  { table: 'activity_logs',            event: 'activity_logs:changed' },
 ];
 
 // Tables that are global (no project_id filter)
