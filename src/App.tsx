@@ -143,6 +143,7 @@ function AppContent() {
   // New feature states
   const [swimlaneBy, setSwimlaneBy] = React.useState<SwimlaneBy>(null);
   const [selectedTaskIds, setSelectedTaskIds] = React.useState<Set<string>>(new Set());
+  const [selectionModeActive, setSelectionModeActive] = React.useState(false);
   const [milestones, setMilestones] = React.useState<Milestone[]>([]);
   const [customFieldDefs, setCustomFieldDefs] = React.useState<CustomFieldDefinition[]>([]);
   const [taskTemplates, setTaskTemplates] = React.useState<TaskTemplate[]>([]);
@@ -881,13 +882,20 @@ function AppContent() {
                     size="sm"
                     className={cn(
                       "h-9 gap-1.5 border-border/50 bg-muted/30 font-medium text-xs hidden md:flex",
-                      selectedTaskIds.size > 0 ? "text-primary border-primary/40 bg-primary/10" : "text-muted-foreground hover:text-foreground"
+                      selectionModeActive ? "text-primary border-primary/40 bg-primary/10" : "text-muted-foreground hover:text-foreground"
                     )}
-                    onClick={() => setSelectedTaskIds(selectedTaskIds.size > 0 ? new Set() : new Set())}
+                    onClick={() => {
+                      if (selectionModeActive) {
+                        setSelectionModeActive(false);
+                        setSelectedTaskIds(new Set());
+                      } else {
+                        setSelectionModeActive(true);
+                      }
+                    }}
                     title="Toggle bulk select"
                   >
                     <CheckSquare className="w-3.5 h-3.5" />
-                    {selectedTaskIds.size > 0 ? selectedTaskIds.size : ''}
+                    {selectionModeActive && selectedTaskIds.size > 0 ? selectedTaskIds.size : ''}
                   </Button>
 
                   {/* Milestones */}
@@ -1003,6 +1011,7 @@ function AppContent() {
                 users={companyUsers}
                 milestones={milestones}
                 selectedTaskIds={selectedTaskIds}
+                selectionMode={selectionModeActive}
                 swimlaneBy={swimlaneBy}
                 onTaskClick={(task) => {
                   setSelectedTask(task);

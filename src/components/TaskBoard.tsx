@@ -16,6 +16,7 @@ interface TaskBoardProps {
   users?: UserProfile[];
   milestones?: Milestone[];
   selectedTaskIds?: Set<string>;
+  selectionMode?: boolean;
   swimlaneBy?: SwimlaneBy;
   onTaskClick: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
@@ -300,10 +301,9 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
 
 export function TaskBoard({
   tasks, stages, users = [], milestones = [],
-  selectedTaskIds = new Set(), swimlaneBy = null,
+  selectedTaskIds = new Set(), selectionMode = false, swimlaneBy = null,
   onTaskClick, onAddTask, onStatusChange, onSelectionChange, onInlineEdit,
 }: TaskBoardProps) {
-  const selectionMode = onSelectionChange !== undefined && selectedTaskIds !== undefined;
 
   const onDragEnd = (result: DropResult) => {
     const { destination, source, draggableId } = result;
