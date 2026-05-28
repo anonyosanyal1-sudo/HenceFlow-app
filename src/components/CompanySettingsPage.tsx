@@ -377,15 +377,11 @@ export function CompanySettingsPage({
                   </Select>
 
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 shrink-0 text-muted-foreground/60 hover:text-muted-foreground"
-                        disabled={isOwner}
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
+                    <DropdownMenuTrigger
+                      disabled={isOwner}
+                      className="h-9 w-9 flex items-center justify-center rounded-lg shrink-0 text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50 transition-colors disabled:pointer-events-none disabled:opacity-50"
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
                       <DropdownMenuItem
