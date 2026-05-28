@@ -34,8 +34,11 @@ interface CompanySettingsPageProps {
 
 function getInitialRoles(company: Company): Record<string, MemberRole> {
   const map: Record<string, MemberRole> = {};
+  // Owner is always Admin, regardless of adminIds array
+  map[company.ownerId] = 'Admin';
   company.memberIds.forEach(uid => {
-    if (uid === company.ownerId || company.adminIds.includes(uid)) {
+    if (uid === company.ownerId) return; // already set
+    if (company.adminIds.includes(uid)) {
       map[uid] = 'Admin';
     } else if (company.viewerIds.includes(uid)) {
       map[uid] = 'Viewer';
@@ -44,6 +47,10 @@ function getInitialRoles(company: Company): Record<string, MemberRole> {
     }
   });
   return map;
+}
+
+function ensureOwner(ids: string[], ownerId: string): string[] {
+  return ids.includes(ownerId) ? ids : [ownerId, ...ids];
 }
 
 export function CompanySettingsPage({
@@ -60,7 +67,7 @@ export function CompanySettingsPage({
   const [roles, setRoles] = React.useState<Record<string, MemberRole>>(
     () => getInitialRoles(company)
   );
-  const [memberIds, setMemberIds] = React.useState<string[]>(company.memberIds);
+  const [memberIds, setMemberIds] = React.useState<string[]>(() => ensureOwner(company.memberIds, company.ownerId));
   const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = React.useState('');
   const [inviteOpen, setInviteOpen] = React.useState(false);
@@ -73,7 +80,7 @@ export function CompanySettingsPage({
     setWebsite((company.website ?? '').replace(/^https?:\/\//, ''));
     setIndustry(company.industry ?? '');
     setRoles(getInitialRoles(company));
-    setMemberIds(company.memberIds);
+    setMemberIds(ensureOwner(company.memberIds, company.ownerId));
     setIsDirty(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyKey]);
@@ -106,7 +113,7 @@ export function CompanySettingsPage({
     setWebsite((company.website ?? '').replace(/^https?:\/\//, ''));
     setIndustry(company.industry ?? '');
     setRoles(getInitialRoles(company));
-    setMemberIds(company.memberIds);
+    setMemberIds(ensureOwner(company.memberIds, company.ownerId));
     setIsDirty(false);
   };
 
@@ -180,7 +187,7 @@ export function CompanySettingsPage({
     return `${mins} minutes ago`;
   }, [lastSaved]);
 
-  const visibleUsers = users.filter(u => memberIds.includes(u.uid));
+  const visibleUsers = users.filter(u => memberIds.includes(u.uid) || u.uid === company.ownerId);
 
   return (
     <div className="h-full overflow-y-auto bg-background">

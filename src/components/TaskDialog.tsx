@@ -168,7 +168,7 @@ export function TaskDialog({
   if (!task) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[580px] bg-card border-border p-0 gap-0 overflow-hidden">
+        <DialogContent showCloseButton={false} className="sm:max-w-[580px] bg-card border-border p-0 gap-0 overflow-hidden">
           <DialogDescription className="sr-only">Create a new task</DialogDescription>
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border/30">
@@ -316,10 +316,10 @@ export function TaskDialog({
   // ─── EDIT MODE ────────────────────────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[920px] h-[88vh] flex flex-col bg-card border-border p-0 gap-0 overflow-hidden">
+      <DialogContent showCloseButton={false} className="sm:max-w-[920px] h-[88vh] flex flex-col bg-card border-border p-0 gap-0 overflow-hidden">
         <DialogDescription className="sr-only">Edit task details</DialogDescription>
 
-        {/* ── Top header ──────────────────────────────────────────────── */}
+        {/* ── Top header (shrink-0) ────────────────────────────────────── */}
         <div className="shrink-0 px-6 pt-5 pb-0">
           {/* ID + actions row */}
           <div className="flex items-center justify-between mb-3">
@@ -366,12 +366,14 @@ export function TaskDialog({
           <Input
             value={title}
             onChange={e => setTitle(e.target.value)}
-            className="text-xl font-bold bg-transparent border-none focus-visible:ring-0 shadow-none px-0 placeholder:text-muted-foreground/30 text-foreground h-auto py-0 mb-4"
+            className="text-xl font-bold bg-transparent border-none focus-visible:ring-0 shadow-none px-0 placeholder:text-muted-foreground/30 text-foreground h-auto py-0 mb-0"
             placeholder="Task title…"
           />
+        </div>
 
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
+        {/* ── Tabs (flex-1, scrollable) ────────────────────────────────── */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="shrink-0 px-6 pt-3">
             <TabsList className="bg-transparent p-0 h-auto gap-0 border-b border-border/30 w-full justify-start rounded-none">
               {['details', 'discussion', 'time', 'activity', 'watchers'].map(tab => (
                 <TabsTrigger
@@ -383,9 +385,10 @@ export function TaskDialog({
                 </TabsTrigger>
               ))}
             </TabsList>
+          </div>
 
-            {/* ── Tab panels ──────────────────────────────────────────── */}
-            <div className="flex-1 min-h-0 overflow-hidden mt-0">
+          {/* ── Tab panels ──────────────────────────────────────────── */}
+          <div className="flex-1 min-h-0 overflow-hidden mt-0">
 
               {/* Details */}
               <TabsContent value="details" className="h-full overflow-y-auto mt-0 data-[state=inactive]:hidden">
@@ -414,7 +417,6 @@ export function TaskDialog({
 
                     {/* Subtasks */}
                     <div className="space-y-2">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Subtasks</label>
                       <SubtasksPanel
                         subtasks={localSubtasks}
                         onChange={(newSubtasks) => {
@@ -623,21 +625,20 @@ export function TaskDialog({
               </TabsContent>
             </div>
 
-            {/* ── Footer ──────────────────────────────────────────────── */}
-            <div className="shrink-0 flex items-center justify-end gap-2 px-6 py-4 border-t border-border/30 bg-card">
-              <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-muted-foreground">
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={!title.trim() || isDescriptionTooLong}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 rounded-xl shadow-sm shadow-primary/20"
-              >
-                Save changes
-              </Button>
-            </div>
-          </Tabs>
-        </div>
+          {/* ── Footer ──────────────────────────────────────────────── */}
+          <div className="shrink-0 flex items-center justify-end gap-2 px-6 py-4 border-t border-border/30 bg-card">
+            <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-muted-foreground">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={!title.trim() || isDescriptionTooLong}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 rounded-xl shadow-sm shadow-primary/20"
+            >
+              Save changes
+            </Button>
+          </div>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
