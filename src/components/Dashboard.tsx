@@ -3,7 +3,6 @@ import { Project, Task, Company, UserProfile } from '../types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { UserAvatar } from './UserAvatar';
 import {
   Settings, Trash2, Plus, AlertCircle, Users, TrendingUp,
@@ -27,12 +26,13 @@ interface DashboardProps {
   onDeleteProject: (projectId: string) => void;
   onArchiveProject?: (projectId: string, archive: boolean) => void;
   onNewProject: () => void;
-  onUpdateCompany: (data: {
+  onUpdateCompany?: (data: {
     name: string; location?: string; website?: string;
     industry?: string; memberIds?: string[]; adminIds?: string[];
   }) => void;
   onDeleteCompany?: (companyId: string) => void;
   onInvite?: () => void;
+  onCompanySettings?: () => void;
 }
 
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -40,25 +40,12 @@ const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 export function Dashboard({
   company, projects, tasks, users, currentUserId,
   onProjectSelect, onEditProject, onDeleteProject, onArchiveProject, onNewProject,
-  onUpdateCompany, onDeleteCompany, onInvite,
+  onUpdateCompany, onDeleteCompany, onInvite, onCompanySettings,
 }: DashboardProps) {
 
   const [projectToDelete, setProjectToDelete] = React.useState<Project | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = React.useState('');
-  const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
   const [workspaceFilter, setWorkspaceFilter] = React.useState<'all' | 'active' | 'archived'>('all');
-  const [companyName, setCompanyName] = React.useState(company?.name || '');
-  const [companyLocation, setCompanyLocation] = React.useState(company?.location || '');
-  const [companyIndustry, setCompanyIndustry] = React.useState(company?.industry || '');
-  const [companyWebsite, setCompanyWebsite] = React.useState(company?.website || '');
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    setCompanyName(company?.name || '');
-    setCompanyLocation(company?.location || '');
-    setCompanyIndustry(company?.industry || '');
-    setCompanyWebsite(company?.website || '');
-  }, [company]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const today = new Date().toISOString().split('T')[0];
@@ -182,8 +169,9 @@ export function Dashboard({
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground/30 font-mono pointer-events-none">⌘K</kbd>
           </div>
           <button
-            onClick={() => setSettingsOpen(true)}
+            onClick={onCompanySettings}
             className="h-9 w-9 flex items-center justify-center rounded-xl text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors"
+            title="Company Settings"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -450,120 +438,7 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* ── Company Settings Dialog ─────────────────────────────────────────── */}
-      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="sm:max-w-2xl bg-card border-border max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold">Company Settings</DialogTitle>
-            <DialogDescription>Manage your company details and team.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-5 py-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Company Name</label>
-                <Input value={companyName} onChange={e => setCompanyName(e.target.value)}
-                  className="bg-muted/50 border-border/60 focus-visible:ring-1 focus-visible:ring-primary" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Location</label>
-                <Input value={companyLocation} onChange={e => setCompanyLocation(e.target.value)}
-                  placeholder="e.g., San Francisco"
-                  className="bg-muted/50 border-border/60 focus-visible:ring-1 focus-visible:ring-primary" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Industry</label>
-                <Input value={companyIndustry} onChange={e => setCompanyIndustry(e.target.value)}
-                  placeholder="e.g., Technology"
-                  className="bg-muted/50 border-border/60 focus-visible:ring-1 focus-visible:ring-primary" />
-              </div>
-              <div className="col-span-2 space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Website</label>
-                <Input value={companyWebsite} onChange={e => setCompanyWebsite(e.target.value)}
-                  placeholder="e.g., https://acme.com"
-                  className="bg-muted/50 border-border/60 focus-visible:ring-1 focus-visible:ring-primary" />
-              </div>
-            </div>
-            <Button onClick={() => {
-              if (companyName.trim()) {
-                onUpdateCompany({ name: companyName.trim(), location: companyLocation.trim() || undefined, industry: companyIndustry.trim() || undefined, website: companyWebsite.trim() || undefined, memberIds: company?.memberIds, adminIds: company?.adminIds });
-              }
-            }} className="bg-primary text-primary-foreground font-semibold">
-              Save Changes
-            </Button>
-
-            {/* Team Members */}
-            <div className="space-y-3 pt-2 border-t border-border/30">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Team Members ({company?.memberIds?.length ?? 0})</p>
-              <div className="space-y-1 max-h-64 overflow-y-auto">
-                {users.map(user => {
-                  const isOwner = user.uid === company?.ownerId;
-                  const isMember = company?.memberIds?.includes(user.uid) ?? false;
-                  const isAdmin = company?.adminIds?.includes(user.uid) ?? false;
-                  const canEdit = currentUserId === company?.ownerId || company?.adminIds?.includes(currentUserId);
-
-                  const toggleMember = () => {
-                    if (isOwner || !canEdit) return;
-                    let newMembers = company?.memberIds ?? [];
-                    let newAdmins = company?.adminIds ?? [];
-                    if (isMember) { newMembers = newMembers.filter(id => id !== user.uid); newAdmins = newAdmins.filter(id => id !== user.uid); }
-                    else newMembers = [...newMembers, user.uid];
-                    onUpdateCompany({ name: company!.name, memberIds: newMembers, adminIds: newAdmins });
-                  };
-                  const toggleAdmin = () => {
-                    if (isOwner || !canEdit) return;
-                    let newAdmins = company?.adminIds ?? [];
-                    let newMembers = company?.memberIds ?? [];
-                    if (isAdmin) newAdmins = newAdmins.filter(id => id !== user.uid);
-                    else { newAdmins = [...newAdmins, user.uid]; if (!isMember) newMembers = [...newMembers, user.uid]; }
-                    onUpdateCompany({ name: company!.name, memberIds: newMembers, adminIds: newAdmins });
-                  };
-
-                  return (
-                    <div key={user.uid} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/30 transition-colors">
-                      <Checkbox checked={isMember} onCheckedChange={toggleMember}
-                        disabled={isOwner || !canEdit}
-                        className="border-primary data-[state=checked]:bg-primary shrink-0" />
-                      <UserAvatar photoURL={user.photoURL} displayName={user.displayName} className="h-8 w-8 text-xs shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-medium text-foreground truncate">{user.displayName || 'Anonymous'}</span>
-                          {user.uid === currentUserId && <span className="text-[10px] text-muted-foreground/50">(You)</span>}
-                        </div>
-                        <span className="text-xs text-muted-foreground/60 truncate">{user.email}</span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-                          <Checkbox checked={isAdmin} onCheckedChange={toggleAdmin}
-                            disabled={isOwner || !isMember || !canEdit} className="h-4 w-4" />
-                          Admin
-                        </label>
-                        {isOwner && <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md">Owner</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Danger zone */}
-            {company?.ownerId === currentUserId && (
-              <div className="pt-2 border-t border-border/30 flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">Deleting a company is irreversible.</p>
-                <div className="flex gap-2">
-                  {isConfirmingDelete ? (
-                    <>
-                      <Button variant="ghost" size="sm" onClick={() => setIsConfirmingDelete(false)}>Cancel</Button>
-                      <Button variant="destructive" size="sm" onClick={async () => { try { await onDeleteCompany?.(company!.id); } finally { setIsConfirmingDelete(false); } }}>Confirm Delete</Button>
-                    </>
-                  ) : (
-                    <Button variant="destructive" size="sm" onClick={() => setIsConfirmingDelete(true)}>Delete Company</Button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* ── Delete Project Dialog ────────────────────────────────────────────── */}
 
       {/* ── Delete Project Dialog ────────────────────────────────────────────── */}
       <Dialog open={!!projectToDelete} onOpenChange={open => { if (!open) { setProjectToDelete(null); setDeleteConfirmName(''); } }}>
