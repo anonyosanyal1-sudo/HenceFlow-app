@@ -51,6 +51,7 @@ import { ProjectDialog } from './components/ProjectDialog';
 import { CompanyDialog } from './components/CompanyDialog';
 import { CompanySettingsPage } from './components/CompanySettingsPage';
 import { InviteDialog } from './components/InviteDialog';
+import { CreateCompanyPage } from './components/CreateCompanyPage';
 import { ProfileSetup } from './components/ProfileSetup';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { MilestoneDialog } from './components/MilestoneDialog';
@@ -797,29 +798,18 @@ function AppContent() {
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : !company ? (
-          <div className="relative flex-1 flex flex-col items-center justify-center p-8 text-center bg-transparent z-10">
-            <div className="absolute top-4 left-4 lg:hidden">
+          <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="absolute top-4 left-4 z-10 lg:hidden">
               <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
                 <Menu className="w-5 h-5" />
               </Button>
             </div>
-            <div className="w-20 h-20 bg-black rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-primary/20 overflow-hidden">
-              <Logo variant="icon" className="w-full h-full" />
-            </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Create your company</h2>
-            <p className="text-muted-foreground max-w-sm mb-8">
-              Pods belong to a company. Create one to get started.
-            </p>
-            <Button
-              size="lg"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 h-12 shadow-xl shadow-primary/20 rounded-xl font-bold"
-              onClick={() => {
+            <CreateCompanyPage
+              onSave={async (data) => {
                 setSelectedCompanyForEdit(null);
-                setCompanyDialogOpen(true);
+                await handleSaveCompany(data);
               }}
-            >
-              Set up Company
-            </Button>
+            />
           </div>
         ) : showCompanySettings && company ? (
           <div className="flex-1 min-w-0 overflow-hidden">
