@@ -988,18 +988,20 @@ function AppContent() {
                           <option value="overdue">Overdue</option>
                         </select>
                       </div>
-                      <div className="space-y-2 border-t border-border/40 pt-3">
-                        <h4 className="font-semibold text-sm text-foreground">Swimlane</h4>
-                        <div className="flex gap-1.5">
-                          {([['Off', null], ['Assignee', 'assignee'], ['Priority', 'priority']] as [string, SwimlaneBy][]).map(([label, val]) => (
-                            <button key={label} onClick={() => setSwimlaneBy(val)}
-                              className={cn("flex-1 px-2 h-8 rounded-lg text-xs font-semibold transition-all border",
-                                swimlaneBy === val ? "bg-primary/10 text-primary border-primary/30" : "text-muted-foreground border-border/40 hover:bg-muted/50")}>
-                              {label}
-                            </button>
-                          ))}
+                      {activeView === 'board' && (
+                        <div className="space-y-2 border-t border-border/40 pt-3">
+                          <h4 className="font-semibold text-sm text-foreground">Swimlane</h4>
+                          <div className="flex gap-1.5">
+                            {([['Off', null], ['Assignee', 'assignee'], ['Priority', 'priority']] as [string, SwimlaneBy][]).map(([label, val]) => (
+                              <button key={label} onClick={() => setSwimlaneBy(val)}
+                                className={cn("flex-1 px-2 h-8 rounded-lg text-xs font-semibold transition-all border",
+                                  swimlaneBy === val ? "bg-primary/10 text-primary border-primary/30" : "text-muted-foreground border-border/40 hover:bg-muted/50")}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
                       {(filterPriority || filterAssignee || filterCreator || searchQuery || filterDueDate) && (
                         <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground hover:text-foreground"
                           onClick={() => { setSearchQuery(''); setFilterPriority(null); setFilterAssignee(null); setFilterCreator(null); setFilterDueDate(null); }}>
