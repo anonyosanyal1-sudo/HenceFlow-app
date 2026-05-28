@@ -103,7 +103,9 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
 
   const handleSave = () => {
     if (!name.trim()) return;
-    onSave({ name, description, members, stages });
+    const validUserIds = new Set(users.map(u => u.uid));
+    const cleanedMembers = members.filter(id => validUserIds.has(id));
+    onSave({ name, description, members: cleanedMembers, stages });
     onOpenChange(false);
   };
 
@@ -182,7 +184,7 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground flex justify-between items-center">
                 <span>Pod Members</span>
-                <span className="text-xs text-muted-foreground">{members.length} selected</span>
+                <span className="text-xs text-muted-foreground">{users.filter(u => members.includes(u.uid)).length} selected</span>
               </label>
               <ScrollArea className="h-[150px] border border-border rounded-lg bg-muted/20 p-2">
                 <div className="space-y-1">
