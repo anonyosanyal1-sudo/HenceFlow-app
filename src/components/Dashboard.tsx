@@ -25,20 +25,22 @@ interface DashboardProps {
   onProjectSelect: (project: Project) => void;
   onEditProject: (project: Project) => void;
   onDeleteProject: (projectId: string) => void;
+  onArchiveProject?: (projectId: string, archive: boolean) => void;
   onNewProject: () => void;
   onUpdateCompany: (data: {
     name: string; location?: string; website?: string;
     industry?: string; memberIds?: string[]; adminIds?: string[];
   }) => void;
   onDeleteCompany?: (companyId: string) => void;
+  onInvite?: () => void;
 }
 
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 export function Dashboard({
   company, projects, tasks, users, currentUserId,
-  onProjectSelect, onEditProject, onDeleteProject, onNewProject,
-  onUpdateCompany, onDeleteCompany,
+  onProjectSelect, onEditProject, onDeleteProject, onArchiveProject, onNewProject,
+  onUpdateCompany, onDeleteCompany, onInvite,
 }: DashboardProps) {
 
   const [projectToDelete, setProjectToDelete] = React.useState<Project | null>(null);
@@ -125,7 +127,11 @@ export function Dashboard({
 
   const accentFor = (project: Project) => project.color || 'oklch(0.67 0.30 285)';
 
-  const filteredProjects = projects; // All/Active/Archived filter TBD by archived field when available
+  const filteredProjects = projects.filter(p => {
+    if (workspaceFilter === 'archived') return p.isArchived === true;
+    if (workspaceFilter === 'active') return !p.isArchived;
+    return true;
+  });
 
   // ── Stats cards ─────────────────────────────────────────────────────────────
   const stats = [
@@ -203,20 +209,20 @@ export function Dashboard({
               </h1>
               <p className="mt-3 text-sm text-muted-foreground">
                 You have{' '}
-                <span className="font-semibold text-foreground">{projects.length} active workspace{projects.length !== 1 ? 's' : ''}</span>
+                <span className="font-semibold text-foreground">{projects.filter(p => !p.isArchived).length} active pod{projects.filter(p => !p.isArchived).length !== 1 ? 's' : ''}</span>
                 {tasksDueThisWeek > 0 && (
                   <> and <span className="font-semibold text-foreground">{tasksDueThisWeek} task{tasksDueThisWeek !== 1 ? 's' : ''}</span> due this week</>
                 )}.
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <Button variant="outline" size="sm" className="h-9 gap-2 border-border/50 font-medium text-muted-foreground hover:text-foreground rounded-xl">
+              <Button variant="outline" size="sm" className="h-9 gap-2 border-border/50 font-medium text-muted-foreground hover:text-foreground rounded-xl" onClick={onInvite}>
                 <Users className="w-3.5 h-3.5" />
                 Invite
               </Button>
               <Button size="sm" onClick={onNewProject} className="h-9 gap-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-semibold">
                 <Plus className="w-3.5 h-3.5" />
-                New workspace
+                New pod
               </Button>
             </div>
           </div>
@@ -239,7 +245,7 @@ export function Dashboard({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-foreground">Overall progress</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Across all workspaces</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Across all pods</p>
                 </div>
                 <span className="text-4xl font-light text-foreground">{overallProgress}<span className="text-2xl text-muted-foreground">%</span></span>
               </div>
@@ -281,7 +287,7 @@ export function Dashboard({
                   );
                 })}
                 {projects.length === 0 && (
-                  <p className="text-xs text-muted-foreground/40 italic text-center py-4">No workspaces yet</p>
+                  <p className="text-xs text-muted-foreground/40 italic text-center py-4">No pods yet</p>
                 )}
               </div>
             </div>
@@ -334,8 +340,8 @@ export function Dashboard({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-foreground">Workspaces</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Active projects you're tracking</p>
+                <h2 className="text-lg font-semibold text-foreground">Pods</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Active pods you're tracking</p>
               </div>
               {/* Filter tabs */}
               <div className="flex items-center bg-muted/30 border border-border/30 rounded-xl p-1 gap-0.5">
@@ -380,12 +386,23 @@ export function Dashboard({
                             <button
                               onClick={e => { e.stopPropagation(); onEditProject(project); }}
                               className="h-6 w-6 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                              title="Settings"
                             >
                               <Settings className="w-3.5 h-3.5" />
                             </button>
+                            {onArchiveProject && (
+                              <button
+                                onClick={e => { e.stopPropagation(); onArchiveProject(project.id, !project.isArchived); }}
+                                className="h-6 w-6 flex items-center justify-center rounded-lg text-muted-foreground hover:text-amber-400 hover:bg-amber-400/10 transition-colors"
+                                title={project.isArchived ? 'Unarchive' : 'Archive'}
+                              >
+                                <TrendingUp className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                             <button
                               onClick={e => { e.stopPropagation(); setProjectToDelete(project); }}
                               className="h-6 w-6 flex items-center justify-center rounded-lg text-muted-foreground hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
+                              title="Delete"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -417,14 +434,14 @@ export function Dashboard({
                 );
               })}
 
-              {/* Add new workspace card */}
+              {/* Add new pod card */}
               <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.15 }}>
                 <button
                   onClick={onNewProject}
                   className="w-full h-full min-h-[140px] border border-dashed border-border/40 rounded-2xl flex flex-col items-center justify-center gap-2 text-muted-foreground/40 hover:text-muted-foreground/70 hover:border-border/60 hover:bg-muted/10 transition-all"
                 >
                   <Plus className="w-5 h-5" />
-                  <span className="text-xs font-medium">New workspace</span>
+                  <span className="text-xs font-medium">New pod</span>
                 </button>
               </motion.div>
             </div>
@@ -553,7 +570,7 @@ export function Dashboard({
         <DialogContent className="sm:max-w-md bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-red-500 font-bold flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" /> Delete Workspace
+              <AlertCircle className="w-4 h-4" /> Delete Pod
             </DialogTitle>
             <DialogDescription className="pt-1">
               This will permanently delete <strong>{projectToDelete?.name}</strong> and all its tasks. This action cannot be undone.
@@ -562,7 +579,7 @@ export function Dashboard({
           <div className="py-3 space-y-2">
             <p className="text-sm text-foreground">Type <span className="font-bold">{projectToDelete?.name}</span> to confirm:</p>
             <Input value={deleteConfirmName} onChange={e => setDeleteConfirmName(e.target.value)}
-              placeholder="Workspace name"
+              placeholder="Pod name"
               className="bg-muted/50 border-border focus-visible:ring-1 focus-visible:ring-red-500" />
           </div>
           <DialogFooter>

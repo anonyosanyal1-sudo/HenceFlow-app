@@ -61,6 +61,7 @@ export function TaskDialog({
   const [dueDate, setDueDate] = React.useState<string>('');
   const [milestoneId, setMilestoneId] = React.useState<string | undefined>(undefined);
   const [recurrenceRule, setRecurrenceRule] = React.useState<RecurrenceRule | undefined>(undefined);
+  const [localSubtasks, setLocalSubtasks] = React.useState<import('../types').Subtask[]>([]);
   const [activeTab, setActiveTab] = React.useState('details');
   const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
   const [templateName, setTemplateName] = React.useState('');
@@ -100,6 +101,7 @@ export function TaskDialog({
       setDueDate(task.dueDate || '');
       setMilestoneId(task.milestoneId);
       setRecurrenceRule(task.recurrenceRule);
+      setLocalSubtasks(task.subtasks ?? []);
       setActiveTab('details');
       setIsConfirmingDelete(false);
       setShowTemplateSave(false);
@@ -112,6 +114,7 @@ export function TaskDialog({
       setDueDate('');
       setMilestoneId(undefined);
       setRecurrenceRule(undefined);
+      setLocalSubtasks([]);
       setActiveTab('details');
       setIsConfirmingDelete(false);
       setShowTemplateSave(false);
@@ -343,11 +346,12 @@ export function TaskDialog({
                     </div>
 
                     <SubtasksPanel
-                      subtasks={task.subtasks ?? []}
+                      subtasks={localSubtasks}
                       onChange={(newSubtasks) => {
                         const pid = task.projectId || activeProjectId || '';
+                        const prev = localSubtasks;
+                        setLocalSubtasks(newSubtasks);
                         updateSubtasks(task.id, newSubtasks, pid).catch(() => {});
-                        const prev = task.subtasks ?? [];
                         const added = newSubtasks.find(s => !prev.some(p => p.id === s.id));
                         const toggled = newSubtasks.find(s => {
                           const old = prev.find(p => p.id === s.id);

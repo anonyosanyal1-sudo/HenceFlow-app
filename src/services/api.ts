@@ -64,6 +64,7 @@ function mapProject(r: Record<string, any>): Project {
     members: r.members ?? [],
     color: r.color,
     stages: r.stages ?? [],
+    isArchived: r.is_archived ?? false,
     createdAt: r.created_at,
   };
 }
@@ -341,7 +342,13 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
   if (updates.members !== undefined) payload.members = updates.members;
   if (updates.color !== undefined) payload.color = updates.color;
   if (updates.stages !== undefined) payload.stages = updates.stages;
+  if (updates.isArchived !== undefined) payload.is_archived = updates.isArchived;
   const { error } = await supabase.from('projects').update(payload).eq('id', projectId);
+  if (error) throw new Error(error.message);
+};
+
+export const archiveProject = async (projectId: string, archive: boolean) => {
+  const { error } = await supabase.from('projects').update({ is_archived: archive }).eq('id', projectId);
   if (error) throw new Error(error.message);
 };
 

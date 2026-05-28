@@ -68,11 +68,10 @@ function TaskCard({ task, index, users, milestones, selected, selectionMode, onC
 
   React.useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
 
-  const seenIds = new Set<string>();
-  const taskUserIds = [task.assigneeId, task.creatorId]
-    .filter((id): id is string => !!id && !seenIds.has(id) && !!seenIds.add(id))
-    .slice(0, 3);
-  const taskUsers = taskUserIds.map(id => users.find(u => u.uid === id)).filter((u): u is UserProfile => !!u);
+  // Only show the assignee — multiple assignees are not supported
+  const taskUsers = task.assigneeId
+    ? [users.find(u => u.uid === task.assigneeId)].filter((u): u is UserProfile => !!u)
+    : [];
 
   return (
     <Draggable key={task.id} draggableId={task.id} index={index}>
@@ -229,13 +228,14 @@ interface ColumnProps {
   selectedTaskIds: Set<string>;
   selectionMode: boolean;
   swimlaneLabel?: string;
+  droppableId?: string;
   onTaskClick: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
   onToggleSelect: (id: string) => void;
   onInlineEdit?: (taskId: string, newTitle: string) => void;
 }
 
-function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode, onTaskClick, onAddTask, onToggleSelect, onInlineEdit }: ColumnProps) {
+function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode, droppableId, onTaskClick, onAddTask, onToggleSelect, onInlineEdit }: ColumnProps) {
   const bgColorRaw = col.color.split(' ').find(c => c.startsWith('bg-'));
   const bgColor = bgColorRaw ? bgColorRaw.split('/')[0] : 'bg-violet-500';
 
@@ -259,7 +259,7 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
         </div>
       </div>
 
-      <Droppable droppableId={col.id}>
+      <Droppable droppableId={droppableId ?? col.id}>
         {(provided, snapshot) => (
           <div
             {...provided.droppableProps}
@@ -309,8 +309,15 @@ export function TaskBoard({
     const { destination, source, draggableId } = result;
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
-    if (destination.droppableId !== source.droppableId) {
-      onStatusChange(draggableId, destination.droppableId as TaskStatus);
+    // In swimlane mode, droppableIds have format "groupKey:stageId"
+    const destStatus = destination.droppableId.includes(':')
+      ? destination.droppableId.split(':').slice(1).join(':')
+      : destination.droppableId;
+    const srcStatus = source.droppableId.includes(':')
+      ? source.droppableId.split(':').slice(1).join(':')
+      : source.droppableId;
+    if (destStatus !== srcStatus || destination.droppableId !== source.droppableId) {
+      onStatusChange(draggableId, destStatus as TaskStatus);
     }
   };
 
@@ -404,6 +411,7 @@ export function TaskBoard({
                 <Column
                   key={`${group.key}-${col.id}`}
                   col={col}
+                  droppableId={`${group.key}:${col.id}`}
                   tasks={getTasksByStatus(col.id, group.tasks)}
                   users={users}
                   milestones={milestones}

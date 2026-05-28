@@ -11,6 +11,7 @@ import {
   fetchTaskTemplates,
   createCompany,
   updateCompany,
+  deleteCompany,
   createPod,
   updatePod,
   deletePod,
@@ -18,6 +19,7 @@ import {
   createProject,
   updateProject,
   deleteProject,
+  archiveProject,
   createTask,
   updateTask,
   deleteTask,
@@ -29,12 +31,13 @@ import {
   createSavedFilter,
   deleteSavedFilter,
   fetchAutomations,
+  addActivityLog,
 } from './services/api';
 import { useServerEvents } from './hooks/useServerEvents';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Project, Task, TaskStatus, TaskPriority, UserProfile, Company, Pod, DEFAULT_STAGES, Stage, Milestone, CustomFieldDefinition, TaskTemplate, Notification, SavedFilter, AutomationRule } from './types';
+import { Project, Task, TaskStatus, TaskPriority, UserProfile, Company, Pod, DEFAULT_STAGES, Stage, Milestone, CustomFieldDefinition, TaskTemplate, Notification, SavedFilter, AutomationRule, Subtask } from './types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -294,6 +297,14 @@ function AppContent() {
     fetchAutomations(activeProject.id).then(setAutomations).catch(() => {});
   }, [activeProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Refresh custom fields and project data when the project settings dialog closes
+  React.useEffect(() => {
+    if (!projectDialogOpen && activeProject) {
+      fetchCustomFieldDefinitions(activeProject.id).then(setCustomFieldDefs).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectDialogOpen]);
+
   // Refresh task data when tab regains focus (catches missed real-time events)
   React.useEffect(() => {
     const onVisible = () => {
@@ -369,14 +380,36 @@ function AppContent() {
     await loadCompany();
   };
 
+  const handleDeleteCompany = async (companyId: string) => {
+    await deleteCompany(companyId);
+    setCompany(null);
+    setProjects([]);
+    setPods([]);
+    setAllTasks([]);
+    setTasks([]);
+    setActiveProject(null);
+  };
+
   const handleSavePod = async (data: { name: string; description?: string; color?: string; members?: string[] }) => {
     if (!company) return;
     if (selectedPodForEdit) {
+      setPods(prev => prev.map(p => p.id === selectedPodForEdit.id ? { ...p, ...data } : p));
       await updatePod(selectedPodForEdit.id, data);
     } else {
-      await createPod(company.id, data);
+      const tempId = `temp-${Date.now()}`;
+      const tempPod: Pod = {
+        id: tempId, companyId: company.id, ownerId: user!.uid,
+        name: data.name, description: data.description, color: data.color ?? '#6366f1',
+        members: data.members ?? [], createdAt: new Date().toISOString(),
+      };
+      setPods(prev => [...prev, tempPod]);
+      try {
+        const newId = await createPod(company.id, data);
+        setPods(prev => prev.map(p => p.id === tempId ? { ...p, id: newId } : p));
+      } catch (err) {
+        setPods(prev => prev.filter(p => p.id !== tempId));
+      }
     }
-    await loadPods(company.id);
   };
 
   const handleDeletePod = async (podId: string) => {
@@ -387,17 +420,81 @@ function AppContent() {
   };
 
   const handleSaveProject = async (data: { name: string; description: string; members: string[]; stages: Stage[] }) => {
+    const dedupedMembers = [...new Set(data.members)];
+    const payload = { ...data, members: dedupedMembers };
     if (selectedProjectForEdit) {
-      await updateProject(selectedProjectForEdit.id, data);
+      setProjects(prev => prev.map(p => p.id === selectedProjectForEdit.id ? { ...p, ...payload } : p));
+      await updateProject(selectedProjectForEdit.id, payload);
+      if (activeProject?.id === selectedProjectForEdit.id) {
+        setActiveProject(prev => prev ? { ...prev, ...payload } : prev);
+      }
     } else if (company) {
-      await createProject(company.id, { ...data, podId: projectDialogPodId });
+      const tempId = `temp-${Date.now()}`;
+      const tempProject: Project = {
+        id: tempId, companyId: company.id, ownerId: user!.uid,
+        name: payload.name, description: payload.description, members: payload.members,
+        stages: payload.stages, color: '#6366f1', podId: projectDialogPodId,
+        isArchived: false, createdAt: new Date().toISOString(),
+      };
+      setProjects(prev => [...prev, tempProject]);
+      try {
+        const newId = await createProject(company.id, { ...payload, podId: projectDialogPodId });
+        setProjects(prev => prev.map(p => p.id === tempId ? { ...p, id: newId } : p));
+      } catch (err) {
+        setProjects(prev => prev.filter(p => p.id !== tempId));
+      }
     }
+  };
+
+  const handleArchiveProject = async (projectId: string, archive: boolean) => {
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, isArchived: archive } : p));
+    if (activeProject?.id === projectId && archive) setActiveProject(null);
+    await archiveProject(projectId, archive);
   };
 
   const companyUsers = React.useMemo(() => {
     if (!company) return [];
-    return users.filter(u => company.memberIds?.includes(u.uid));
+    // Include owner even if not in memberIds, then company members
+    const ownerUser = users.find(u => u.uid === company.ownerId);
+    const memberUsers = users.filter(u => company.memberIds?.includes(u.uid));
+    const all = ownerUser ? [ownerUser, ...memberUsers.filter(u => u.uid !== company.ownerId)] : memberUsers;
+    return all;
   }, [users, company]);
+
+  const executeAutomations = React.useCallback(async (
+    projectId: string,
+    taskId: string,
+    updates: Partial<Task>,
+  ) => {
+    const rules = automations.filter(r => r.isActive && r.projectId === projectId);
+    for (const rule of rules) {
+      let triggered = false;
+      if (rule.triggerType === 'status_changed' && updates.status !== undefined) {
+        triggered = !rule.triggerValue || updates.status === rule.triggerValue;
+      } else if (rule.triggerType === 'priority_changed' && updates.priority !== undefined) {
+        triggered = !rule.triggerValue || updates.priority === rule.triggerValue;
+      } else if (rule.triggerType === 'assignee_changed' && 'assigneeId' in updates) {
+        triggered = !rule.triggerValue || updates.assigneeId === rule.triggerValue;
+      }
+      if (!triggered) continue;
+
+      const actionUpdates: Partial<Task> = {};
+      if (rule.actionType === 'set_status' && rule.actionValue) {
+        actionUpdates.status = rule.actionValue as TaskStatus;
+      } else if (rule.actionType === 'set_priority' && rule.actionValue) {
+        actionUpdates.priority = rule.actionValue as TaskPriority;
+      } else if (rule.actionType === 'set_assignee') {
+        actionUpdates.assigneeId = rule.actionValue || undefined;
+      }
+
+      if (Object.keys(actionUpdates).length > 0) {
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...actionUpdates } : t));
+        setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...actionUpdates } : t));
+        updateTask(projectId, taskId, actionUpdates).catch(() => {});
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [automations]);
 
   const handleDeleteProject = async (projectId: string) => {
     const prevProjects = projects;
@@ -416,15 +513,48 @@ function AppContent() {
     const targetProjectId = selectedTask?.projectId || activeProject?.id;
     if (!targetProjectId) return;
     if (selectedTask) {
+      const updatedTask = { ...selectedTask, ...taskData };
+      setTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
+      setAllTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
       await updateTask(targetProjectId, selectedTask.id, taskData);
+      executeAutomations(targetProjectId, selectedTask.id, taskData);
     } else {
-      await createTask(targetProjectId, taskData);
+      const tempId = `temp-${Date.now()}`;
+      const tempTask: Task = {
+        id: tempId,
+        projectId: targetProjectId,
+        creatorId: user!.uid,
+        title: taskData.title ?? '',
+        description: taskData.description,
+        status: (taskData.status ?? 'todo') as TaskStatus,
+        priority: (taskData.priority ?? 'medium') as TaskPriority,
+        assigneeId: taskData.assigneeId,
+        dueDate: taskData.dueDate,
+        tags: taskData.tags ?? [],
+        subtasks: (taskData.subtasks ?? []) as Subtask[],
+        milestoneId: taskData.milestoneId,
+        recurrenceRule: taskData.recurrenceRule,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setTasks(prev => [...prev, tempTask]);
+      setAllTasks(prev => [...prev, tempTask]);
+      try {
+        const newId = await createTask(targetProjectId, taskData);
+        setTasks(prev => prev.map(t => t.id === tempId ? { ...t, id: newId } : t));
+        setAllTasks(prev => prev.map(t => t.id === tempId ? { ...t, id: newId } : t));
+        addActivityLog(newId, targetProjectId, 'task_created').catch(() => {});
+      } catch (err) {
+        setTasks(prev => prev.filter(t => t.id !== tempId));
+        setAllTasks(prev => prev.filter(t => t.id !== tempId));
+      }
     }
   };
 
   const handleDeleteTask = async (taskId: string) => {
     const targetProjectId = selectedTask?.projectId || activeProject?.id;
     if (!targetProjectId) return;
+    addActivityLog(taskId, targetProjectId, 'task_deleted').catch(() => {});
     setTasks(prev => prev.filter(t => t.id !== taskId));
     setAllTasks(prev => prev.filter(t => t.id !== taskId));
     deleteTask(targetProjectId, taskId).catch(() => {});
@@ -522,8 +652,9 @@ function AppContent() {
                 activeProject={activeProject}
                 activeView={activeView}
                 onNewPod={() => {
-                  setSelectedPodForEdit(null);
-                  setPodDialogOpen(true);
+                  setSelectedProjectForEdit(null);
+                  setProjectDialogPodId(undefined);
+                  setProjectDialogOpen(true);
                   setSidebarOpen(false);
                 }}
                 onEditPod={(pod) => {
@@ -543,7 +674,7 @@ function AppContent() {
                 }}
                 onNewProject={(pod) => {
                   setSelectedProjectForEdit(null);
-                  setProjectDialogPodId(pod.id);
+                  setProjectDialogPodId(pod?.id);
                   setProjectDialogOpen(true);
                   setSidebarOpen(false);
                 }}
@@ -588,8 +719,9 @@ function AppContent() {
         activeProject={activeProject}
         activeView={activeView}
         onNewPod={() => {
-          setSelectedPodForEdit(null);
-          setPodDialogOpen(true);
+          setSelectedProjectForEdit(null);
+          setProjectDialogPodId(undefined);
+          setProjectDialogOpen(true);
         }}
         onEditPod={(pod) => {
           setSelectedPodForEdit(pod);
@@ -605,7 +737,7 @@ function AppContent() {
         }}
         onNewProject={(pod) => {
           setSelectedProjectForEdit(null);
-          setProjectDialogPodId(pod.id);
+          setProjectDialogPodId(pod?.id);
           setProjectDialogOpen(true);
         }}
         onEditProject={(proj) => {
@@ -644,7 +776,7 @@ function AppContent() {
             </div>
             <h2 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Create your company</h2>
             <p className="text-muted-foreground max-w-sm mb-8">
-              Pods and workspaces belong to a company. Create one to get started.
+              Pods belong to a company. Create one to get started.
             </p>
             <Button
               size="lg"
@@ -699,12 +831,18 @@ function AppContent() {
                 setProjectDialogOpen(true);
               }}
               onDeleteProject={handleDeleteProject}
+              onArchiveProject={handleArchiveProject}
               onNewProject={() => {
                 setSelectedProjectForEdit(null);
                 setProjectDialogPodId(undefined);
                 setProjectDialogOpen(true);
               }}
               onUpdateCompany={handleSaveCompany}
+              onDeleteCompany={handleDeleteCompany}
+              onInvite={() => {
+                setSelectedCompanyForEdit(company);
+                setCompanyDialogOpen(true);
+              }}
             />
           </div>
         ) : (
@@ -730,7 +868,7 @@ function AppContent() {
                       </button>
                     </div>
                     <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground/50 mt-0.5">
-                      <span>{activeProject.members?.length || 1} members</span>
+                      <span>{[...new Set(activeProject.members ?? [])].length || 1} members</span>
                       <span className="opacity-40">·</span>
                       <span>{tasks.length} tasks</span>
                       <span className="opacity-40">·</span>
@@ -963,6 +1101,7 @@ function AppContent() {
                   };
                   applyStatus(newStatus);
                   updateTask(activeProject.id, taskId, { status: newStatus })
+                    .then(() => executeAutomations(activeProject.id, taskId, { status: newStatus }))
                     .catch(() => {
                       if (prevStatus !== undefined) applyStatus(prevStatus);
                     });
@@ -1011,6 +1150,7 @@ function AppContent() {
           users={users}
           currentUserId={user.uid}
           onSave={handleSaveCompany}
+          onDelete={handleDeleteCompany}
         />
 
         <PodDialog

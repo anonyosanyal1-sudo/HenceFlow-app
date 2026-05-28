@@ -89,7 +89,7 @@ export function CompanyDialog({ open, onOpenChange, company, users, currentUserI
           <DialogDescription className="text-muted-foreground">
             {company 
               ? 'Update your company settings and manage members.' 
-              : 'Create a new company to manage workspaces.'
+              : 'Create a new company to manage pods.'
             }
           </DialogDescription>
         </DialogHeader>
@@ -194,7 +194,7 @@ export function CompanyDialog({ open, onOpenChange, company, users, currentUserI
                   })}
                 </div>
               </ScrollArea>
-              <p className="text-[10px] text-muted-foreground italic">Add or remove members from your company. Members can view and collaborate on company workspaces.</p>
+              <p className="text-[10px] text-muted-foreground italic">Add or remove members from your company. Members can view and collaborate on company pods.</p>
             </div>
           )}
         </div>

@@ -69,6 +69,7 @@ export interface Project {
   members: string[];
   color: string;
   stages?: Stage[];
+  isArchived?: boolean;
   createdAt: string;
 }
 
@@ -137,7 +138,7 @@ export interface Milestone {
 
 export interface ActivityLog {
   id: string;
-  taskId: string;
+  taskId: string | null;
   projectId: string;
   userId: string;
   action: string;
