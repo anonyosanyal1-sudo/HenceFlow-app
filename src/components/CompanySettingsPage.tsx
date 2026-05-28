@@ -10,12 +10,14 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ChevronRight, Plus, MoreHorizontal, Trash2 } from 'lucide-react';
+import { InviteDialog } from './InviteDialog';
 
 type MemberRole = 'Admin' | 'Member' | 'Viewer';
 
 interface CompanySettingsPageProps {
   company: Company;
   users: UserProfile[];
+  allUsers: UserProfile[];
   currentUserId: string;
   onSave: (data: {
     name: string;
@@ -28,7 +30,6 @@ interface CompanySettingsPageProps {
   }) => void;
   onDelete?: (companyId: string) => void;
   onBack: () => void;
-  onInvite: () => void;
 }
 
 function getInitialRoles(company: Company): Record<string, MemberRole> {
@@ -46,7 +47,7 @@ function getInitialRoles(company: Company): Record<string, MemberRole> {
 }
 
 export function CompanySettingsPage({
-  company, users, currentUserId, onSave, onDelete, onBack, onInvite,
+  company, users, allUsers, currentUserId, onSave, onDelete, onBack,
 }: CompanySettingsPageProps) {
   const [name, setName] = React.useState(company.name);
   const [location, setLocation] = React.useState(company.location ?? '');
@@ -62,7 +63,10 @@ export function CompanySettingsPage({
   const [memberIds, setMemberIds] = React.useState<string[]>(company.memberIds);
   const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = React.useState('');
+  const [inviteOpen, setInviteOpen] = React.useState(false);
 
+  // Sync from parent when company data changes (e.g. after save or invite)
+  const companyKey = `${company.id}|${company.memberIds.join(',')}|${company.adminIds.join(',')}|${company.viewerIds.join(',')}`;
   React.useEffect(() => {
     setName(company.name);
     setLocation(company.location ?? '');
@@ -71,11 +75,12 @@ export function CompanySettingsPage({
     setRoles(getInitialRoles(company));
     setMemberIds(company.memberIds);
     setIsDirty(false);
-  }, [company.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyKey]);
 
   const mark = () => setIsDirty(true);
 
-  const handleSave = () => {
+  const handleSaveDetails = () => {
     const adminIds = Object.entries(roles)
       .filter(([, r]) => r === 'Admin')
       .map(([uid]) => uid);
@@ -107,15 +112,64 @@ export function CompanySettingsPage({
 
   const setMemberRole = (uid: string, role: MemberRole) => {
     if (uid === company.ownerId) return;
-    setRoles(prev => ({ ...prev, [uid]: role }));
-    mark();
+    const newRoles = { ...roles, [uid]: role };
+    setRoles(newRoles);
+    // Auto-save role change immediately
+    const adminIds = Object.entries(newRoles).filter(([, r]) => r === 'Admin').map(([id]) => id);
+    const viewerIds = Object.entries(newRoles).filter(([, r]) => r === 'Viewer').map(([id]) => id);
+    onSave({
+      name: company.name,
+      location: company.location,
+      website: company.website,
+      industry: company.industry,
+      memberIds,
+      adminIds,
+      viewerIds,
+    });
+    setLastSaved(new Date());
   };
 
   const removeMember = (uid: string) => {
     if (uid === company.ownerId) return;
-    setMemberIds(prev => prev.filter(id => id !== uid));
-    setRoles(prev => { const next = { ...prev }; delete next[uid]; return next; });
-    mark();
+    const newMemberIds = memberIds.filter(id => id !== uid);
+    const newRoles = { ...roles };
+    delete newRoles[uid];
+    setMemberIds(newMemberIds);
+    setRoles(newRoles);
+    const adminIds = Object.entries(newRoles).filter(([, r]) => r === 'Admin').map(([id]) => id);
+    const viewerIds = Object.entries(newRoles).filter(([, r]) => r === 'Viewer').map(([id]) => id);
+    onSave({
+      name: company.name,
+      location: company.location,
+      website: company.website,
+      industry: company.industry,
+      memberIds: newMemberIds,
+      adminIds,
+      viewerIds,
+    });
+    setLastSaved(new Date());
+  };
+
+  const handleInvite = (newMembers: { uid: string; role: MemberRole }[]) => {
+    const addedIds = newMembers.map(m => m.uid);
+    const newMemberIds = [...new Set([...memberIds, ...addedIds])];
+    const newRoles = { ...roles };
+    newMembers.forEach(({ uid, role }) => { newRoles[uid] = role; });
+    setMemberIds(newMemberIds);
+    setRoles(newRoles);
+    const adminIds = Object.entries(newRoles).filter(([, r]) => r === 'Admin').map(([id]) => id);
+    const viewerIds = Object.entries(newRoles).filter(([, r]) => r === 'Viewer').map(([id]) => id);
+    onSave({
+      name: company.name,
+      location: company.location,
+      website: company.website,
+      industry: company.industry,
+      memberIds: newMemberIds,
+      adminIds,
+      viewerIds,
+    });
+    setLastSaved(new Date());
+    setInviteOpen(false);
   };
 
   const lastSavedText = React.useMemo(() => {
@@ -242,7 +296,7 @@ export function CompanySettingsPage({
               </Button>
               <Button
                 size="sm"
-                onClick={handleSave}
+                onClick={handleSaveDetails}
                 disabled={!isDirty || !name.trim()}
                 className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground"
               >
@@ -263,7 +317,12 @@ export function CompanySettingsPage({
                 Invite teammates and manage their roles.
               </p>
             </div>
-            <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border/60" onClick={onInvite}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 border-border/60"
+              onClick={() => setInviteOpen(true)}
+            >
               <Plus className="w-3.5 h-3.5" />
               Invite member
             </Button>
@@ -272,9 +331,7 @@ export function CompanySettingsPage({
           <div className="divide-y divide-border/30">
             {visibleUsers.map(user => {
               const isOwner = user.uid === company.ownerId;
-              const role: MemberRole = isOwner
-                ? 'Admin'
-                : (roles[user.uid] ?? 'Member');
+              const role: MemberRole = isOwner ? 'Admin' : (roles[user.uid] ?? 'Member');
 
               return (
                 <div key={user.uid} className="px-6 py-4 flex items-center gap-4">
@@ -387,6 +444,14 @@ export function CompanySettingsPage({
           </div>
         )}
       </div>
+
+      <InviteDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        company={{ ...company, memberIds }}
+        allUsers={allUsers}
+        onInvite={handleInvite}
+      />
     </div>
   );
 }

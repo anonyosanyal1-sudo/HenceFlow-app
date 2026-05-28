@@ -50,6 +50,7 @@ import { TaskDialog } from './components/TaskDialog';
 import { ProjectDialog } from './components/ProjectDialog';
 import { CompanyDialog } from './components/CompanyDialog';
 import { CompanySettingsPage } from './components/CompanySettingsPage';
+import { InviteDialog } from './components/InviteDialog';
 import { ProfileSetup } from './components/ProfileSetup';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { MilestoneDialog } from './components/MilestoneDialog';
@@ -179,6 +180,7 @@ function AppContent() {
   const [companyDialogOpen, setCompanyDialogOpen] = React.useState(false);
   const [selectedCompanyForEdit, setSelectedCompanyForEdit] = React.useState<Company | null>(null);
   const [showCompanySettings, setShowCompanySettings] = React.useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = React.useState(false);
   const [profileSetupOpen, setProfileSetupOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -381,6 +383,30 @@ function AppContent() {
       await createCompany(data);
     }
     await loadCompany();
+    await fetchUsers().then(setUsers).catch(() => {});
+  };
+
+  const handleInviteMembers = async (newMembers: { uid: string; role: 'Admin' | 'Member' | 'Viewer' }[]) => {
+    if (!company) return;
+    const addedIds = newMembers.map(m => m.uid);
+    const newMemberIds = [...new Set([...company.memberIds, ...addedIds])];
+    const newAdminIds = [...new Set([
+      ...company.adminIds,
+      ...newMembers.filter(m => m.role === 'Admin').map(m => m.uid),
+    ])];
+    const newViewerIds = [...new Set([
+      ...company.viewerIds,
+      ...newMembers.filter(m => m.role === 'Viewer').map(m => m.uid),
+    ])];
+    await updateCompany(company.id, {
+      name: company.name,
+      memberIds: newMemberIds,
+      adminIds: newAdminIds,
+      viewerIds: newViewerIds,
+    });
+    await loadCompany();
+    await fetchUsers().then(setUsers).catch(() => {});
+    setInviteDialogOpen(false);
   };
 
   const handleDeleteCompany = async (companyId: string) => {
@@ -799,15 +825,12 @@ function AppContent() {
           <div className="flex-1 min-w-0 overflow-hidden">
             <CompanySettingsPage
               company={company}
-              users={users}
+              users={companyUsers}
+              allUsers={users}
               currentUserId={user.uid}
               onSave={async (data) => { await handleSaveCompany(data); }}
               onDelete={handleDeleteCompany}
               onBack={() => setShowCompanySettings(false)}
-              onInvite={() => {
-                setSelectedCompanyForEdit(company);
-                setCompanyDialogOpen(true);
-              }}
             />
           </div>
         ) : activeView === 'analytics' ? (
@@ -860,10 +883,8 @@ function AppContent() {
               }}
               onUpdateCompany={handleSaveCompany}
               onDeleteCompany={handleDeleteCompany}
-              onInvite={() => {
-                setSelectedCompanyForEdit(company);
-                setCompanyDialogOpen(true);
-              }}
+              onInvite={() => setInviteDialogOpen(true)}
+              onCompanySettings={() => setShowCompanySettings(true)}
             />
           </div>
         ) : (
@@ -1173,6 +1194,16 @@ function AppContent() {
           onSave={handleSaveCompany}
           onDelete={handleDeleteCompany}
         />
+
+        {company && (
+          <InviteDialog
+            open={inviteDialogOpen}
+            onOpenChange={setInviteDialogOpen}
+            company={company}
+            allUsers={users}
+            onInvite={handleInviteMembers}
+          />
+        )}
 
         <PodDialog
           open={podDialogOpen}
