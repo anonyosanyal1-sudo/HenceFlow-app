@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog, DialogContent, DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Task, TaskStatus, TaskPriority, UserProfile, Stage, Milestone, CustomFieldDefinition, TaskTemplate, RecurrenceRule } from '../types';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskComments } from './TaskComments';
 import { SubtasksPanel } from './SubtasksPanel';
@@ -19,7 +18,7 @@ import { ActivityLogPanel } from './ActivityLogPanel';
 import { CustomFieldsPanel } from './CustomFieldsPanel';
 import { cn } from '@/lib/utils';
 import { updateSubtasks, createTaskTemplate, fetchWatchers, watchTask, unwatchTask, addActivityLog } from '../services/api';
-import { Milestone as MilestoneIcon, RefreshCw, LayoutTemplate, Eye, EyeOff } from 'lucide-react';
+import { Milestone as MilestoneIcon, RefreshCw, LayoutTemplate, Eye, EyeOff, Trash2, X, Hash } from 'lucide-react';
 import { TaskWatcher } from '../types';
 import { UserAvatar } from './UserAvatar';
 
@@ -42,11 +41,24 @@ interface TaskDialogProps {
 
 const MAX_DESCRIPTION_LENGTH = 1000;
 
+const PRIORITY_CONFIG: Record<TaskPriority, { label: string; color: string; dot: string }> = {
+  urgent: { label: 'Urgent', color: 'text-red-400', dot: 'bg-red-400' },
+  high:   { label: 'High',   color: 'text-orange-400', dot: 'bg-orange-400' },
+  medium: { label: 'Medium', color: 'text-yellow-400', dot: 'bg-yellow-400' },
+  low:    { label: 'Low',    color: 'text-sky-400', dot: 'bg-sky-400' },
+};
+
 const RECURRENCE_OPTIONS: { value: RecurrenceRule; label: string }[] = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
 ];
+
+function stageColorDot(stages: Stage[], stageId: string) {
+  const stage = stages.find(s => s.id === stageId);
+  if (!stage) return '';
+  return stage.color.split(' ').find(c => c.startsWith('bg-'))?.split('/')[0] ?? '';
+}
 
 export function TaskDialog({
   open, onOpenChange, task, defaultStatus, users, stages, activeProjectId,
@@ -58,7 +70,7 @@ export function TaskDialog({
   const [status, setStatus] = React.useState<TaskStatus>('todo');
   const [priority, setPriority] = React.useState<TaskPriority>('medium');
   const [assigneeId, setAssigneeId] = React.useState<string | undefined>(undefined);
-  const [dueDate, setDueDate] = React.useState<string>('');
+  const [dueDate, setDueDate] = React.useState('');
   const [milestoneId, setMilestoneId] = React.useState<string | undefined>(undefined);
   const [recurrenceRule, setRecurrenceRule] = React.useState<RecurrenceRule | undefined>(undefined);
   const [localSubtasks, setLocalSubtasks] = React.useState<import('../types').Subtask[]>([]);
@@ -125,16 +137,7 @@ export function TaskDialog({
 
   const handleSave = () => {
     if (!title.trim() || isDescriptionTooLong) return;
-    onSave({
-      title,
-      description,
-      status,
-      priority,
-      assigneeId,
-      dueDate: dueDate || undefined,
-      milestoneId: milestoneId || undefined,
-      recurrenceRule: recurrenceRule || undefined,
-    });
+    onSave({ title, description, status, priority, assigneeId, dueDate: dueDate || undefined, milestoneId: milestoneId || undefined, recurrenceRule: recurrenceRule || undefined });
     onOpenChange(false);
   };
 
@@ -150,268 +153,459 @@ export function TaskDialog({
   const handleSaveTemplate = async () => {
     if (!templateName.trim() || !projectId) return;
     setSavingTemplate(true);
-    await createTaskTemplate(projectId, templateName.trim(), {
-      title, description, priority, status, assigneeId, recurrenceRule,
-    });
+    await createTaskTemplate(projectId, templateName.trim(), { title, description, priority, status, assigneeId, recurrenceRule });
     setTemplateName('');
     setSavingTemplate(false);
     setShowTemplateSave(false);
   };
 
-  const stageColorSolid = (stageId: string) => {
-    const stage = stages.find(s => s.id === stageId);
-    if (!stage) return '';
-    return stage.color.split(' ').find(c => c.startsWith('bg-'))?.split('/')[0] ?? '';
-  };
+  const assignee = users.find(u => u.uid === assigneeId);
+  const pc = PRIORITY_CONFIG[priority];
+  const stageDot = stageColorDot(stages, status);
+  const stageLabel = stages.find(s => s.id === status)?.label ?? status;
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(
-        "sm:max-w-[520px] flex flex-col h-[90vh] md:h-auto md:max-h-[90vh] bg-card border-border",
-        task && "sm:max-w-[860px]"
-      )}>
-        <DialogHeader className="shrink-0">
-          <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle className="text-xl font-bold tracking-tight text-foreground">
-                {task ? 'Task Details' : 'Create New Task'}
-              </DialogTitle>
-              <DialogDescription className="text-muted-foreground">
-                {task ? `ID: ${task.id.slice(0, 8)}` : 'Fill in the details for your new task.'}
-              </DialogDescription>
+  // ─── CREATE MODE ──────────────────────────────────────────────────────────────
+  if (!task) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[580px] bg-card border-border p-0 gap-0 overflow-hidden">
+          <DialogDescription className="sr-only">Create a new task</DialogDescription>
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border/30">
+            <h2 className="text-lg font-bold text-foreground tracking-tight">New task</h2>
+            <div className="flex items-center gap-2">
+              {templates.length > 0 && (
+                <Select onValueChange={id => { const t = templates.find(t => t.id === id); if (t) applyTemplate(t); }}>
+                  <SelectTrigger className="h-7 text-xs bg-muted/50 border-none w-36 rounded-lg">
+                    <div className="flex items-center gap-1.5">
+                      <LayoutTemplate className="w-3 h-3 text-muted-foreground" />
+                      <SelectValue placeholder="Use template…" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map(t => <SelectItem key={t.id} value={t.id} className="text-xs">{t.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              <button onClick={() => onOpenChange(false)} className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            {/* Template selector for new tasks */}
-            {!task && templates.length > 0 && (
-              <Select onValueChange={id => { const t = templates.find(t => t.id === id); if (t) applyTemplate(t); }}>
-                <SelectTrigger className="h-8 text-xs bg-muted/50 border-none w-40">
-                  <div className="flex items-center gap-1.5">
-                    <LayoutTemplate className="w-3 h-3 text-muted-foreground" />
-                    <SelectValue placeholder="Use template…" />
-                  </div>
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
+            {/* Title */}
+            <Input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Task title…"
+              className="text-lg font-semibold bg-transparent border-none focus-visible:ring-0 shadow-none px-0 placeholder:text-muted-foreground/40 text-foreground h-auto py-0"
+              autoFocus
+            />
+
+            {/* Meta row */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Status */}
+              <Select value={status} onValueChange={(v: TaskStatus) => setStatus(v)}>
+                <SelectTrigger className="h-7 bg-muted/50 border-none rounded-lg text-xs w-auto gap-1.5 px-2.5">
+                  <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", stageDot)} />
+                  <span className="text-foreground font-medium">{stageLabel}</span>
                 </SelectTrigger>
                 <SelectContent>
-                  {templates.map(t => (
-                    <SelectItem key={t.id} value={t.id} className="text-xs">{t.name}</SelectItem>
+                  {stages.map(s => (
+                    <SelectItem key={s.id} value={s.id} className="text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-2 h-2 rounded-full", stageColorDot(stages, s.id))} />
+                        {s.label}
+                      </div>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            )}
-          </div>
-        </DialogHeader>
 
-        {task ? (
+              {/* Priority */}
+              <Select value={priority} onValueChange={(v: TaskPriority) => setPriority(v)}>
+                <SelectTrigger className="h-7 bg-muted/50 border-none rounded-lg text-xs w-auto gap-1.5 px-2.5">
+                  <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", pc.dot)} />
+                  <span className={cn("font-medium", pc.color)}>{pc.label}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(PRIORITY_CONFIG).map(([val, cfg]) => (
+                    <SelectItem key={val} value={val} className="text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-2 h-2 rounded-full", cfg.dot)} />
+                        <span className={cfg.color}>{cfg.label}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Assignee */}
+              <Select value={assigneeId || 'unassigned'} onValueChange={v => setAssigneeId(v === 'unassigned' ? undefined : v)}>
+                <SelectTrigger className="h-7 bg-muted/50 border-none rounded-lg text-xs w-auto gap-1.5 px-2.5">
+                  {assignee ? (
+                    <div className="flex items-center gap-1.5">
+                      <UserAvatar photoURL={assignee.photoURL} displayName={assignee.displayName} className="w-4 h-4 text-[8px]" />
+                      <span className="font-medium text-foreground">{assignee.displayName || assignee.email}</span>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">Assignee</span>
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned" className="text-sm italic text-muted-foreground">Unassigned</SelectItem>
+                  {users.map(u => (
+                    <SelectItem key={u.uid} value={u.uid} className="text-sm">
+                      <div className="flex items-center gap-2">
+                        <UserAvatar photoURL={u.photoURL} displayName={u.displayName} className="w-5 h-5 text-[9px]" />
+                        {u.displayName || u.email}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Due date */}
+              <Input
+                type="date"
+                value={dueDate}
+                onChange={e => setDueDate(e.target.value)}
+                className="h-7 bg-muted/50 border-none rounded-lg text-xs w-auto px-2.5 focus-visible:ring-0 text-muted-foreground font-medium"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-muted-foreground font-medium">Description</label>
+                <span className={cn("text-[10px] tabular-nums", isDescriptionTooLong ? "text-red-400" : "text-muted-foreground/50")}>
+                  {description.length}/{MAX_DESCRIPTION_LENGTH}
+                </span>
+              </div>
+              <Textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Add details, notes, or context…"
+                className={cn(
+                  "min-h-[120px] bg-muted/30 border border-border/30 focus-visible:ring-1 focus-visible:ring-primary resize-none text-sm text-foreground rounded-xl",
+                  isDescriptionTooLong && "ring-1 ring-red-500 border-red-500/50"
+                )}
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border/30">
+            <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-muted-foreground">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={!title.trim() || isDescriptionTooLong}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 rounded-xl"
+            >
+              Create task
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // ─── EDIT MODE ────────────────────────────────────────────────────────────────
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[920px] h-[88vh] flex flex-col bg-card border-border p-0 gap-0 overflow-hidden">
+        <DialogDescription className="sr-only">Edit task details</DialogDescription>
+
+        {/* ── Top header ──────────────────────────────────────────────── */}
+        <div className="shrink-0 px-6 pt-5 pb-0">
+          {/* ID + actions row */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 text-muted-foreground/50">
+              <Hash className="w-3.5 h-3.5" />
+              <span className="text-xs font-mono">{task.id.slice(0, 8).toUpperCase()}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleToggleWatch}
+                className={cn(
+                  "h-7 px-2.5 flex items-center gap-1.5 rounded-lg text-xs font-medium transition-colors",
+                  isWatching
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50"
+                )}
+              >
+                {isWatching ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                {isWatching ? 'Watching' : 'Watch'}
+              </button>
+              {onDelete && (
+                isConfirmingDelete ? (
+                  <>
+                    <button onClick={() => setIsConfirmingDelete(false)} className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/50 transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={() => { onDelete(task.id); onOpenChange(false); }} className="h-7 px-2.5 text-xs font-semibold text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors">
+                      Confirm delete
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={() => setIsConfirmingDelete(true)} className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )
+              )}
+              <button onClick={() => onOpenChange(false)} className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-muted/50 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Title */}
+          <Input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            className="text-xl font-bold bg-transparent border-none focus-visible:ring-0 shadow-none px-0 placeholder:text-muted-foreground/30 text-foreground h-auto py-0 mb-4"
+            placeholder="Task title…"
+          />
+
+          {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-5 mb-4 bg-muted p-1 rounded-xl shrink-0">
-              <TabsTrigger value="details" className="rounded-lg text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm">Details</TabsTrigger>
-              <TabsTrigger value="discussion" className="rounded-lg text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm">Discussion</TabsTrigger>
-              <TabsTrigger value="time" className="rounded-lg text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm">Time</TabsTrigger>
-              <TabsTrigger value="activity" className="rounded-lg text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm">Activity</TabsTrigger>
-              <TabsTrigger value="watchers" className="rounded-lg text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm">Watchers</TabsTrigger>
+            <TabsList className="bg-transparent p-0 h-auto gap-0 border-b border-border/30 w-full justify-start rounded-none">
+              {['details', 'discussion', 'time', 'activity', 'watchers'].map(tab => (
+                <TabsTrigger
+                  key={tab}
+                  value={tab}
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none text-muted-foreground/60 hover:text-muted-foreground capitalize text-xs font-semibold px-4 pb-3 pt-1 h-auto"
+                >
+                  {tab}
+                </TabsTrigger>
+              ))}
             </TabsList>
 
-            <div className="flex-1 min-h-0">
-              {/* ── Details tab ─────────────────────────────────────────────── */}
-              <TabsContent value="details" className="h-full overflow-y-auto space-y-0 mt-0 pr-1">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
-                  {/* Left column */}
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Title <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        value={title}
-                        onChange={e => setTitle(e.target.value)}
-                        placeholder="What needs to be done?"
-                        className="bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary font-medium text-foreground"
-                      />
-                    </div>
+            {/* ── Tab panels ──────────────────────────────────────────── */}
+            <div className="flex-1 min-h-0 overflow-hidden mt-0">
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</label>
-                        <Select value={status} onValueChange={(v: TaskStatus) => setStatus(v)}>
-                          <SelectTrigger className="bg-muted/50 border-none focus:ring-1 focus:ring-primary text-foreground h-9">
-                            <SelectValue>
-                              {(() => {
-                                const s = stages.find(s => s.id === status);
-                                const dot = stageColorSolid(status);
-                                return s ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <div className={cn("w-2 h-2 rounded-full", dot)} />
-                                    <span className="text-sm font-medium">{s.label}</span>
-                                  </div>
-                                ) : <span className="text-sm">{status}</span>;
-                              })()}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent className="bg-popover border-border">
-                            {stages.map(s => (
-                              <SelectItem key={s.id} value={s.id}>
-                                <div className="flex items-center gap-1.5">
-                                  <div className={cn("w-2 h-2 rounded-full", stageColorSolid(s.id))} />
-                                  <span className="text-sm">{s.label}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
-                        <Select value={priority} onValueChange={(v: TaskPriority) => setPriority(v)}>
-                          <SelectTrigger className="bg-muted/50 border-none focus:ring-1 focus:ring-primary text-foreground h-9">
-                            <SelectValue placeholder="Priority" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-popover border-border">
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="urgent">Urgent</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+              {/* Details */}
+              <TabsContent value="details" className="h-full overflow-y-auto mt-0 data-[state=inactive]:hidden">
+                <div className="grid grid-cols-[1fr_260px] gap-0 h-full">
 
-                    <AssigneeSelect users={users} value={assigneeId} onChange={setAssigneeId} />
-
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Due Date</label>
-                      <Input
-                        type="date"
-                        value={dueDate}
-                        onChange={e => setDueDate(e.target.value)}
-                        className="bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary font-medium h-9 text-foreground"
-                      />
-                    </div>
-
-                    {milestones.length > 0 && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                          <MilestoneIcon className="w-3 h-3" /> Milestone
-                        </label>
-                        <Select value={milestoneId ?? 'none'} onValueChange={v => setMilestoneId(v === 'none' ? undefined : v)}>
-                          <SelectTrigger className="bg-muted/50 border-none focus:ring-1 focus:ring-primary text-foreground h-9">
-                            <SelectValue placeholder="No milestone" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-popover border-border">
-                            <SelectItem value="none" className="italic text-muted-foreground text-sm">None</SelectItem>
-                            {milestones.map(m => (
-                              <SelectItem key={m.id} value={m.id} className="text-sm">{m.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                        <RefreshCw className="w-3 h-3" /> Recurrence
-                      </label>
-                      <Select
-                        value={recurrenceRule ?? 'none'}
-                        onValueChange={v => setRecurrenceRule(v === 'none' ? undefined : v as RecurrenceRule)}
-                      >
-                        <SelectTrigger className="bg-muted/50 border-none focus:ring-1 focus:ring-primary text-foreground h-9">
-                          <SelectValue placeholder="No recurrence" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-popover border-border">
-                          <SelectItem value="none" className="italic text-muted-foreground text-sm">None</SelectItem>
-                          {RECURRENCE_OPTIONS.map(o => (
-                            <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Right column */}
-                  <div className="space-y-4">
-                    <div className="space-y-2">
+                  {/* Left: content */}
+                  <div className="overflow-y-auto px-6 py-5 space-y-5 border-r border-border/20">
+                    {/* Description */}
+                    <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description</label>
-                        <span className={cn("text-[10px] font-bold tabular-nums", isDescriptionTooLong ? "text-red-500" : "text-muted-foreground")}>
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</label>
+                        <span className={cn("text-[10px] tabular-nums", isDescriptionTooLong ? "text-red-400" : "text-muted-foreground/50")}>
                           {description.length}/{MAX_DESCRIPTION_LENGTH}
                         </span>
                       </div>
                       <Textarea
                         value={description}
                         onChange={e => setDescription(e.target.value)}
-                        placeholder="Add more details…"
+                        placeholder="Add details, notes, or context…"
                         className={cn(
-                          "min-h-[120px] bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary resize-none text-sm text-foreground",
+                          "min-h-[140px] bg-muted/30 border border-border/30 focus-visible:ring-1 focus-visible:ring-primary resize-none text-sm text-foreground rounded-xl",
                           isDescriptionTooLong && "ring-1 ring-red-500"
                         )}
                       />
                     </div>
 
-                    <SubtasksPanel
-                      subtasks={localSubtasks}
-                      onChange={(newSubtasks) => {
-                        const pid = task.projectId || activeProjectId || '';
-                        const prev = localSubtasks;
-                        setLocalSubtasks(newSubtasks);
-                        updateSubtasks(task.id, newSubtasks, pid).catch(() => {});
-                        const added = newSubtasks.find(s => !prev.some(p => p.id === s.id));
-                        const toggled = newSubtasks.find(s => {
-                          const old = prev.find(p => p.id === s.id);
-                          return old && old.completed !== s.completed;
-                        });
-                        if (added) addActivityLog(task.id, pid, 'subtask_added', { newValue: added.title }).catch(() => {});
-                        else if (toggled) addActivityLog(task.id, pid, 'subtask_completed', { newValue: toggled.title }).catch(() => {});
-                      }}
-                    />
+                    {/* Subtasks */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Subtasks</label>
+                      <SubtasksPanel
+                        subtasks={localSubtasks}
+                        onChange={(newSubtasks) => {
+                          const pid = task.projectId || activeProjectId || '';
+                          const prev = localSubtasks;
+                          setLocalSubtasks(newSubtasks);
+                          updateSubtasks(task.id, newSubtasks, pid).catch(() => {});
+                          const added = newSubtasks.find(s => !prev.some(p => p.id === s.id));
+                          const toggled = newSubtasks.find(s => { const old = prev.find(p => p.id === s.id); return old && old.completed !== s.completed; });
+                          if (added) addActivityLog(task.id, pid, 'subtask_added', { newValue: added.title }).catch(() => {});
+                          else if (toggled) addActivityLog(task.id, pid, 'subtask_completed', { newValue: toggled.title }).catch(() => {});
+                        }}
+                      />
+                    </div>
 
+                    {/* Dependencies */}
                     <DependenciesPanel task={task} allTasks={allTasks} />
 
+                    {/* Custom fields */}
                     {customFieldDefs.length > 0 && (
-                      <CustomFieldsPanel taskId={task.id} fieldDefs={customFieldDefs} />
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Custom Fields</label>
+                        <CustomFieldsPanel taskId={task.id} fieldDefs={customFieldDefs} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: properties sidebar */}
+                  <div className="overflow-y-auto px-5 py-5 space-y-1 bg-muted/10">
+                    <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-3">Properties</p>
+
+                    <PropertyRow label="Status">
+                      <Select value={status} onValueChange={(v: TaskStatus) => setStatus(v)}>
+                        <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1.5 w-full justify-start">
+                          <div className={cn("w-2 h-2 rounded-full shrink-0", stageDot)} />
+                          <span className="text-foreground font-medium text-sm">{stageLabel}</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stages.map(s => (
+                            <SelectItem key={s.id} value={s.id} className="text-sm">
+                              <div className="flex items-center gap-2">
+                                <div className={cn("w-2 h-2 rounded-full", stageColorDot(stages, s.id))} />
+                                {s.label}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </PropertyRow>
+
+                    <PropertyRow label="Priority">
+                      <Select value={priority} onValueChange={(v: TaskPriority) => setPriority(v)}>
+                        <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1.5 w-full justify-start">
+                          <div className={cn("w-2 h-2 rounded-full shrink-0", pc.dot)} />
+                          <span className={cn("font-medium text-sm", pc.color)}>{pc.label}</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(PRIORITY_CONFIG).map(([val, cfg]) => (
+                            <SelectItem key={val} value={val} className="text-sm">
+                              <div className="flex items-center gap-2">
+                                <div className={cn("w-2 h-2 rounded-full", cfg.dot)} />
+                                <span className={cfg.color}>{cfg.label}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </PropertyRow>
+
+                    <PropertyRow label="Assignee">
+                      <Select value={assigneeId || 'unassigned'} onValueChange={v => setAssigneeId(v === 'unassigned' ? undefined : v)}>
+                        <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1.5 w-full justify-start">
+                          {assignee ? (
+                            <div className="flex items-center gap-1.5">
+                              <UserAvatar photoURL={assignee.photoURL} displayName={assignee.displayName} className="w-5 h-5 text-[9px]" />
+                              <span className="text-foreground font-medium text-sm truncate">{assignee.displayName || assignee.email}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm italic">Unassigned</span>
+                          )}
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned" className="text-sm italic text-muted-foreground">Unassigned</SelectItem>
+                          {users.map(u => (
+                            <SelectItem key={u.uid} value={u.uid} className="text-sm">
+                              <div className="flex items-center gap-2">
+                                <UserAvatar photoURL={u.photoURL} displayName={u.displayName} className="w-5 h-5 text-[9px]" />
+                                {u.displayName || u.email}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </PropertyRow>
+
+                    <PropertyRow label="Due date">
+                      <Input
+                        type="date"
+                        value={dueDate}
+                        onChange={e => setDueDate(e.target.value)}
+                        className="h-8 bg-transparent border-none focus-visible:ring-0 shadow-none text-sm px-0 text-foreground font-medium w-full"
+                      />
+                    </PropertyRow>
+
+                    {milestones.length > 0 && (
+                      <PropertyRow label="Milestone">
+                        <Select value={milestoneId ?? 'none'} onValueChange={v => setMilestoneId(v === 'none' ? undefined : v)}>
+                          <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1 w-full justify-start">
+                            <MilestoneIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            <span className="text-foreground text-sm truncate">{milestoneId ? milestones.find(m => m.id === milestoneId)?.name : <span className="text-muted-foreground italic">None</span>}</span>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none" className="text-sm italic text-muted-foreground">None</SelectItem>
+                            {milestones.map(m => <SelectItem key={m.id} value={m.id} className="text-sm">{m.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </PropertyRow>
+                    )}
+
+                    <PropertyRow label="Recurrence">
+                      <Select value={recurrenceRule ?? 'none'} onValueChange={v => setRecurrenceRule(v === 'none' ? undefined : v as RecurrenceRule)}>
+                        <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1 w-full justify-start">
+                          <RefreshCw className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <span className="text-foreground text-sm">{recurrenceRule ? RECURRENCE_OPTIONS.find(o => o.value === recurrenceRule)?.label : <span className="text-muted-foreground italic">None</span>}</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none" className="text-sm italic text-muted-foreground">None</SelectItem>
+                          {RECURRENCE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </PropertyRow>
+
+                    {/* Template save */}
+                    {projectId && (
+                      <div className="pt-4 border-t border-border/20 mt-2">
+                        {showTemplateSave ? (
+                          <div className="space-y-2">
+                            <Input
+                              value={templateName}
+                              onChange={e => setTemplateName(e.target.value)}
+                              placeholder="Template name…"
+                              className="h-7 text-xs bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary"
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground flex-1" onClick={() => setShowTemplateSave(false)}>Cancel</Button>
+                              <Button size="sm" className="h-7 text-xs flex-1" onClick={handleSaveTemplate} disabled={!templateName.trim() || savingTemplate}>Save</Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button onClick={() => setShowTemplateSave(true)} className="text-xs text-muted-foreground/50 hover:text-muted-foreground flex items-center gap-1.5 transition-colors">
+                            <LayoutTemplate className="w-3 h-3" /> Save as template
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
               </TabsContent>
 
-              {/* ── Discussion tab ───────────────────────────────────────────── */}
-              <TabsContent value="discussion" className="mt-0 h-full overflow-hidden">
-                <TaskComments
-                  key={task.id}
-                  projectId={task.projectId || activeProjectId || ''}
-                  taskId={task.id}
-                  users={users}
-                />
+              {/* Discussion */}
+              <TabsContent value="discussion" className="h-full mt-0 data-[state=inactive]:hidden overflow-hidden">
+                <div className="h-full px-6 pt-4">
+                  <TaskComments key={task.id} projectId={task.projectId || activeProjectId || ''} taskId={task.id} users={users} />
+                </div>
               </TabsContent>
 
-              {/* ── Time tab ─────────────────────────────────────────────────── */}
-              <TabsContent value="time" className="mt-0 h-full overflow-y-auto">
-                <TimeTrackingPanel
-                  taskId={task.id}
-                  projectId={task.projectId || activeProjectId || ''}
-                  currentUserId={currentUserId}
-                  users={users}
-                />
+              {/* Time */}
+              <TabsContent value="time" className="h-full overflow-y-auto mt-0 data-[state=inactive]:hidden">
+                <div className="px-6 pt-4">
+                  <TimeTrackingPanel taskId={task.id} projectId={task.projectId || activeProjectId || ''} currentUserId={currentUserId} users={users} />
+                </div>
               </TabsContent>
 
-              {/* ── Activity tab ─────────────────────────────────────────────── */}
-              <TabsContent value="activity" className="mt-0 h-full overflow-y-auto">
-                <ActivityLogPanel taskId={task.id} users={users} />
+              {/* Activity */}
+              <TabsContent value="activity" className="h-full overflow-y-auto mt-0 data-[state=inactive]:hidden">
+                <div className="px-6 pt-4">
+                  <ActivityLogPanel taskId={task.id} users={users} />
+                </div>
               </TabsContent>
 
-              {/* ── Watchers tab ─────────────────────────────────────────────── */}
-              <TabsContent value="watchers" className="flex-1 overflow-y-auto mt-0">
-                <div className="p-4 space-y-4">
+              {/* Watchers */}
+              <TabsContent value="watchers" className="h-full overflow-y-auto mt-0 data-[state=inactive]:hidden">
+                <div className="px-6 pt-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-foreground">Watchers ({watchers.length})</h3>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1.5 text-xs"
-                      onClick={handleToggleWatch}
-                    >
+                    <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs border-border/60" onClick={handleToggleWatch}>
                       {isWatching ? <><EyeOff className="w-3.5 h-3.5" /> Unwatch</> : <><Eye className="w-3.5 h-3.5" /> Watch</>}
                     </Button>
                   </div>
                   {watchers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No watchers yet. Click Watch to follow this task.</p>
+                    <p className="text-sm text-muted-foreground">No watchers yet.</p>
                   ) : (
                     <div className="space-y-2">
                       {watchers.map(w => {
@@ -428,238 +622,32 @@ export function TaskDialog({
                 </div>
               </TabsContent>
             </div>
-          </Tabs>
-        ) : (
-          /* ── New task form ────────────────────────────────────────────────── */
-          <div className="flex-1 overflow-y-auto min-h-0 space-y-5 py-4 pr-2 -mr-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Title <span className="text-red-500">*</span></label>
-              <Input
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="What needs to be done?"
-                className="bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary font-medium text-foreground"
-              />
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Status</label>
-                <Select value={status} onValueChange={(v: TaskStatus) => setStatus(v)}>
-                  <SelectTrigger className="bg-muted/50 border-none focus:ring-1 focus:ring-primary text-foreground">
-                    <SelectValue>
-                      {(() => {
-                        const s = stages.find(s => s.id === status);
-                        return s ? (
-                          <div className="flex items-center gap-1.5">
-                            <div className={cn("w-2 h-2 rounded-full", stageColorSolid(status))} />
-                            <span className="text-sm font-medium">{s.label}</span>
-                          </div>
-                        ) : <span className="text-sm">{status}</span>;
-                      })()}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    {stages.map(s => (
-                      <SelectItem key={s.id} value={s.id}>
-                        <div className="flex items-center gap-1.5">
-                          <div className={cn("w-2 h-2 rounded-full", stageColorSolid(s.id))} />
-                          <span className="text-sm">{s.label}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Priority</label>
-                <Select value={priority} onValueChange={(v: TaskPriority) => setPriority(v)}>
-                  <SelectTrigger className="bg-muted/50 border-none focus:ring-1 focus:ring-primary text-foreground">
-                    <SelectValue placeholder="Priority" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <AssigneeSelect users={users} value={assigneeId} onChange={setAssigneeId} />
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Due Date</label>
-              <Input
-                type="date"
-                value={dueDate}
-                onChange={e => setDueDate(e.target.value)}
-                className="bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary font-medium h-10 text-foreground"
-              />
-            </div>
-
-            {milestones.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground flex items-center gap-1">
-                  <MilestoneIcon className="w-3.5 h-3.5" /> Milestone
-                </label>
-                <Select value={milestoneId ?? 'none'} onValueChange={v => setMilestoneId(v === 'none' ? undefined : v)}>
-                  <SelectTrigger className="bg-muted/50 border-none focus:ring-1 focus:ring-primary text-foreground">
-                    <SelectValue placeholder="No milestone" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    <SelectItem value="none" className="italic text-muted-foreground text-sm">None</SelectItem>
-                    {milestones.map(m => (
-                      <SelectItem key={m.id} value={m.id} className="text-sm">{m.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground flex items-center gap-1">
-                <RefreshCw className="w-3.5 h-3.5" /> Recurrence
-              </label>
-              <Select
-                value={recurrenceRule ?? 'none'}
-                onValueChange={v => setRecurrenceRule(v === 'none' ? undefined : v as RecurrenceRule)}
+            {/* ── Footer ──────────────────────────────────────────────── */}
+            <div className="shrink-0 flex items-center justify-end gap-2 px-6 py-4 border-t border-border/30 bg-card">
+              <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-muted-foreground">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={!title.trim() || isDescriptionTooLong}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 rounded-xl shadow-sm shadow-primary/20"
               >
-                <SelectTrigger className="bg-muted/50 border-none focus:ring-1 focus:ring-primary text-foreground">
-                  <SelectValue placeholder="No recurrence" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border">
-                  <SelectItem value="none" className="italic text-muted-foreground text-sm">None</SelectItem>
-                  {RECURRENCE_OPTIONS.map(o => (
-                    <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                Save changes
+              </Button>
             </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-foreground">Description</label>
-                <span className={cn("text-[10px] font-bold tabular-nums", isDescriptionTooLong ? "text-red-500" : "text-muted-foreground")}>
-                  {description.length}/{MAX_DESCRIPTION_LENGTH}
-                </span>
-              </div>
-              <Textarea
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Add more details…"
-                className={cn(
-                  "min-h-[100px] bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary resize-none text-sm text-foreground",
-                  isDescriptionTooLong && "ring-1 ring-red-500"
-                )}
-              />
-            </div>
-          </div>
-        )}
-
-        <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t border-border mt-4 bg-muted/20 -mx-6 px-6 -mb-6 pb-6 rounded-b-xl shrink-0">
-          {task && onDelete && (
-            <div className="flex items-center gap-2">
-              {isConfirmingDelete ? (
-                <>
-                  <Button variant="ghost" size="sm" className="text-muted-foreground font-semibold" onClick={() => setIsConfirmingDelete(false)}>
-                    Cancel
-                  </Button>
-                  <Button variant="destructive" size="sm" className="bg-red-500 hover:bg-red-600 font-bold" onClick={() => { onDelete(task.id); onOpenChange(false); }}>
-                    Confirm Delete
-                  </Button>
-                </>
-              ) : (
-                <Button variant="ghost" className="text-red-400 hover:text-red-500 hover:bg-red-400/10 font-semibold" onClick={() => setIsConfirmingDelete(true)}>
-                  Delete
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* Save as template (for existing tasks) */}
-          {task && projectId && (
-            <div className="flex items-center gap-2">
-              {showTemplateSave ? (
-                <>
-                  <Input
-                    value={templateName}
-                    onChange={e => setTemplateName(e.target.value)}
-                    placeholder="Template name…"
-                    className="h-8 text-xs bg-muted/50 border-none w-36 focus-visible:ring-1 focus-visible:ring-primary"
-                  />
-                  <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground" onClick={() => setShowTemplateSave(false)}>Cancel</Button>
-                  <Button size="sm" className="h-8 text-xs" onClick={handleSaveTemplate} disabled={!templateName.trim() || savingTemplate}>
-                    Save
-                  </Button>
-                </>
-              ) : (
-                <Button variant="ghost" size="sm" className="text-muted-foreground/60 hover:text-muted-foreground text-xs gap-1" onClick={() => setShowTemplateSave(true)}>
-                  <LayoutTemplate className="w-3 h-3" /> Save as template
-                </Button>
-              )}
-            </div>
-          )}
-
-          <div className="flex-1" />
-          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-semibold text-muted-foreground">Cancel</Button>
-          <Button
-            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 font-bold rounded-xl px-6"
-            onClick={handleSave}
-            disabled={!title.trim() || isDescriptionTooLong}
-          >
-            {task ? 'Save Changes' : 'Create Task'}
-          </Button>
-        </DialogFooter>
+          </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-function AssigneeSelect({ users, value, onChange }: { users: UserProfile[]; value?: string; onChange: (id?: string) => void }) {
+function PropertyRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-2">
-      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Assignee</label>
-      <Select value={value || 'unassigned'} onValueChange={v => onChange(v === 'unassigned' ? undefined : v)}>
-        <SelectTrigger className="bg-muted/50 border-none focus:ring-1 focus:ring-primary text-foreground h-10">
-          <SelectValue>
-            {value && users.find(u => u.uid === value) ? (() => {
-              const user = users.find(u => u.uid === value)!;
-              return (
-                <div className="flex items-center space-x-2">
-                  <Avatar className="h-5 w-5 border border-border">
-                    <AvatarImage src={user.photoURL || undefined} />
-                    <AvatarFallback className="text-[10px] bg-primary/20 text-primary">{user.displayName?.[0] || 'U'}</AvatarFallback>
-                  </Avatar>
-                  <span className="font-medium">{user.displayName || 'Unnamed'}</span>
-                </div>
-              );
-            })() : <span className="text-muted-foreground italic">Unassigned</span>}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent className="max-h-[200px] bg-popover border-border">
-          <SelectItem value="unassigned" className="font-medium text-muted-foreground italic">
-            <div className="flex items-center space-x-2 py-0.5">
-              <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center">
-                <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-              </div>
-              <span>Unassigned</span>
-            </div>
-          </SelectItem>
-          {users.map(user => (
-            <SelectItem key={user.uid} value={user.uid}>
-              <div className="flex items-center space-x-2 py-0.5">
-                <Avatar className="h-5 w-5 border border-border shadow-sm">
-                  <AvatarImage src={user.photoURL || undefined} />
-                  <AvatarFallback className="text-[10px] bg-primary/20 text-primary font-bold">{user.displayName?.[0] || 'U'}</AvatarFallback>
-                </Avatar>
-                <span className="font-medium text-sm text-foreground">{user.displayName || 'Unnamed'}</span>
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+    <div className="grid grid-cols-[80px_1fr] items-center gap-2 py-1.5 border-b border-border/10 last:border-0">
+      <span className="text-xs text-muted-foreground/70 font-medium shrink-0">{label}</span>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
