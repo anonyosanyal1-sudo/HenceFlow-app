@@ -8,6 +8,11 @@
 ALTER TABLE public.projects
   ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- ── Viewer role for company members ──────────────────────────────────────────
+
+ALTER TABLE public.companies
+  ADD COLUMN IF NOT EXISTS viewer_ids UUID[] NOT NULL DEFAULT '{}';
+
 -- ── Activity logs: preserve entries when task is deleted ──────────────────────
 
 -- Drop the existing NOT NULL constraint and CASCADE FK
