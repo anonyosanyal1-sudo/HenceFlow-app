@@ -50,11 +50,7 @@ export function Dashboard({
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const today = new Date().toISOString().split('T')[0];
 
-  const isCompleted = (t: Task) => {
-    const proj = projects.find(p => p.id === t.projectId);
-    const closedId = proj?.stages?.[proj.stages.length - 1]?.id ?? 'closed';
-    return t.status === closedId;
-  };
+  const isCompleted = (t: Task) => t.status === 'closed';
 
   const isOverdue = (t: Task) =>
     !!t.dueDate && t.dueDate < today && !isCompleted(t);

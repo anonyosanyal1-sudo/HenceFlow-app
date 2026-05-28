@@ -25,12 +25,14 @@ export interface Company {
 
 export interface Pod {
   id: string;
+  projectId: string;
   companyId: string;
   name: string;
   description?: string;
   color: string;
   ownerId: string;
   members: string[];
+  stages: Stage[];
   createdAt: string;
 }
 
@@ -63,13 +65,12 @@ const _STAGE_ACCENT_SAFELIST =
 export interface Project {
   id: string;
   companyId: string;
-  podId?: string;
   name: string;
   description?: string;
   ownerId: string;
+  managerId?: string;
   members: string[];
   color: string;
-  stages?: Stage[];
   isArchived?: boolean;
   createdAt: string;
 }
@@ -82,6 +83,7 @@ export interface Subtask {
 
 export interface Task {
   id: string;
+  podId?: string;
   projectId: string;
   title: string;
   description?: string;

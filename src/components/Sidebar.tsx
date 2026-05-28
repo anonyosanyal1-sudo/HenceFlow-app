@@ -1,30 +1,30 @@
 import React from 'react';
 import {
   Layout, LogOut, ChevronRight, Plus, MoreVertical, Edit2,
-  ChevronDown, ChevronLeft, BarChart3, UserCircle, Sun, Moon,
-  Sparkles, PanelLeft,
+  ChevronDown, BarChart3, UserCircle, Sun, Moon,
+  Sparkles, PanelLeft, FolderOpen, Layers,
 } from 'lucide-react';
 import { UserAvatar } from './UserAvatar';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Project, Company, Pod } from '../types';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-// DropdownMenu kept for user profile dropdown below
 import { Logo } from './Logo';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface SidebarProps {
   company: Company | null;
-  pods: Pod[];
   projects: Project[];
+  pods: Pod[];
   activeProject: Project | null;
   activePod: Pod | null;
   activeView?: 'board' | 'analytics' | 'timeline';
   onProjectSelect: (project: Project) => void;
-  onNewProject: (pod?: Pod) => void;
+  onPodSelect: (pod: Pod) => void;
+  onNewProject: () => void;
   onEditProject: (project: Project) => void;
   onNewPod: () => void;
   onEditPod: (pod: Pod) => void;
@@ -43,18 +43,38 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  company, pods, projects, activeProject, activeView = 'board',
-  onProjectSelect, onNewProject, onEditProject, onNewPod, onEditPod,
+  company, projects, pods, activeProject, activePod, activeView = 'board',
+  onProjectSelect, onPodSelect, onNewProject, onEditProject,
+  onNewPod, onEditPod,
   onLogout, onAnalyticsSelect, onDashboardSelect, onEditProfile,
   onCompanySettings, user, onClose, className, isCollapsed = false,
   onToggleCollapse, theme, onToggleTheme,
 }: SidebarProps) {
 
-  const isDashboard = !activeProject && activeView === 'board';
+  const isDashboard = !activeProject && !activePod && activeView === 'board';
   const isAnalytics = activeView === 'analytics';
 
-  // Flat list of all workspaces for the sidebar
-  const allProjects = projects;
+  // Track which projects are expanded in the sidebar
+  const [expandedProjectIds, setExpandedProjectIds] = React.useState<Set<string>>(() => {
+    return activeProject ? new Set([activeProject.id]) : new Set();
+  });
+
+  // Auto-expand the active project
+  React.useEffect(() => {
+    if (activeProject) {
+      setExpandedProjectIds(prev => new Set([...prev, activeProject.id]));
+    }
+  }, [activeProject?.id]);
+
+  const toggleExpand = (projectId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedProjectIds(prev => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
 
   return (
     <TooltipProvider>
@@ -64,7 +84,7 @@ export function Sidebar({
         className
       )}>
 
-        {/* ── Logo row ────────────────────────────────────────────────────── */}
+        {/* ── Logo row ─────────────────────────────────────────────────────── */}
         <div className={cn("flex items-center shrink-0 mb-3", isCollapsed ? "justify-center px-0" : "justify-between px-1")}>
           {isCollapsed ? (
             <button onClick={onToggleCollapse} title="Expand sidebar" className="text-muted-foreground hover:text-foreground transition-colors p-1">
@@ -96,7 +116,7 @@ export function Sidebar({
           )}
         </div>
 
-        {/* ── Company card ─────────────────────────────────────────────────── */}
+        {/* ── Company card ──────────────────────────────────────────────────── */}
         {isCollapsed ? (
           <Tooltip>
             <TooltipTrigger render={
@@ -126,7 +146,7 @@ export function Sidebar({
           </button>
         )}
 
-        {/* ── Nav ──────────────────────────────────────────────────────────── */}
+        {/* ── Nav ───────────────────────────────────────────────────────────── */}
         <div className={cn("space-y-0.5 mb-3", isCollapsed ? "px-0" : "px-1")}>
           {isCollapsed ? (
             <>
@@ -173,73 +193,153 @@ export function Sidebar({
           )}
         </div>
 
-        {/* ── Pods list ────────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-0.5 min-h-0">
+        {/* ── Projects + Pods list ──────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 space-y-0.5">
           {!isCollapsed && (
             <p className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
-              Pods
+              Projects
             </p>
           )}
 
-          {allProjects.map(project => {
+          {projects.map(project => {
+            const isActiveProject = activeProject?.id === project.id;
+            const isExpanded = expandedProjectIds.has(project.id);
+            const projectPods = pods.filter(p => p.projectId === project.id);
             const accent = project.color || 'oklch(0.67 0.30 285)';
-            const isActive = activeProject?.id === project.id;
-            return isCollapsed ? (
-              <Tooltip key={project.id}>
-                <TooltipTrigger render={
-                  <div
-                    onClick={() => onProjectSelect(project)}
-                    className={cn("w-full flex items-center justify-center rounded-xl cursor-pointer transition-all p-2 h-9 relative", isActive ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}
-                  >
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: accent }} />
-                  </div>
-                } />
-                <TooltipContent side="right" sideOffset={10}>{project.name}</TooltipContent>
-              </Tooltip>
-            ) : (
-              <div
-                key={project.id}
-                onClick={() => onProjectSelect(project)}
-                className={cn(
-                  "group w-full flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-all",
-                  isActive ? "bg-muted/50 text-foreground" : "text-muted-foreground hover:bg-muted/30 hover:text-foreground"
-                )}
-              >
-                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: accent }} />
-                <span className="text-xs font-medium flex-1 truncate">{project.name}</span>
-                <button
-                  onClick={e => { e.stopPropagation(); onEditProject(project); }}
-                  className="h-5 w-5 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all shrink-0"
+
+            if (isCollapsed) {
+              return (
+                <Tooltip key={project.id}>
+                  <TooltipTrigger render={
+                    <div
+                      onClick={() => onProjectSelect(project)}
+                      className={cn(
+                        "w-full flex items-center justify-center rounded-xl cursor-pointer transition-all p-2 h-9 relative",
+                        isActiveProject ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      )}
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: accent }} />
+                    </div>
+                  } />
+                  <TooltipContent side="right" sideOffset={10}>{project.name}</TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            return (
+              <div key={project.id}>
+                {/* Project row */}
+                <div
+                  className={cn(
+                    "group flex items-center gap-1.5 px-2 py-1.5 rounded-xl cursor-pointer transition-all",
+                    isActiveProject && !activePod
+                      ? "bg-muted/50 text-foreground"
+                      : "text-muted-foreground hover:bg-muted/30 hover:text-foreground"
+                  )}
                 >
-                  <MoreVertical className="w-3 h-3" />
-                </button>
+                  {/* Expand toggle */}
+                  <button
+                    onClick={e => toggleExpand(project.id, e)}
+                    className="h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50 transition-all shrink-0"
+                  >
+                    <ChevronRight className={cn("w-3 h-3 transition-transform", isExpanded && "rotate-90")} />
+                  </button>
+
+                  {/* Project dot + name */}
+                  <div
+                    className="flex items-center gap-2 flex-1 min-w-0"
+                    onClick={() => { onProjectSelect(project); setExpandedProjectIds(prev => new Set([...prev, project.id])); }}
+                  >
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: accent }} />
+                    <span className="text-xs font-semibold truncate">{project.name}</span>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <button
+                      onClick={e => { e.stopPropagation(); onEditProject(project); }}
+                      className="h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-all"
+                      title="Edit project"
+                    >
+                      <Edit2 className="w-2.5 h-2.5" />
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); onProjectSelect(project); setExpandedProjectIds(prev => new Set([...prev, project.id])); onNewPod(); }}
+                      className="h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-all"
+                      title="New pod"
+                    >
+                      <Plus className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Pods under this project */}
+                {isExpanded && (
+                  <div className="ml-4 pl-3 border-l border-border/30 space-y-0.5 my-0.5">
+                    {projectPods.length === 0 ? (
+                      <p className="px-2 py-1 text-[11px] text-muted-foreground/40 italic">No pods yet</p>
+                    ) : (
+                      projectPods.map(pod => {
+                        const isPodActive = activePod?.id === pod.id;
+                        return (
+                          <div
+                            key={pod.id}
+                            onClick={() => { onProjectSelect(project); onPodSelect(pod); }}
+                            className={cn(
+                              "group flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all",
+                              isPodActive
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                            )}
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: pod.color }} />
+                            <span className="text-xs font-medium flex-1 truncate">{pod.name}</span>
+                            <button
+                              onClick={e => { e.stopPropagation(); onEditPod(pod); }}
+                              className="opacity-0 group-hover:opacity-100 h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-all shrink-0"
+                            >
+                              <MoreVertical className="w-3 h-3" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                    {/* New pod button inside expanded project */}
+                    <button
+                      onClick={() => { onProjectSelect(project); onNewPod(); }}
+                      className="w-full flex items-center gap-2 px-2 py-1 rounded-lg text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/30 transition-all text-[11px] font-medium"
+                    >
+                      <Plus className="w-3 h-3" />
+                      New pod
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
 
-          {/* New pod button */}
-          {!isCollapsed && (
+          {/* New project button */}
+          {!isCollapsed ? (
             <button
-              onClick={onNewPod}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/30 transition-all cursor-pointer text-xs font-medium"
+              onClick={onNewProject}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/30 transition-all cursor-pointer text-xs font-medium mt-1"
             >
               <Plus className="w-3.5 h-3.5" />
-              New pod
+              New project
             </button>
-          )}
-          {isCollapsed && (
+          ) : (
             <Tooltip>
               <TooltipTrigger render={
-                <Button variant="ghost" size="sm" className="w-full justify-center px-0 h-9 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10" onClick={onNewPod}>
+                <Button variant="ghost" size="sm" className="w-full justify-center px-0 h-9 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10" onClick={onNewProject}>
                   <Plus className="w-4 h-4" />
                 </Button>
               } />
-              <TooltipContent side="right" sideOffset={10}>New pod</TooltipContent>
+              <TooltipContent side="right" sideOffset={10}>New project</TooltipContent>
             </Tooltip>
           )}
         </div>
 
-        {/* ── Upgrade to Pro card ──────────────────────────────────────────── */}
+        {/* ── Upgrade card ──────────────────────────────────────────────────── */}
         {!isCollapsed && (
           <div className="mt-3 mx-1 p-3.5 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border border-primary/20 space-y-2.5 shrink-0">
             <div className="flex items-center gap-2">
@@ -247,7 +347,7 @@ export function Sidebar({
               <span className="text-xs font-bold text-foreground">Upgrade to Pro</span>
             </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Unlimited pods, advanced analytics &amp; AI assist.
+              Unlimited projects, advanced analytics &amp; AI assist.
             </p>
             <button className="w-full text-xs font-semibold text-foreground bg-card/80 hover:bg-card border border-border/40 rounded-xl py-1.5 transition-colors">
               See plans
@@ -255,7 +355,7 @@ export function Sidebar({
           </div>
         )}
 
-        {/* ── User profile ─────────────────────────────────────────────────── */}
+        {/* ── User profile ──────────────────────────────────────────────────── */}
         <div className="shrink-0 mt-3 border-t border-sidebar-border pt-3">
           <DropdownMenu>
             <DropdownMenuTrigger className="w-full bg-transparent border-none p-0 outline-none">
@@ -303,6 +403,7 @@ export function Sidebar({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
       </div>
     </TooltipProvider>
   );

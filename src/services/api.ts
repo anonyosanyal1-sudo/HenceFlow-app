@@ -44,12 +44,14 @@ function mapCompany(r: Record<string, any>): Company {
 function mapPod(r: Record<string, any>): Pod {
   return {
     id: r.id,
+    projectId: r.project_id,
     companyId: r.company_id,
     name: r.name,
     description: r.description ?? undefined,
     color: r.color,
     ownerId: r.owner_id,
     members: r.members ?? [],
+    stages: r.stages ?? [],
     createdAt: r.created_at,
   };
 }
@@ -58,13 +60,12 @@ function mapProject(r: Record<string, any>): Project {
   return {
     id: r.id,
     companyId: r.company_id,
-    podId: r.pod_id ?? undefined,
     name: r.name,
     description: r.description ?? undefined,
     ownerId: r.owner_id,
+    managerId: r.manager_id ?? undefined,
     members: r.members ?? [],
     color: r.color,
-    stages: r.stages ?? [],
     isArchived: r.is_archived ?? false,
     createdAt: r.created_at,
   };
@@ -73,6 +74,7 @@ function mapProject(r: Record<string, any>): Project {
 function mapTask(r: Record<string, any>): Task {
   return {
     id: r.id,
+    podId: r.pod_id ?? undefined,
     projectId: r.project_id,
     title: r.title,
     description: r.description ?? undefined,
@@ -271,23 +273,25 @@ export const deleteCompany = async (companyId: string) => {
 
 // ── Pods ──────────────────────────────────────────────────────────────────────
 
-export const fetchPods = async (companyId: string): Promise<Pod[]> => {
-  const { data, error } = await supabase.from('pods').select('*').eq('company_id', companyId);
+export const fetchPods = async (projectId: string): Promise<Pod[]> => {
+  const { data, error } = await supabase.from('pods').select('*').eq('project_id', projectId);
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapPod);
 };
 
-export const createPod = async (companyId: string, data: Partial<Pod>): Promise<string> => {
+export const createPod = async (projectId: string, companyId: string, data: Partial<Pod>): Promise<string> => {
   const userId = await getCurrentUserId();
   const { data: row, error } = await supabase
     .from('pods')
     .insert({
+      project_id: projectId,
       company_id: companyId,
       name: data.name,
       description: data.description ?? null,
       color: data.color ?? '#6366f1',
       owner_id: userId,
       members: data.members ?? [],
+      stages: data.stages ?? [],
     })
     .select('id')
     .single();
@@ -301,6 +305,7 @@ export const updatePod = async (podId: string, updates: Partial<Pod>) => {
   if (updates.description !== undefined) payload.description = updates.description;
   if (updates.color !== undefined) payload.color = updates.color;
   if (updates.members !== undefined) payload.members = updates.members;
+  if (updates.stages !== undefined) payload.stages = updates.stages;
   const { error } = await supabase.from('pods').update(payload).eq('id', podId);
   if (error) throw new Error(error.message);
 };
@@ -312,27 +317,24 @@ export const deletePod = async (podId: string) => {
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 
-export const fetchProjects = async (companyId: string, podId?: string): Promise<Project[]> => {
-  let query = supabase.from('projects').select('*').eq('company_id', companyId);
-  if (podId) query = query.eq('pod_id', podId);
-  const { data, error } = await query;
+export const fetchProjects = async (companyId: string): Promise<Project[]> => {
+  const { data, error } = await supabase.from('projects').select('*').eq('company_id', companyId);
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapProject);
 };
 
-export const createProject = async (companyId: string, data: Partial<Project> & { podId?: string }): Promise<string> => {
+export const createProject = async (companyId: string, data: Partial<Project>): Promise<string> => {
   const userId = await getCurrentUserId();
   const { data: row, error } = await supabase
     .from('projects')
     .insert({
       company_id: companyId,
-      pod_id: data.podId ?? null,
       name: data.name,
       description: data.description ?? null,
       owner_id: userId,
+      manager_id: data.managerId ?? userId,
       members: data.members ?? [],
       color: data.color ?? '#6366f1',
-      stages: data.stages ?? [],
     })
     .select('id')
     .single();
@@ -346,7 +348,7 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
   if (updates.description !== undefined) payload.description = updates.description;
   if (updates.members !== undefined) payload.members = updates.members;
   if (updates.color !== undefined) payload.color = updates.color;
-  if (updates.stages !== undefined) payload.stages = updates.stages;
+  if (updates.managerId !== undefined) payload.manager_id = updates.managerId;
   if (updates.isArchived !== undefined) payload.is_archived = updates.isArchived;
   const { error } = await supabase.from('projects').update(payload).eq('id', projectId);
   if (error) throw new Error(error.message);
@@ -370,11 +372,18 @@ export const fetchTasks = async (projectId: string): Promise<Task[]> => {
   return (data ?? []).map(mapTask);
 };
 
-export const createTask = async (projectId: string, data: Partial<Task>): Promise<string> => {
+export const fetchPodTasks = async (podId: string): Promise<Task[]> => {
+  const { data, error } = await supabase.from('tasks').select('*').eq('pod_id', podId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapTask);
+};
+
+export const createTask = async (podId: string, projectId: string, data: Partial<Task>): Promise<string> => {
   const userId = await getCurrentUserId();
   const { data: row, error } = await supabase
     .from('tasks')
     .insert({
+      pod_id: podId,
       project_id: projectId,
       title: data.title,
       description: data.description ?? null,
@@ -746,8 +755,8 @@ export const subscribeToUsers = (callback: (users: UserProfile[]) => void) => {
   return () => {};
 };
 
-export const subscribeToTasks = (projectId: string, callback: (tasks: Task[]) => void) => {
-  fetchTasks(projectId).then(callback).catch(console.error);
+export const subscribeToTasks = (podId: string, callback: (tasks: Task[]) => void) => {
+  fetchPodTasks(podId).then(callback).catch(console.error);
   return () => {};
 };
 
