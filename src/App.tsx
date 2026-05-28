@@ -5,6 +5,7 @@ import {
   fetchCompanies,
   fetchProjects,
   fetchTasks,
+  fetchPodTasks,
   fetchUsers,
   fetchMilestones,
   fetchCustomFieldDefinitions,
@@ -43,6 +44,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 import { Sidebar } from './components/Sidebar';
+import { ProjectOverview } from './components/ProjectOverview';
 import { TaskBoard, SwimlaneBy } from './components/TaskBoard';
 import { Dashboard } from './components/Dashboard';
 import { Auth } from './components/Auth';
@@ -131,7 +133,6 @@ function AppContent() {
   // Pod dialog state
   const [podDialogOpen, setPodDialogOpen] = React.useState(false);
   const [selectedPodForEdit, setSelectedPodForEdit] = React.useState<Pod | null>(null);
-  const [projectDialogPodId, setProjectDialogPodId] = React.useState<string | undefined>(undefined);
 
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [activeProject, setActiveProject] = React.useState<Project | null>(null);
@@ -214,8 +215,8 @@ function AppContent() {
     setCompanyLoaded(true);
   }, [user]);
 
-  const loadPods = React.useCallback(async (companyId: string) => {
-    const podList = await fetchPods(companyId).catch(() => [] as Pod[]);
+  const loadPods = React.useCallback(async (projectId: string) => {
+    const podList = await fetchPods(projectId).catch(() => [] as Pod[]);
     setPods(podList);
   }, []);
 
@@ -228,14 +229,17 @@ function AppContent() {
     }
   }, [user, company, activeProject]);
 
-  const loadProjectData = React.useCallback(async (projectId: string) => {
-    const [taskList, milestoneList, fieldDefs, templates] = await Promise.all([
-      fetchTasks(projectId).catch(() => [] as Task[]),
+  const loadPodData = React.useCallback(async (podId: string) => {
+    const taskList = await fetchPodTasks(podId).catch(() => [] as Task[]);
+    setTasks(taskList);
+  }, []);
+
+  const loadProjectFeatureData = React.useCallback(async (projectId: string) => {
+    const [milestoneList, fieldDefs, templates] = await Promise.all([
       fetchMilestones(projectId).catch(() => [] as Milestone[]),
       fetchCustomFieldDefinitions(projectId).catch(() => [] as CustomFieldDefinition[]),
       fetchTaskTemplates(projectId).catch(() => [] as TaskTemplate[]),
     ]);
-    setTasks(taskList);
     setMilestones(milestoneList);
     setCustomFieldDefs(fieldDefs);
     setTaskTemplates(templates);
@@ -253,23 +257,33 @@ function AppContent() {
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
-    if (!company) { setPods([]); return; }
-    loadPods(company.id);
-  }, [company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  React.useEffect(() => {
     if (!user || !company) { setProjects([]); setActiveProject(null); return; }
     loadProjects();
   }, [user, company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (!activeProject) {
-      setTasks([]); setMilestones([]); setCustomFieldDefs([]); setTaskTemplates([]);
+      setPods([]);
+      setActivePod(null);
+      setTasks([]);
+      setMilestones([]);
+      setCustomFieldDefs([]);
+      setTaskTemplates([]);
       setSelectedTaskIds(new Set());
       return;
     }
-    loadProjectData(activeProject.id);
-  }, [activeProject]); // eslint-disable-line react-hooks/exhaustive-deps
+    loadPods(activeProject.id);
+    loadProjectFeatureData(activeProject.id);
+  }, [activeProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  React.useEffect(() => {
+    if (!activePod) {
+      setTasks([]);
+      setSelectedTaskIds(new Set());
+      return;
+    }
+    loadPodData(activePod.id);
+  }, [activePod?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => { loadAllTasks(); }, [projects]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -302,7 +316,7 @@ function AppContent() {
     fetchAutomations(activeProject.id).then(setAutomations).catch(() => {});
   }, [activeProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Refresh custom fields and project data when the project settings dialog closes
+  // Refresh custom fields when the project settings dialog closes
   React.useEffect(() => {
     if (!projectDialogOpen && activeProject) {
       fetchCustomFieldDefinitions(activeProject.id).then(setCustomFieldDefs).catch(() => {});
@@ -310,16 +324,24 @@ function AppContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectDialogOpen]);
 
+  // Refresh pod data when pod dialog closes
+  React.useEffect(() => {
+    if (!podDialogOpen && activeProject) {
+      loadPods(activeProject.id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [podDialogOpen]);
+
   // Refresh task data when tab regains focus (catches missed real-time events)
   React.useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === 'visible' && activeProject) {
-        loadProjectData(activeProject.id);
+      if (document.visibilityState === 'visible' && activePod) {
+        loadPodData(activePod.id);
       }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [activeProject]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activePod]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // SSE: listen for server-side changes and refetch affected data
   const activeProjectId = activeProject?.id;
@@ -329,10 +351,11 @@ function AppContent() {
     [projects.map(p => p.id).join(',')]
   );
 
+  const activePodId = activePod?.id;
   useServerEvents(projectIdsForSSE, React.useCallback((type: string, data: Record<string, unknown>) => {
-    const pid = (data.projectId as string | undefined) ?? (data.taskId ? undefined : undefined);
+    const pid = data.projectId as string | undefined;
     if (type === 'tasks:changed') {
-      if (activeProjectId) loadProjectData(activeProjectId);
+      if (activePodId) loadPodData(activePodId);
       loadAllTasks();
     } else if (type === 'milestones:changed') {
       if (pid === activeProjectId && activeProjectId) {
@@ -347,25 +370,25 @@ function AppContent() {
     } else if (type === 'projects:changed') {
       loadProjects();
     } else if (type === 'pods:changed') {
-      if (company) loadPods(company.id);
+      if (activeProjectId) loadPods(activeProjectId);
     } else if (type === 'companies:changed') {
       loadCompany();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProjectId]));
+  }, [activeProjectId, activePodId]));
 
   useKeyboardShortcuts({
     onNewTask: () => {
-      if (!activeProject) return;
+      if (!activePod) return;
       setSelectedTask(null);
       setDefaultStatus('todo');
       setTaskDialogOpen(true);
     },
     onFocusSearch: () => searchInputRef.current?.focus(),
     onShowShortcuts: () => setShortcutsHelpOpen(true),
-    onGoTimeline: () => { if (activeProject) setActiveView('timeline'); },
+    onGoTimeline: () => { if (activePod) setActiveView('timeline'); },
     onGoBoard: () => setActiveView('board'),
-    onGoAnalytics: () => { setActiveProject(null); setActiveView('analytics'); },
+    onGoAnalytics: () => { setActiveProject(null); setActivePod(null); setActiveView('analytics'); },
   }, !!user);
 
   const handleSaveCompany = async (data: {
@@ -420,21 +443,31 @@ function AppContent() {
     setActiveProject(null);
   };
 
-  const handleSavePod = async (data: { name: string; description?: string; color?: string; members?: string[] }) => {
-    if (!company) return;
+  const handleSavePod = async (data: { name: string; description?: string; color?: string; members?: string[]; stages?: Stage[] }) => {
+    if (!company || !activeProject) return;
     if (selectedPodForEdit) {
       setPods(prev => prev.map(p => p.id === selectedPodForEdit.id ? { ...p, ...data } : p));
+      if (activePod?.id === selectedPodForEdit.id) {
+        setActivePod(prev => prev ? { ...prev, ...data } : prev);
+      }
       await updatePod(selectedPodForEdit.id, data);
     } else {
       const tempId = `temp-${Date.now()}`;
       const tempPod: Pod = {
-        id: tempId, companyId: company.id, ownerId: user!.uid,
-        name: data.name, description: data.description, color: data.color ?? '#6366f1',
-        members: data.members ?? [], createdAt: new Date().toISOString(),
+        id: tempId,
+        projectId: activeProject.id,
+        companyId: company.id,
+        ownerId: user!.uid,
+        name: data.name ?? 'New Pod',
+        description: data.description,
+        color: data.color ?? '#6366f1',
+        members: data.members ?? [],
+        stages: data.stages ?? [...DEFAULT_STAGES],
+        createdAt: new Date().toISOString(),
       };
       setPods(prev => [...prev, tempPod]);
       try {
-        const newId = await createPod(company.id, data);
+        const newId = await createPod(activeProject.id, company.id, data);
         setPods(prev => prev.map(p => p.id === tempId ? { ...p, id: newId } : p));
       } catch (err) {
         setPods(prev => prev.filter(p => p.id !== tempId));
@@ -449,7 +482,7 @@ function AppContent() {
     if (activePod?.id === podId) setActivePod(null);
   };
 
-  const handleSaveProject = async (data: { name: string; description: string; members: string[]; stages: Stage[] }) => {
+  const handleSaveProject = async (data: { name: string; description: string; members: string[]; managerId?: string; color?: string }) => {
     const dedupedMembers = [...new Set(data.members)];
     const payload = { ...data, members: dedupedMembers };
     if (selectedProjectForEdit) {
@@ -461,14 +494,20 @@ function AppContent() {
     } else if (company) {
       const tempId = `temp-${Date.now()}`;
       const tempProject: Project = {
-        id: tempId, companyId: company.id, ownerId: user!.uid,
-        name: payload.name, description: payload.description, members: payload.members,
-        stages: payload.stages, color: '#6366f1', podId: projectDialogPodId,
-        isArchived: false, createdAt: new Date().toISOString(),
+        id: tempId,
+        companyId: company.id,
+        ownerId: user!.uid,
+        managerId: payload.managerId ?? user!.uid,
+        name: payload.name,
+        description: payload.description,
+        members: payload.members,
+        color: payload.color ?? '#6366f1',
+        isArchived: false,
+        createdAt: new Date().toISOString(),
       };
       setProjects(prev => [...prev, tempProject]);
       try {
-        const newId = await createProject(company.id, { ...payload, podId: projectDialogPodId });
+        const newId = await createProject(company.id, payload);
         setProjects(prev => prev.map(p => p.id === tempId ? { ...p, id: newId } : p));
       } catch (err) {
         setProjects(prev => prev.filter(p => p.id !== tempId));
@@ -540,8 +579,9 @@ function AppContent() {
   };
 
   const handleSaveTask = async (taskData: Partial<Task>) => {
-    const targetProjectId = selectedTask?.projectId || activeProject?.id;
-    if (!targetProjectId) return;
+    const targetPodId = selectedTask?.podId ?? activePod?.id;
+    const targetProjectId = selectedTask?.projectId ?? activeProject?.id;
+    if (!targetPodId || !targetProjectId) return;
     if (selectedTask) {
       const updatedTask = { ...selectedTask, ...taskData };
       setTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
@@ -552,6 +592,7 @@ function AppContent() {
       const tempId = `temp-${Date.now()}`;
       const tempTask: Task = {
         id: tempId,
+        podId: targetPodId,
         projectId: targetProjectId,
         creatorId: user!.uid,
         title: taskData.title ?? '',
@@ -570,7 +611,7 @@ function AppContent() {
       setTasks(prev => [...prev, tempTask]);
       setAllTasks(prev => [...prev, tempTask]);
       try {
-        const newId = await createTask(targetProjectId, taskData);
+        const newId = await createTask(targetPodId, targetProjectId, taskData);
         setTasks(prev => prev.map(t => t.id === tempId ? { ...t, id: newId } : t));
         setAllTasks(prev => prev.map(t => t.id === tempId ? { ...t, id: newId } : t));
         addActivityLog(newId, targetProjectId, 'task_created').catch(() => {});
@@ -582,7 +623,7 @@ function AppContent() {
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    const targetProjectId = selectedTask?.projectId || activeProject?.id;
+    const targetProjectId = selectedTask?.projectId ?? activeProject?.id;
     if (!targetProjectId) return;
     addActivityLog(taskId, targetProjectId, 'task_deleted').catch(() => {});
     setTasks(prev => prev.filter(t => t.id !== taskId));
@@ -681,53 +722,16 @@ function AppContent() {
                 projects={projects}
                 activeProject={activeProject}
                 activeView={activeView}
-                onNewPod={() => {
-                  setSelectedProjectForEdit(null);
-                  setProjectDialogPodId(undefined);
-                  setProjectDialogOpen(true);
-                  setSidebarOpen(false);
-                }}
-                onEditPod={(pod) => {
-                  setSelectedPodForEdit(pod);
-                  setPodDialogOpen(true);
-                  setSidebarOpen(false);
-                }}
-                onCompanySettings={() => {
-                  setShowCompanySettings(true);
-                  setSidebarOpen(false);
-                }}
-                onProjectSelect={(p) => {
-                  setActiveProject(p);
-                  setActiveView('board');
-                  setSidebarOpen(false);
-                }}
-                onNewProject={(pod) => {
-                  setSelectedProjectForEdit(null);
-                  setProjectDialogPodId(pod?.id);
-                  setProjectDialogOpen(true);
-                  setSidebarOpen(false);
-                }}
-                onEditProject={(proj) => {
-                  setSelectedProjectForEdit(proj);
-                  setProjectDialogOpen(true);
-                  setSidebarOpen(false);
-                }}
-                onDashboardSelect={() => {
-                  setActiveProject(null);
-                  setActiveView('board');
-                  setShowCompanySettings(false);
-                  setSidebarOpen(false);
-                }}
-                onAnalyticsSelect={() => {
-                  setActiveProject(null);
-                  setActiveView('analytics');
-                  setShowCompanySettings(false);
-                  setSidebarOpen(false);
-                }}
-                onEditProfile={() => {
-                  setProfileSetupOpen(true);
-                  setSidebarOpen(false);
-                }}
+                onNewPod={() => { setSelectedPodForEdit(null); setPodDialogOpen(true); setSidebarOpen(false); }}
+                onEditPod={(pod) => { setSelectedPodForEdit(pod); setPodDialogOpen(true); setSidebarOpen(false); }}
+                onCompanySettings={() => { setShowCompanySettings(true); setSidebarOpen(false); }}
+                onProjectSelect={(p) => { setActiveProject(p); setActivePod(null); setActiveView('board'); setShowCompanySettings(false); setSidebarOpen(false); }}
+                onPodSelect={(pod) => { setActivePod(pod); setActiveView('board'); setSidebarOpen(false); }}
+                onNewProject={() => { setSelectedProjectForEdit(null); setProjectDialogOpen(true); setSidebarOpen(false); }}
+                onEditProject={(proj) => { setSelectedProjectForEdit(proj); setProjectDialogOpen(true); setSidebarOpen(false); }}
+                onDashboardSelect={() => { setActiveProject(null); setActivePod(null); setActiveView('board'); setShowCompanySettings(false); setSidebarOpen(false); }}
+                onAnalyticsSelect={() => { setActiveProject(null); setActivePod(null); setActiveView('analytics'); setShowCompanySettings(false); setSidebarOpen(false); }}
+                onEditProfile={() => { setProfileSetupOpen(true); setSidebarOpen(false); }}
                 onLogout={logout}
                 user={user}
                 onClose={() => setSidebarOpen(false)}
@@ -749,42 +753,15 @@ function AppContent() {
         projects={projects}
         activeProject={activeProject}
         activeView={activeView}
-        onNewPod={() => {
-          setSelectedProjectForEdit(null);
-          setProjectDialogPodId(undefined);
-          setProjectDialogOpen(true);
-        }}
-        onEditPod={(pod) => {
-          setSelectedPodForEdit(pod);
-          setPodDialogOpen(true);
-        }}
-        onCompanySettings={() => {
-          setShowCompanySettings(true);
-        }}
-        onProjectSelect={(p) => {
-          setActiveProject(p);
-          setActiveView('board');
-          setShowCompanySettings(false);
-        }}
-        onNewProject={(pod) => {
-          setSelectedProjectForEdit(null);
-          setProjectDialogPodId(pod?.id);
-          setProjectDialogOpen(true);
-        }}
-        onEditProject={(proj) => {
-          setSelectedProjectForEdit(proj);
-          setProjectDialogOpen(true);
-        }}
-        onDashboardSelect={() => {
-          setActiveProject(null);
-          setActiveView('board');
-          setShowCompanySettings(false);
-        }}
-        onAnalyticsSelect={() => {
-          setActiveProject(null);
-          setActiveView('analytics');
-          setShowCompanySettings(false);
-        }}
+        onNewPod={() => { setSelectedPodForEdit(null); setPodDialogOpen(true); }}
+        onEditPod={(pod) => { setSelectedPodForEdit(pod); setPodDialogOpen(true); }}
+        onCompanySettings={() => setShowCompanySettings(true)}
+        onProjectSelect={(p) => { setActiveProject(p); setActivePod(null); setActiveView('board'); setShowCompanySettings(false); }}
+        onPodSelect={(pod) => { setActivePod(pod); setActiveView('board'); }}
+        onNewProject={() => { setSelectedProjectForEdit(null); setProjectDialogOpen(true); }}
+        onEditProject={(proj) => { setSelectedProjectForEdit(proj); setProjectDialogOpen(true); }}
+        onDashboardSelect={() => { setActiveProject(null); setActivePod(null); setActiveView('board'); setShowCompanySettings(false); }}
+        onAnalyticsSelect={() => { setActiveProject(null); setActivePod(null); setActiveView('analytics'); setShowCompanySettings(false); }}
         onEditProfile={() => setProfileSetupOpen(true)}
         onLogout={logout}
         user={user}
@@ -841,14 +818,11 @@ function AppContent() {
           </div>
         ) : !activeProject ? (
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            {/* Mobile Only Header for Dashboard */}
             <div className="lg:hidden h-16 border-b border-border flex items-center px-6 bg-card shrink-0">
               <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="mr-4">
                 <Menu className="w-5 h-5" />
               </Button>
-              <h2 className="text-lg font-bold tracking-tight text-foreground group flex items-center">
-                Dashboard
-              </h2>
+              <h2 className="text-lg font-bold tracking-tight text-foreground">Dashboard</h2>
             </div>
             <Dashboard
               company={company}
@@ -856,25 +830,35 @@ function AppContent() {
               tasks={allTasks}
               users={users}
               currentUserId={user.uid}
-              onProjectSelect={(p) => {
-                setActiveProject(p);
-                setActiveView('board');
-              }}
-              onEditProject={(proj) => {
-                setSelectedProjectForEdit(proj);
-                setProjectDialogOpen(true);
-              }}
+              onProjectSelect={(p) => { setActiveProject(p); setActivePod(null); setActiveView('board'); }}
+              onEditProject={(proj) => { setSelectedProjectForEdit(proj); setProjectDialogOpen(true); }}
               onDeleteProject={handleDeleteProject}
               onArchiveProject={handleArchiveProject}
-              onNewProject={() => {
-                setSelectedProjectForEdit(null);
-                setProjectDialogPodId(undefined);
-                setProjectDialogOpen(true);
-              }}
+              onNewProject={() => { setSelectedProjectForEdit(null); setProjectDialogOpen(true); }}
               onUpdateCompany={handleSaveCompany}
               onDeleteCompany={handleDeleteCompany}
               onInvite={() => setInviteDialogOpen(true)}
               onCompanySettings={() => setShowCompanySettings(true)}
+            />
+          </div>
+        ) : !activePod ? (
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="lg:hidden h-14 border-b border-border flex items-center px-4 bg-card/50 shrink-0">
+              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="mr-3 h-8 w-8">
+                <Menu className="w-4 h-4" />
+              </Button>
+              <span className="text-sm font-bold text-foreground truncate">{activeProject.name}</span>
+            </div>
+            <ProjectOverview
+              project={activeProject}
+              pods={pods}
+              allTasks={allTasks}
+              users={companyUsers}
+              currentUserId={user.uid}
+              onPodSelect={(pod) => { setActivePod(pod); setActiveView('board'); }}
+              onNewPod={() => { setSelectedPodForEdit(null); setPodDialogOpen(true); }}
+              onEditProject={() => { setSelectedProjectForEdit(activeProject); setProjectDialogOpen(true); }}
+              onEditPod={(pod) => { setSelectedPodForEdit(pod); setPodDialogOpen(true); }}
             />
           </div>
         ) : (
@@ -889,18 +873,25 @@ function AppContent() {
                   </Button>
                   <div className="flex flex-col min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="font-bold text-foreground text-sm truncate leading-tight">
+                      <button
+                        onClick={() => setActivePod(null)}
+                        className="text-muted-foreground/60 hover:text-muted-foreground text-xs font-medium truncate hidden sm:block transition-colors"
+                      >
                         {activeProject.name}
+                      </button>
+                      <span className="text-muted-foreground/30 hidden sm:block text-xs">/</span>
+                      <span className="font-bold text-foreground text-sm truncate leading-tight">
+                        {activePod.name}
                       </span>
                       <button
                         className="text-muted-foreground/40 hover:text-muted-foreground transition-colors shrink-0"
-                        onClick={() => { setSelectedProjectForEdit(activeProject); setProjectDialogOpen(true); }}
+                        onClick={() => { setSelectedPodForEdit(activePod); setPodDialogOpen(true); }}
                       >
                         <Settings className="w-3.5 h-3.5" />
                       </button>
                     </div>
                     <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground/50 mt-0.5">
-                      <span>{[...new Set(activeProject.members ?? [])].length || 1} members</span>
+                      <span>{[...new Set(activePod.members ?? [])].length || 1} members</span>
                       <span className="opacity-40">·</span>
                       <span>{tasks.length} tasks</span>
                       <span className="opacity-40">·</span>
@@ -1092,7 +1083,7 @@ function AppContent() {
                   <Button
                     className="h-9 px-4 font-bold text-primary-foreground shadow-md shadow-primary/25 border-0 hover:opacity-90 transition-opacity gap-1.5 rounded-xl"
                     style={{ background: 'linear-gradient(135deg, oklch(0.67 0.30 285), oklch(0.60 0.26 310))' }}
-                    onClick={() => { setSelectedTask(null); setDefaultStatus('todo'); setTaskDialogOpen(true); }}
+                    onClick={() => { if (!activePod) return; setSelectedTask(null); setDefaultStatus('todo'); setTaskDialogOpen(true); }}
                   >
                     <span className="text-base leading-none font-light">+</span>
                     <span className="hidden sm:inline">New task</span>
@@ -1104,14 +1095,14 @@ function AppContent() {
             {activeView === 'timeline' ? (
               <GanttView
                 tasks={filteredTasks}
-                stages={activeProject.stages || DEFAULT_STAGES}
+                stages={activePod.stages?.length ? activePod.stages : DEFAULT_STAGES}
                 users={companyUsers}
                 onTaskClick={(task) => { setSelectedTask(task); setTaskDialogOpen(true); }}
               />
             ) : (
               <TaskBoard
                 tasks={filteredTasks}
-                stages={activeProject.stages || DEFAULT_STAGES}
+                stages={activePod.stages?.length ? activePod.stages : DEFAULT_STAGES}
                 users={companyUsers}
                 milestones={milestones}
                 selectedTaskIds={selectedTaskIds}
@@ -1157,7 +1148,7 @@ function AppContent() {
           activeProjectId={activeProject?.id}
           defaultStatus={defaultStatus}
           users={companyUsers}
-          stages={activeProject?.stages || DEFAULT_STAGES}
+          stages={activePod?.stages?.length ? activePod.stages : DEFAULT_STAGES}
           milestones={milestones}
           customFieldDefs={customFieldDefs}
           templates={taskTemplates}
@@ -1234,7 +1225,7 @@ function AppContent() {
           automations={automations}
           onAutomationsChange={setAutomations}
           users={companyUsers}
-          stages={activeProject?.stages || DEFAULT_STAGES}
+          stages={activePod?.stages?.length ? activePod.stages : DEFAULT_STAGES}
         />
 
         {/* Keyboard Shortcuts Help */}
@@ -1247,7 +1238,7 @@ function AppContent() {
         <BulkActionBar
           selectedIds={selectedTaskIds}
           onClear={() => setSelectedTaskIds(new Set())}
-          stages={activeProject?.stages || DEFAULT_STAGES}
+          stages={activePod?.stages?.length ? activePod.stages : DEFAULT_STAGES}
           users={companyUsers}
           milestones={milestones}
           onMoveToStage={async (status) => {

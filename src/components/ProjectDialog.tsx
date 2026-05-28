@@ -1,27 +1,19 @@
 import React from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, X, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { UserAvatar } from './UserAvatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-import { Project, UserProfile, Stage, DEFAULT_STAGES, CustomFieldDefinition } from '../types';
+import { Project, UserProfile, CustomFieldDefinition } from '../types';
 import {
   subscribeToCustomFieldDefinitions,
   createCustomFieldDefinition,
@@ -32,52 +24,31 @@ interface ProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project?: Project | null;
-  users: UserProfile[]; // Users in the current company
+  users: UserProfile[];
   currentUserId: string;
-  onSave: (project: { name: string; description: string; members: string[]; stages: Stage[] }) => void;
+  onSave: (data: { name: string; description: string; members: string[]; managerId?: string; color?: string }) => void;
   onDelete?: (projectId: string) => void;
 }
 
-const STAGE_COLORS = [
-  { label: 'Slate', value: 'bg-slate-500/20 text-slate-300 border-slate-500/40' },
-  { label: 'Gray', value: 'bg-gray-500/20 text-gray-300 border-gray-500/40' },
-  { label: 'Zinc', value: 'bg-zinc-500/20 text-zinc-300 border-zinc-500/40' },
-  { label: 'Neutral', value: 'bg-neutral-500/20 text-neutral-300 border-neutral-500/40' },
-  { label: 'Stone', value: 'bg-stone-500/20 text-stone-300 border-stone-500/40' },
-  { label: 'Red', value: 'bg-red-500/20 text-red-300 border-red-500/40' },
-  { label: 'Orange', value: 'bg-orange-500/20 text-orange-300 border-orange-500/40' },
-  { label: 'Amber', value: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
-  { label: 'Yellow', value: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' },
-  { label: 'Lime', value: 'bg-lime-500/20 text-lime-300 border-lime-500/40' },
-  { label: 'Green', value: 'bg-green-500/20 text-green-300 border-green-500/40' },
-  { label: 'Emerald', value: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
-  { label: 'Teal', value: 'bg-teal-500/20 text-teal-300 border-teal-500/40' },
-  { label: 'Cyan', value: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' },
-  { label: 'Sky', value: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
-  { label: 'Blue', value: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
-  { label: 'Indigo', value: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' },
-  { label: 'Violet', value: 'bg-violet-500/20 text-violet-300 border-violet-500/40' },
-  { label: 'Purple', value: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
-  { label: 'Fuchsia', value: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40' },
-  { label: 'Pink', value: 'bg-pink-500/20 text-pink-300 border-pink-500/40' },
-  { label: 'Rose', value: 'bg-rose-500/20 text-rose-300 border-rose-500/40' },
-  { label: 'Primary', value: 'bg-primary/20 text-primary border-primary/40' },
-  { label: 'Secondary', value: 'bg-secondary/40 text-secondary-foreground border-secondary/60' },
-  { label: 'Accent', value: 'bg-accent/40 text-accent-foreground border-accent/60' },
+const PROJECT_COLORS = [
+  '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b',
+  '#10b981', '#3b82f6', '#ef4444', '#14b8a6',
+  '#f97316', '#84cc16', '#06b6d4', '#a855f7',
 ];
 
-export function ProjectDialog({ open, onOpenChange, project, users, currentUserId, onSave, onDelete }: ProjectDialogProps) {
+export function ProjectDialog({
+  open, onOpenChange, project, users, currentUserId, onSave, onDelete,
+}: ProjectDialogProps) {
   const [name, setName] = React.useState('');
   const [description, setDescription] = React.useState('');
+  const [managerId, setManagerId] = React.useState<string>('');
   const [members, setMembers] = React.useState<string[]>([]);
-  const [stages, setStages] = React.useState<Stage[]>([]);
+  const [color, setColor] = React.useState(PROJECT_COLORS[0]);
   const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
 
-  // Custom fields state (only for existing projects)
   const [customFields, setCustomFields] = React.useState<CustomFieldDefinition[]>([]);
   const [newFieldName, setNewFieldName] = React.useState('');
   const [newFieldType, setNewFieldType] = React.useState<CustomFieldDefinition['fieldType']>('text');
-  const [newFieldOptions, setNewFieldOptions] = React.useState('');
 
   React.useEffect(() => {
     if (!project?.id) return;
@@ -89,14 +60,16 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
     if (project) {
       setName(project.name);
       setDescription(project.description || '');
+      setManagerId(project.managerId || project.ownerId || currentUserId);
       setMembers(project.members || []);
-      setStages(project.stages || [...DEFAULT_STAGES]);
+      setColor(project.color || PROJECT_COLORS[0]);
       setIsConfirmingDelete(false);
     } else {
       setName('');
       setDescription('');
+      setManagerId(currentUserId);
       setMembers([currentUserId]);
-      setStages([...DEFAULT_STAGES]);
+      setColor(PROJECT_COLORS[0]);
       setIsConfirmingDelete(false);
     }
   }, [project, open, currentUserId]);
@@ -105,307 +78,213 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
     if (!name.trim()) return;
     const validUserIds = new Set(users.map(u => u.uid));
     const cleanedMembers = members.filter(id => validUserIds.has(id));
-    onSave({ name, description, members: cleanedMembers, stages });
+    onSave({ name: name.trim(), description, members: cleanedMembers, managerId: managerId || currentUserId, color });
     onOpenChange(false);
   };
 
   const toggleMember = (uid: string) => {
-    if (members.includes(uid)) {
-      if (uid === project?.ownerId || (!project && uid === currentUserId)) return; // Prevent owner removal
-      setMembers(prev => prev.filter(id => id !== uid));
-    } else {
-      setMembers(prev => [...prev, uid]);
-    }
+    const isOwner = uid === (project?.ownerId ?? currentUserId);
+    if (isOwner) return;
+    setMembers(prev =>
+      prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]
+    );
   };
 
-  const handleAddStage = () => {
-    const newStage: Stage = {
-      id: `stage-${Date.now()}`,
-      label: 'New Stage',
-      color: 'bg-muted text-muted-foreground border-border',
-    };
-    setStages([...stages, newStage]);
-  };
-
-  const updateStage = (index: number, newLabel: string) => {
-    setStages(stages.map((s, i) => i === index ? { ...s, label: newLabel } : s));
-  };
-
-  const updateStageColor = (index: number, newColor: string) => {
-    setStages(stages.map((s, i) => i === index ? { ...s, color: newColor } : s));
-  };
-
-  const removeStage = (index: number) => {
-    setStages(stages.filter((_, i) => i !== index));
+  const handleAddField = async () => {
+    if (!newFieldName.trim() || !project?.id) return;
+    await createCustomFieldDefinition(project.id, { name: newFieldName.trim(), fieldType: newFieldType, options: [] });
+    setNewFieldName('');
+    setNewFieldType('text');
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold tracking-tight text-foreground">
-            {project ? 'Pod Settings' : 'New Pod'}
+      <DialogContent showCloseButton={false} className="bg-card border-border sm:max-w-[520px] h-[82vh] flex flex-col p-0 gap-0">
+
+        {/* Header */}
+        <div className="shrink-0 px-6 pt-5 pb-3 border-b border-border/40">
+          <DialogTitle className="text-lg font-bold text-foreground">
+            {project ? 'Project Settings' : 'New Project'}
           </DialogTitle>
-          <DialogDescription className="text-muted-foreground">
-            {project
-              ? 'Update your pod details and members.'
-              : 'Create a new pod to organize your projects and tasks.'
-            }
+          <DialogDescription className="text-muted-foreground text-sm mt-0.5">
+            {project ? 'Update project details and members.' : 'Create a new project for your team.'}
           </DialogDescription>
-        </DialogHeader>
+        </div>
 
-        <Tabs defaultValue="general" className="w-full">
-          <TabsList className="w-full mb-4">
-            <TabsTrigger value="general" className="flex-1 text-xs">General</TabsTrigger>
-            <TabsTrigger value="stages" className="flex-1 text-xs">Stages</TabsTrigger>
-            {project && <TabsTrigger value="fields" className="flex-1 text-xs">Custom Fields</TabsTrigger>}
-          </TabsList>
-          
-          <TabsContent value="general" className="space-y-4 focus-visible:outline-none">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Pod Name</label>
-              <Input 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                placeholder="e.g. Mobile App, Marketing Campaign" 
-                className="bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary text-foreground"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Description (Optional)</label>
-              <Textarea 
-                value={description} 
-                onChange={(e) => setDescription(e.target.value)} 
-                placeholder="What is this pod about?"
-                className="bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary resize-none h-24 text-foreground"
+        <Tabs defaultValue="general" className="flex-1 min-h-0 flex flex-col">
+          <div className="shrink-0 px-6 pt-3">
+            <TabsList className="bg-muted/40 border border-border/30 rounded-xl h-9 p-1">
+              <TabsTrigger value="general" className="rounded-lg text-xs font-semibold data-[state=active]:bg-card data-[state=active]:shadow-sm h-7 px-3">General</TabsTrigger>
+              {project && (
+                <TabsTrigger value="custom-fields" className="rounded-lg text-xs font-semibold data-[state=active]:bg-card data-[state=active]:shadow-sm h-7 px-3">Custom Fields</TabsTrigger>
+              )}
+            </TabsList>
+          </div>
+
+          {/* ── General tab ─────────────────────────────────────────────────── */}
+          <TabsContent value="general" className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 pt-4 space-y-4 mt-0">
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Project Name *</label>
+              <Input
+                placeholder="e.g. Website Redesign"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="h-10"
+                autoFocus
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</label>
+              <Textarea
+                placeholder="What is this project about?"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                className="resize-none h-20"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Project Manager</label>
+              <Select value={managerId} onValueChange={setManagerId}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Select manager" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map(u => (
+                    <SelectItem key={u.uid} value={u.uid}>
+                      <div className="flex items-center gap-2">
+                        <UserAvatar photoURL={u.photoURL} displayName={u.displayName} className="w-5 h-5 text-[9px]" />
+                        <span>{u.displayName || u.email}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground flex justify-between items-center">
-                <span>Pod Members</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Members</span>
                 <span className="text-xs text-muted-foreground">{users.filter(u => members.includes(u.uid)).length} selected</span>
               </label>
-              <ScrollArea className="h-[150px] border border-border rounded-lg bg-muted/20 p-2">
-                <div className="space-y-1">
+              <ScrollArea className="h-[140px] border border-border rounded-lg bg-muted/20 p-2">
+                <div className="space-y-0.5">
                   {users.map(user => {
-                    const isOwner = user.uid === (project?.ownerId || currentUserId);
+                    const isOwner = user.uid === (project?.ownerId ?? currentUserId);
                     const isSelected = members.includes(user.uid);
-                    
                     return (
-                      <div 
-                        key={user.uid} 
-                        className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-md transition-colors cursor-pointer"
+                      <div
+                        key={user.uid}
+                        className="flex items-center gap-3 p-2 hover:bg-muted/50 rounded-md transition-colors cursor-pointer"
                         onClick={() => toggleMember(user.uid)}
                       >
-                         <Checkbox 
-                           checked={isSelected}
-                           disabled={isOwner}
-                           className="border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-                         />
-                         <UserAvatar
-                           photoURL={user.photoURL}
-                           displayName={user.displayName}
-                           className="h-8 w-8 text-xs shadow-sm shrink-0"
-                         />
-                         <div className="flex flex-col flex-1 min-w-0">
-                           <span className="text-sm font-medium text-foreground truncate">
-                             {user.displayName || 'Anonymous User'}
-                           </span>
-                           <span className="text-[10px] text-muted-foreground truncate">
-                             {user.email}
-                           </span>
-                         </div>
-                         {isOwner && (
-                           <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">
-                             Owner
-                           </span>
-                         )}
+                        <Checkbox
+                          checked={isSelected}
+                          disabled={isOwner}
+                          className="border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                        />
+                        <UserAvatar photoURL={user.photoURL} displayName={user.displayName} className="h-7 w-7 text-xs shadow-sm shrink-0" />
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <span className="text-sm font-medium text-foreground truncate">{user.displayName || 'Anonymous'}</span>
+                          <span className="text-[10px] text-muted-foreground truncate">{user.email}</span>
+                        </div>
+                        {isOwner && (
+                          <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">Owner</span>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               </ScrollArea>
             </div>
-          </TabsContent>
 
-          <TabsContent value="stages" className="space-y-4 focus-visible:outline-none">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-foreground">Board Columns</label>
-              <Button variant="outline" size="sm" onClick={handleAddStage} className="h-8 text-xs">
-                <Plus className="w-3 h-3 mr-1" /> Add Stage
-              </Button>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Color</label>
+              <div className="flex gap-2 flex-wrap">
+                {PROJECT_COLORS.map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={cn("w-7 h-7 rounded-full transition-all border-2", color === c ? "border-white scale-110 shadow-md" : "border-transparent hover:scale-105")}
+                    style={{ backgroundColor: c }}
+                    onClick={() => setColor(c)}
+                  />
+                ))}
+              </div>
             </div>
-            <ScrollArea className="h-[250px] pr-4">
-              <div className="space-y-2">
-                {stages.map((stage, index) => (
-                  <div key={stage.id} className="flex items-center space-x-2 group">
-                    <Popover>
-                      <PopoverTrigger
-                        className={cn(
-                          "flex-shrink-0 w-6 h-6 rounded-full border border-border cursor-pointer transition-transform hover:scale-110",
-                          stage.color.split(' ')[0].split('/')[0]
-                        )} 
-                        title="Change Color"
-                      />
-                      <PopoverContent className="w-64 p-3 bg-card border-border shadow-2xl z-[100]" align="start">
-                        <div className="grid grid-cols-5 gap-2">
-                          {STAGE_COLORS.map((c) => (
-                            <button
-                              key={c.value}
-                              className={cn(
-                                "w-9 h-9 rounded-full border transition-all hover:scale-110",
-                                c.value.split(' ')[0].split('/')[0],
-                                stage.color === c.value ? "ring-2 ring-primary ring-offset-2 ring-offset-card" : "border-border"
-                              )}
-                              onClick={() => updateStageColor(index, c.value)}
-                            />
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                    <Input 
-                      value={stage.label}
-                      onChange={(e) => updateStage(index, e.target.value)}
-                      className="h-8 bg-muted/50 border-none focus-visible:ring-1"
-                    />
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => removeStage(index)}
-                      className="h-8 w-8 text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity hover:text-red-500 hover:bg-red-500/10"
-                      disabled={stages.length <= 1}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-            <p className="text-xs text-muted-foreground">Adding, removing, or renaming columns applies instantly to the pod board.</p>
           </TabsContent>
 
+          {/* ── Custom Fields tab ────────────────────────────────────────────── */}
           {project && (
-            <TabsContent value="fields" className="space-y-4 focus-visible:outline-none">
-              <p className="text-xs text-muted-foreground">
-                Custom fields appear in every task in this pod. Only owners can manage them.
-              </p>
-              <div className="space-y-2">
-                {customFields.length === 0 && (
-                  <p className="text-sm text-muted-foreground/50 italic py-2">No custom fields yet.</p>
-                )}
-                {customFields.map(f => (
-                  <div key={f.id} className="flex items-center gap-2 group">
-                    <span className="text-sm font-medium text-foreground flex-1 truncate">{f.name}</span>
-                    <span className="text-xs text-muted-foreground/60 bg-muted/40 px-2 py-0.5 rounded-full capitalize shrink-0">{f.fieldType}</span>
-                    <Button
-                      size="icon" variant="ghost"
-                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-red-400/60 hover:text-red-400"
-                      onClick={() => deleteCustomFieldDefinition(f.id).then(() => setCustomFields(prev => prev.filter(x => x.id !== f.id)))}
+            <TabsContent value="custom-fields" className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 pt-4 mt-0">
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground">Custom fields are available on all tasks in this project.</p>
+                {customFields.map(field => (
+                  <div key={field.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border/30">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{field.name}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{field.fieldType}</p>
+                    </div>
+                    <button
+                      onClick={() => deleteCustomFieldDefinition(field.id).then(() => setCustomFields(prev => prev.filter(f => f.id !== field.id)))}
+                      className="text-muted-foreground/40 hover:text-rose-400 transition-colors p-1 rounded-md hover:bg-rose-500/10"
                     >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
-              </div>
-
-              <div className="space-y-2 pt-2 border-t border-border/40">
-                <p className="text-xs font-semibold text-muted-foreground">Add new field</p>
                 <div className="flex gap-2">
                   <Input
+                    placeholder="Field name"
                     value={newFieldName}
                     onChange={e => setNewFieldName(e.target.value)}
-                    placeholder="Field name…"
-                    className="h-8 text-sm bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary flex-1"
+                    className="h-9 flex-1"
+                    onKeyDown={e => { if (e.key === 'Enter') handleAddField(); }}
                   />
-                  <Select value={newFieldType} onValueChange={(v: CustomFieldDefinition['fieldType']) => setNewFieldType(v)}>
-                    <SelectTrigger className="h-8 text-xs bg-muted/50 border-none w-28">
+                  <Select value={newFieldType} onValueChange={v => setNewFieldType(v as CustomFieldDefinition['fieldType'])}>
+                    <SelectTrigger className="h-9 w-28">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="text" className="text-xs">Text</SelectItem>
-                      <SelectItem value="number" className="text-xs">Number</SelectItem>
-                      <SelectItem value="url" className="text-xs">URL</SelectItem>
-                      <SelectItem value="select" className="text-xs">Select</SelectItem>
+                      <SelectItem value="text">Text</SelectItem>
+                      <SelectItem value="number">Number</SelectItem>
+                      <SelectItem value="url">URL</SelectItem>
+                      <SelectItem value="select">Select</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Button size="sm" onClick={handleAddField} disabled={!newFieldName.trim()} className="h-9 px-3">Add</Button>
                 </div>
-                {newFieldType === 'select' && (
-                  <Input
-                    value={newFieldOptions}
-                    onChange={e => setNewFieldOptions(e.target.value)}
-                    placeholder="Options (comma-separated)"
-                    className="h-8 text-sm bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary"
-                  />
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 text-xs gap-1"
-                  disabled={!newFieldName.trim()}
-                  onClick={async () => {
-                    if (!newFieldName.trim() || !project?.id) return;
-                    const options = newFieldType === 'select'
-                      ? newFieldOptions.split(',').map(s => s.trim()).filter(Boolean)
-                      : [];
-                    await createCustomFieldDefinition(project.id, { name: newFieldName.trim(), fieldType: newFieldType, options });
-                    setNewFieldName('');
-                    setNewFieldOptions('');
-                    setNewFieldType('text');
-                  }}
-                >
-                  <Plus className="w-3 h-3" /> Add Field
-                </Button>
               </div>
             </TabsContent>
           )}
-        </Tabs>
 
-        <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t border-border mt-4">
-          {project && onDelete && (
-            <div className="flex items-center gap-2">
-              {isConfirmingDelete ? (
-                <>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    className="text-muted-foreground mr-1"
-                    onClick={() => setIsConfirmingDelete(false)}
-                  >
-                    Cancel
+          {/* ── Footer ─────────────────────────────────────────────────────── */}
+          <div className="shrink-0 px-6 py-4 border-t border-border/40 flex items-center justify-between gap-2">
+            {project && onDelete && (
+              isConfirmingDelete ? (
+                <div className="flex gap-2">
+                  <Button variant="destructive" size="sm" onClick={() => { onDelete(project.id); onOpenChange(false); }}>
+                    Confirm Delete
                   </Button>
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => {
-                      onDelete(project.id);
-                      onOpenChange(false);
-                    }}
-                  >
-                    Confirm
-                  </Button>
-                </>
+                  <Button variant="ghost" size="sm" onClick={() => setIsConfirmingDelete(false)}>Cancel</Button>
+                </div>
               ) : (
-                <Button 
-                  variant="ghost" 
-                  className="text-red-400 hover:text-red-500 hover:bg-red-400/10 font-semibold"
-                  onClick={() => setIsConfirmingDelete(true)}
-                >
-                  Delete Pod
+                <Button variant="ghost" size="sm" className="text-rose-400 hover:text-rose-500 hover:bg-rose-500/10 gap-1.5" onClick={() => setIsConfirmingDelete(true)}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
                 </Button>
-              )}
+              )
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button size="sm" onClick={handleSave} disabled={!name.trim()}>
+                {project ? 'Save Changes' : 'Create Project'}
+              </Button>
             </div>
-          )}
-          <div className="flex-1" />
-          <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-muted-foreground">Cancel</Button>
-          <Button 
-            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 font-bold px-6" 
-            onClick={handleSave}
-            disabled={!name.trim() || stages.length === 0}
-          >
-            {project ? 'Save Changes' : 'Create Pod'}
-          </Button>
-        </DialogFooter>
+          </div>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
