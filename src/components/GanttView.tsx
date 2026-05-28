@@ -1,8 +1,9 @@
 import React from 'react';
 import { Task, UserProfile, Stage } from '../types';
-import { addDays, format, startOfWeek, differenceInDays, parseISO } from 'date-fns';
+import { addDays, subDays, format, startOfWeek, differenceInDays, parseISO, min, max } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from './UserAvatar';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface GanttViewProps {
   tasks: Task[];
@@ -18,16 +19,13 @@ const PRIORITY_BAR: Record<string, string> = {
   low: 'bg-slate-500',
 };
 
+const MIN_DAYS = 28;
+const DAY_W = 40;
+const PAD_DAYS = 3;
+
 export function GanttView({ tasks, stages, users, onTaskClick }: GanttViewProps) {
   const today = React.useMemo(() => new Date(), []);
-  const weekStart = React.useMemo(() => startOfWeek(today, { weekStartsOn: 1 }), [today]);
-  const DAYS = 28;
-  const DAY_W = 40;
-
-  const days = React.useMemo(
-    () => Array.from({ length: DAYS }, (_, i) => addDays(weekStart, i)),
-    [weekStart]
-  );
+  const [offset, setOffset] = React.useState(0); // week offset for navigation
 
   const tasksWithDates = React.useMemo(
     () => tasks.filter(t => t.dueDate).map(t => {
@@ -38,23 +36,67 @@ export function GanttView({ tasks, stages, users, onTaskClick }: GanttViewProps)
     [tasks]
   );
 
+  // Compute window: cover all tasks + today, with padding, min 28 days
+  const { windowStart, DAYS } = React.useMemo(() => {
+    const baseStart = addDays(startOfWeek(today, { weekStartsOn: 1 }), offset * 7);
+    if (tasksWithDates.length === 0) {
+      return { windowStart: baseStart, DAYS: MIN_DAYS };
+    }
+    const allStarts = tasksWithDates.map(t => t.start);
+    const allEnds = tasksWithDates.map(t => t.end);
+    const earliest = min([...allStarts, today]);
+    const latest = max([...allEnds, today]);
+    const paddedStart = subDays(earliest, PAD_DAYS);
+    const paddedEnd = addDays(latest, PAD_DAYS);
+    const span = Math.max(MIN_DAYS, differenceInDays(paddedEnd, paddedStart) + 1);
+    // When navigating, respect manual offset; otherwise auto-fit
+    if (offset !== 0) return { windowStart: baseStart, DAYS: MIN_DAYS };
+    return { windowStart: paddedStart, DAYS: span };
+  }, [tasksWithDates, today, offset]);
+
+  const days = React.useMemo(
+    () => Array.from({ length: DAYS }, (_, i) => addDays(windowStart, i)),
+    [windowStart, DAYS]
+  );
+
   const getBarStyle = (start: Date, end: Date) => {
-    const rangeStart = weekStart;
-    const startOffset = Math.max(0, differenceInDays(start, rangeStart));
-    const endOffset = Math.min(DAYS, differenceInDays(end, rangeStart) + 1);
+    const startOffset = Math.max(0, differenceInDays(start, windowStart));
+    const endOffset = Math.min(DAYS, differenceInDays(end, windowStart) + 1);
     const width = Math.max(1, endOffset - startOffset);
     if (endOffset <= 0 || startOffset >= DAYS) return null;
     return { left: startOffset * DAY_W, width: width * DAY_W };
   };
 
-  const todayOffset = differenceInDays(today, weekStart);
+  const todayOffset = differenceInDays(today, windowStart);
 
   return (
     <div className="flex-1 overflow-auto p-4">
       <div className="min-w-max">
         {/* Header */}
         <div className="flex sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
-          <div className="w-56 shrink-0 px-4 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">Task</div>
+          <div className="w-56 shrink-0 px-4 py-2 flex items-center justify-between">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Task</span>
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => setOffset(o => o - 1)}
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-muted/60 text-muted-foreground/60 hover:text-foreground transition-colors"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setOffset(0)}
+                className="px-1.5 h-5 rounded text-[9px] font-semibold text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors"
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setOffset(o => o + 1)}
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-muted/60 text-muted-foreground/60 hover:text-foreground transition-colors"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
           <div className="flex">
             {days.map((d, i) => {
               const isToday = differenceInDays(d, today) === 0;
@@ -82,7 +124,7 @@ export function GanttView({ tasks, stages, users, onTaskClick }: GanttViewProps)
           {todayOffset >= 0 && todayOffset < DAYS && (
             <div
               className="absolute top-0 bottom-0 w-px bg-primary/50 z-10 pointer-events-none"
-              style={{ left: 256 + todayOffset * DAY_W + DAY_W / 2 }}
+              style={{ left: 224 + todayOffset * DAY_W + DAY_W / 2 }}
             />
           )}
 
