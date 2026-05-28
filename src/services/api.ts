@@ -231,13 +231,16 @@ export const fetchCompanies = async (): Promise<Company[]> => {
 
 export const createCompany = async (data: Partial<Company>): Promise<string> => {
   const userId = await getCurrentUserId();
+  // Always include the owner in member_ids and admin_ids so RLS policies work
+  const memberIds = [...new Set([userId, ...(data.memberIds ?? [])])];
+  const adminIds = [...new Set([userId, ...(data.adminIds ?? [])])];
   const { data: row, error } = await supabase
     .from('companies')
     .insert({
       name: data.name,
       owner_id: userId,
-      admin_ids: data.adminIds ?? [],
-      member_ids: data.memberIds ?? [],
+      admin_ids: adminIds,
+      member_ids: memberIds,
       location: data.location ?? null,
       website: data.website ?? null,
       industry: data.industry ?? null,
