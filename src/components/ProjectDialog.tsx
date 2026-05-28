@@ -142,12 +142,12 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
       <DialogContent className="bg-card border-border sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold tracking-tight text-foreground">
-            {project ? 'Workspace Settings' : 'New Workspace'}
+            {project ? 'Pod Settings' : 'New Pod'}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            {project 
-              ? 'Update your workspace details and members.' 
-              : 'Create a new workspace to organize your projects and tasks.'
+            {project
+              ? 'Update your pod details and members.'
+              : 'Create a new pod to organize your projects and tasks.'
             }
           </DialogDescription>
         </DialogHeader>
@@ -161,7 +161,7 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
           
           <TabsContent value="general" className="space-y-4 focus-visible:outline-none">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Workspace Name</label>
+              <label className="text-sm font-medium text-foreground">Pod Name</label>
               <Input 
                 value={name} 
                 onChange={(e) => setName(e.target.value)} 
@@ -174,14 +174,14 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
               <Textarea 
                 value={description} 
                 onChange={(e) => setDescription(e.target.value)} 
-                placeholder="What is this workspace about?" 
+                placeholder="What is this pod about?"
                 className="bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary resize-none h-24 text-foreground"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground flex justify-between items-center">
-                <span>Workspace Members</span>
+                <span>Pod Members</span>
                 <span className="text-xs text-muted-foreground">{members.length} selected</span>
               </label>
               <ScrollArea className="h-[150px] border border-border rounded-lg bg-muted/20 p-2">
@@ -280,13 +280,13 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
                 ))}
               </div>
             </ScrollArea>
-            <p className="text-xs text-muted-foreground">Adding, removing, or renaming columns applies instantly to the workspace board.</p>
+            <p className="text-xs text-muted-foreground">Adding, removing, or renaming columns applies instantly to the pod board.</p>
           </TabsContent>
 
           {project && (
             <TabsContent value="fields" className="space-y-4 focus-visible:outline-none">
               <p className="text-xs text-muted-foreground">
-                Custom fields appear in every task in this workspace. Only owners can manage them.
+                Custom fields appear in every task in this pod. Only owners can manage them.
               </p>
               <div className="space-y-2">
                 {customFields.length === 0 && (
@@ -389,7 +389,7 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
                   className="text-red-400 hover:text-red-500 hover:bg-red-400/10 font-semibold"
                   onClick={() => setIsConfirmingDelete(true)}
                 >
-                  Delete Workspace
+                  Delete Pod
                 </Button>
               )}
             </div>
@@ -401,7 +401,7 @@ export function ProjectDialog({ open, onOpenChange, project, users, currentUserI
             onClick={handleSave}
             disabled={!name.trim() || stages.length === 0}
           >
-            {project ? 'Save Changes' : 'Create Workspace'}
+            {project ? 'Save Changes' : 'Create Pod'}
           </Button>
         </DialogFooter>
       </DialogContent>

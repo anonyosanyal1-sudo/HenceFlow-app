@@ -148,7 +148,7 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground text-sm mt-1">Overview of tasks across all workspaces</p>
+          <p className="text-muted-foreground text-sm mt-1">Overview of tasks across all pods</p>
         </div>
         {activeProjectId && (
           <Button
@@ -204,7 +204,7 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
             </div>
             <p className="text-foreground font-semibold">No data yet</p>
             <p className="text-muted-foreground text-sm max-w-xs">
-              Create some tasks across your workspaces and come back to see analytics.
+              Create some tasks across your pods and come back to see analytics.
             </p>
           </CardContent>
         </Card>
@@ -279,7 +279,7 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
           {projectTaskData.length > 0 && (
             <Card className="bg-card border-border">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-foreground">Tasks per Workspace</CardTitle>
+                <CardTitle className="text-base font-semibold text-foreground">Tasks per Pod</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>

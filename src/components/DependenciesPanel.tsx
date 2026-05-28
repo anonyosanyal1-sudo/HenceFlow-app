@@ -16,13 +16,20 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
   const [blocking, setBlocking] = React.useState<TaskDependency[]>([]);
   const [search, setSearch] = React.useState('');
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
-    const result = await getDependencies(task.id);
-    setBlockedBy(result.blockedBy);
-    setBlocking(result.blocking);
-    setLoading(false);
+    setError(null);
+    try {
+      const result = await getDependencies(task.id);
+      setBlockedBy(result.blockedBy);
+      setBlocking(result.blocking);
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to load dependencies');
+    } finally {
+      setLoading(false);
+    }
   }, [task.id]);
 
   React.useEffect(() => { load(); }, [load]);
@@ -41,14 +48,24 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
     : [];
 
   const handleAdd = async (dependsOnId: string) => {
-    await addDependency(task.id, dependsOnId);
-    setSearch('');
-    load();
+    setError(null);
+    try {
+      await addDependency(task.id, dependsOnId);
+      setSearch('');
+      load();
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to add dependency');
+    }
   };
 
   const handleRemove = async (depId: string) => {
-    await removeDependency(depId);
-    load();
+    setError(null);
+    try {
+      await removeDependency(depId);
+      load();
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to remove dependency');
+    }
   };
 
   const getTask = (id: string) => allTasks.find(t => t.id === id);
@@ -60,6 +77,10 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
       <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
         Dependencies
       </label>
+
+      {error && (
+        <p className="text-xs text-red-400 bg-red-500/10 rounded-lg px-2 py-1.5">{error}</p>
+      )}
 
       {blockedBy.length > 0 && (
         <div className="space-y-1">
