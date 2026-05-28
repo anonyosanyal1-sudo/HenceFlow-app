@@ -49,6 +49,7 @@ import { Auth } from './components/Auth';
 import { TaskDialog } from './components/TaskDialog';
 import { ProjectDialog } from './components/ProjectDialog';
 import { CompanyDialog } from './components/CompanyDialog';
+import { CompanySettingsPage } from './components/CompanySettingsPage';
 import { ProfileSetup } from './components/ProfileSetup';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { MilestoneDialog } from './components/MilestoneDialog';
@@ -177,6 +178,7 @@ function AppContent() {
   const [selectedProjectForEdit, setSelectedProjectForEdit] = React.useState<Project | null>(null);
   const [companyDialogOpen, setCompanyDialogOpen] = React.useState(false);
   const [selectedCompanyForEdit, setSelectedCompanyForEdit] = React.useState<Company | null>(null);
+  const [showCompanySettings, setShowCompanySettings] = React.useState(false);
   const [profileSetupOpen, setProfileSetupOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -369,7 +371,8 @@ function AppContent() {
     website?: string;
     industry?: string;
     memberIds?: string[];
-    adminIds?: string[]
+    adminIds?: string[];
+    viewerIds?: string[];
   }) => {
     const targetId = selectedCompanyForEdit?.id ?? company?.id;
     if (targetId) {
@@ -663,8 +666,7 @@ function AppContent() {
                   setSidebarOpen(false);
                 }}
                 onCompanySettings={() => {
-                  setSelectedCompanyForEdit(company);
-                  setCompanyDialogOpen(true);
+                  setShowCompanySettings(true);
                   setSidebarOpen(false);
                 }}
                 onProjectSelect={(p) => {
@@ -686,11 +688,13 @@ function AppContent() {
                 onDashboardSelect={() => {
                   setActiveProject(null);
                   setActiveView('board');
+                  setShowCompanySettings(false);
                   setSidebarOpen(false);
                 }}
                 onAnalyticsSelect={() => {
                   setActiveProject(null);
                   setActiveView('analytics');
+                  setShowCompanySettings(false);
                   setSidebarOpen(false);
                 }}
                 onEditProfile={() => {
@@ -728,12 +732,12 @@ function AppContent() {
           setPodDialogOpen(true);
         }}
         onCompanySettings={() => {
-          setSelectedCompanyForEdit(company);
-          setCompanyDialogOpen(true);
+          setShowCompanySettings(true);
         }}
         onProjectSelect={(p) => {
           setActiveProject(p);
           setActiveView('board');
+          setShowCompanySettings(false);
         }}
         onNewProject={(pod) => {
           setSelectedProjectForEdit(null);
@@ -747,10 +751,12 @@ function AppContent() {
         onDashboardSelect={() => {
           setActiveProject(null);
           setActiveView('board');
+          setShowCompanySettings(false);
         }}
         onAnalyticsSelect={() => {
           setActiveProject(null);
           setActiveView('analytics');
+          setShowCompanySettings(false);
         }}
         onEditProfile={() => setProfileSetupOpen(true)}
         onLogout={logout}
@@ -788,6 +794,21 @@ function AppContent() {
             >
               Set up Company
             </Button>
+          </div>
+        ) : showCompanySettings && company ? (
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <CompanySettingsPage
+              company={company}
+              users={users}
+              currentUserId={user.uid}
+              onSave={async (data) => { await handleSaveCompany(data); }}
+              onDelete={handleDeleteCompany}
+              onBack={() => setShowCompanySettings(false)}
+              onInvite={() => {
+                setSelectedCompanyForEdit(company);
+                setCompanyDialogOpen(true);
+              }}
+            />
           </div>
         ) : activeView === 'analytics' ? (
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

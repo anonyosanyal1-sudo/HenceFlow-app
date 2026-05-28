@@ -33,6 +33,7 @@ function mapCompany(r: Record<string, any>): Company {
     ownerId: r.owner_id,
     adminIds: r.admin_ids ?? [],
     memberIds: r.member_ids ?? [],
+    viewerIds: r.viewer_ids ?? [],
     location: r.location ?? undefined,
     website: r.website ?? undefined,
     industry: r.industry ?? undefined,
@@ -255,6 +256,7 @@ export const updateCompany = async (companyId: string, updates: Partial<Company>
   if (updates.industry !== undefined) payload.industry = updates.industry;
   if (updates.adminIds !== undefined) payload.admin_ids = updates.adminIds;
   if (updates.memberIds !== undefined) payload.member_ids = updates.memberIds;
+  if (updates.viewerIds !== undefined) payload.viewer_ids = updates.viewerIds;
   const { error } = await supabase.from('companies').update(payload).eq('id', companyId);
   if (error) throw new Error(error.message);
 };

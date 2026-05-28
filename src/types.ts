@@ -16,6 +16,7 @@ export interface Company {
   ownerId: string;
   adminIds: string[];
   memberIds: string[];
+  viewerIds: string[];
   location?: string;
   website?: string;
   industry?: string;
