@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import {
   Task, Project, UserProfile, Comment, Company, Pod,
-  TaskDependency, TimeEntry, Milestone, ActivityLog,
+  TaskDependency, TaskRelation, TimeEntry, Milestone, ActivityLog,
   CustomFieldDefinition, CustomFieldValue, TaskTemplate, Subtask,
   Notification, TaskWatcher, SavedFilter, AutomationRule,
   Sprint, Goal, IntakeForm, IntakeSubmission, TaskApproval, DependencyRelationType,
@@ -182,11 +182,12 @@ function mapComment(r: Record<string, any>): Comment {
   };
 }
 
-function mapDependency(r: Record<string, any>): TaskDependency {
+function mapDependency(r: Record<string, any>): TaskRelation {
   return {
     id: r.id,
     taskId: r.task_id,
     dependsOnId: r.depends_on_id,
+    relationType: (r.relation_type ?? 'blocks') as DependencyRelationType,
     createdAt: r.created_at,
   };
 }
@@ -601,7 +602,7 @@ export const deleteComment = async (_p: string, _t: string, commentId: string) =
 
 // ── Task Dependencies ─────────────────────────────────────────────────────────
 
-export const getDependencies = async (taskId: string): Promise<{ blockedBy: TaskDependency[]; blocking: TaskDependency[] }> => {
+export const getDependencies = async (taskId: string): Promise<{ blockedBy: TaskRelation[]; blocking: TaskRelation[] }> => {
   const [{ data: blockedByData, error: err1 }, { data: blockingData, error: err2 }] = await Promise.all([
     supabase.from('task_dependencies').select('*').eq('task_id', taskId),
     supabase.from('task_dependencies').select('*').eq('depends_on_id', taskId),

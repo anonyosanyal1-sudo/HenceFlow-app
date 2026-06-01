@@ -238,6 +238,7 @@ function AppContent() {
   const [taskDialogOpen, setTaskDialogOpen] = React.useState(false);
   const [selectedTask, setSelectedTask] = React.useState<Task | null>(null);
   const [defaultStatus, setDefaultStatus] = React.useState<TaskStatus>('todo');
+  const [defaultDueDate, setDefaultDueDate] = React.useState('');
   const [projectDialogOpen, setProjectDialogOpen] = React.useState(false);
   const [selectedProjectForEdit, setSelectedProjectForEdit] = React.useState<Project | null>(null);
   const [companyDialogOpen, setCompanyDialogOpen] = React.useState(false);
@@ -528,6 +529,7 @@ function AppContent() {
       if (!activePod) return;
       setSelectedTask(null);
       setDefaultStatus('todo');
+      setDefaultDueDate('');
       setTaskDialogOpen(true);
     },
     onFocusSearch: () => searchInputRef.current?.focus(),
@@ -1424,7 +1426,7 @@ function AppContent() {
                   <Button
                     className="h-8 px-3 font-semibold text-primary-foreground shadow-md shadow-primary/20 border-0 hover:opacity-90 transition-opacity gap-1.5 rounded-lg text-xs"
                     style={{ background: 'linear-gradient(135deg, oklch(0.67 0.30 285), oklch(0.60 0.26 310))' }}
-                    onClick={() => { if (!activePod) return; setSelectedTask(null); setDefaultStatus('todo'); setTaskDialogOpen(true); }}
+                    onClick={() => { if (!activePod) return; setSelectedTask(null); setDefaultStatus('todo'); setDefaultDueDate(''); setTaskDialogOpen(true); }}
                   >
                     <span className="text-sm leading-none font-light">+</span>
                     <span className="hidden sm:inline">New task</span>
@@ -1467,8 +1469,8 @@ function AppContent() {
                   if (!activePod) return;
                   setSelectedTask(null);
                   setDefaultStatus('todo');
+                  setDefaultDueDate(dueDate);
                   setTaskDialogOpen(true);
-                  // Pass due date as query — will be set in the create dialog
                 }}
               />
             ) : (
@@ -1488,6 +1490,7 @@ function AppContent() {
                 onAddTask={(status) => {
                   setSelectedTask(null);
                   setDefaultStatus(status);
+                  setDefaultDueDate('');
                   setTaskDialogOpen(true);
                 }}
                 onStatusChange={(taskId, newStatus) => {
@@ -1545,6 +1548,7 @@ function AppContent() {
           task={selectedTask}
           activeProjectId={activeProject?.id}
           defaultStatus={defaultStatus}
+          defaultDueDate={defaultDueDate}
           users={companyUsers}
           stages={activePod?.stages?.length ? activePod.stages : DEFAULT_STAGES}
           milestones={milestones}
@@ -1700,40 +1704,48 @@ function AppContent() {
             if (isViewer) { toast.error('Viewers cannot edit tasks'); return; }
             const ids = Array.from(selectedTaskIds);
             const prev = tasks;
+            const prevAll = allTasks;
             setBulkLoading(true);
             setTasks(t => t.map(x => ids.includes(x.id) ? { ...x, status } : x));
+            setAllTasks(t => t.map(x => ids.includes(x.id) ? { ...x, status } : x));
             bulkUpdateTasks(ids, { status })
-              .catch(() => { setTasks(prev); toast.error('Bulk update failed'); })
+              .catch(() => { setTasks(prev); setAllTasks(prevAll); toast.error('Bulk update failed'); })
               .finally(() => { setBulkLoading(false); setSelectedTaskIds(new Set()); });
           }}
           onAssign={async (assigneeId) => {
             if (isViewer) { toast.error('Viewers cannot edit tasks'); return; }
             const ids = Array.from(selectedTaskIds);
             const prev = tasks;
+            const prevAll = allTasks;
             setBulkLoading(true);
             setTasks(t => t.map(x => ids.includes(x.id) ? { ...x, assigneeId: assigneeId ?? undefined } : x));
+            setAllTasks(t => t.map(x => ids.includes(x.id) ? { ...x, assigneeId: assigneeId ?? undefined } : x));
             bulkUpdateTasks(ids, { assigneeId: assigneeId ?? undefined })
-              .catch(() => { setTasks(prev); toast.error('Bulk update failed'); })
+              .catch(() => { setTasks(prev); setAllTasks(prevAll); toast.error('Bulk update failed'); })
               .finally(() => { setBulkLoading(false); setSelectedTaskIds(new Set()); });
           }}
           onSetPriority={async (priority: TaskPriority) => {
             if (isViewer) { toast.error('Viewers cannot edit tasks'); return; }
             const ids = Array.from(selectedTaskIds);
             const prev = tasks;
+            const prevAll = allTasks;
             setBulkLoading(true);
             setTasks(t => t.map(x => ids.includes(x.id) ? { ...x, priority } : x));
+            setAllTasks(t => t.map(x => ids.includes(x.id) ? { ...x, priority } : x));
             bulkUpdateTasks(ids, { priority })
-              .catch(() => { setTasks(prev); toast.error('Bulk update failed'); })
+              .catch(() => { setTasks(prev); setAllTasks(prevAll); toast.error('Bulk update failed'); })
               .finally(() => { setBulkLoading(false); setSelectedTaskIds(new Set()); });
           }}
           onSetMilestone={async (milestoneId) => {
             if (isViewer) { toast.error('Viewers cannot edit tasks'); return; }
             const ids = Array.from(selectedTaskIds);
             const prev = tasks;
+            const prevAll = allTasks;
             setBulkLoading(true);
             setTasks(t => t.map(x => ids.includes(x.id) ? { ...x, milestoneId: milestoneId ?? undefined } : x));
+            setAllTasks(t => t.map(x => ids.includes(x.id) ? { ...x, milestoneId: milestoneId ?? undefined } : x));
             bulkUpdateTasks(ids, { milestoneId: milestoneId ?? undefined })
-              .catch(() => { setTasks(prev); toast.error('Bulk update failed'); })
+              .catch(() => { setTasks(prev); setAllTasks(prevAll); toast.error('Bulk update failed'); })
               .finally(() => { setBulkLoading(false); setSelectedTaskIds(new Set()); });
           }}
           onDelete={async () => {

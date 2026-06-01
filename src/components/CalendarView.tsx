@@ -49,9 +49,10 @@ export function CalendarView({ tasks, projects, onTaskClick, onNewTask }: Calend
     const map = new Map<number, Task[]>();
     tasks.forEach(task => {
       if (!task.dueDate) return;
-      const d = new Date(task.dueDate);
-      if (d.getFullYear() === viewYear && d.getMonth() === viewMonth) {
-        const day = d.getDate();
+      const datePart = task.dueDate.split('T')[0];
+      const [y, mo, dy] = datePart.split('-').map(Number);
+      if (y === viewYear && mo - 1 === viewMonth) {
+        const day = dy;
         if (!map.has(day)) map.set(day, []);
         map.get(day)!.push(task);
       }
