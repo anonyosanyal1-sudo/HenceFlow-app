@@ -95,18 +95,18 @@ export function ProfileSetup({ open, onOpenChange, currentDisplayName, currentPh
 
           {/* Name */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Display Name</label>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Display Name</label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Alex Johnson"
-              className="bg-zinc-800/60 border-zinc-700 text-white placeholder:text-zinc-600 focus-visible:ring-primary h-11"
+              className="bg-muted/40 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary h-11"
             />
           </div>
 
           {/* Animal avatar grid */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Choose Animal Avatar
               {selectedEmoji && (
                 <button
@@ -118,7 +118,7 @@ export function ProfileSetup({ open, onOpenChange, currentDisplayName, currentPh
                 </button>
               )}
             </label>
-            <ScrollArea className="h-52 rounded-lg border border-zinc-700/50 bg-zinc-900/30 p-2">
+            <ScrollArea className="h-52 rounded-lg border border-border bg-muted/20 p-2">
               <div className="grid grid-cols-8 gap-1.5 p-1">
                 {ANIMAL_EMOJIS.map((emoji) => {
                   const isSelected = selectedEmoji === emoji;
@@ -128,10 +128,10 @@ export function ProfileSetup({ open, onOpenChange, currentDisplayName, currentPh
                       type="button"
                       onClick={() => setSelectedEmoji(isSelected ? null : emoji)}
                       className={cn(
-                        "relative w-full aspect-square rounded-lg flex items-center justify-center text-2xl transition-all hover:scale-110 hover:bg-zinc-700/60",
+                        "relative w-full aspect-square rounded-lg flex items-center justify-center text-2xl transition-all hover:scale-110 hover:bg-muted/60",
                         isSelected
                           ? "bg-primary/20 ring-2 ring-primary scale-110 shadow-md shadow-primary/20"
-                          : "bg-zinc-800/40"
+                          : "bg-muted/30"
                       )}
                       title={emoji}
                     >

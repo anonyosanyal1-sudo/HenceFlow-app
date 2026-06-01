@@ -2,11 +2,12 @@ import React from 'react';
 import {
   Layout, LogOut, ChevronRight, Plus, MoreVertical, Edit2,
   ChevronDown, BarChart3, UserCircle, Sun, Moon,
-  Sparkles, PanelLeft, FolderOpen, Layers,
+  Sparkles, PanelLeft,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { UserAvatar } from './UserAvatar';
 import { Button } from '@/components/ui/button';
-import { Project, Company, Pod } from '../types';
+import { Project, Company, Pod, AppUser } from '../types';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -33,7 +34,7 @@ interface SidebarProps {
   onDashboardSelect?: () => void;
   onEditProfile?: () => void;
   onCompanySettings?: () => void;
-  user: any;
+  user: AppUser | null;
   onClose?: () => void;
   className?: string;
   isCollapsed?: boolean;
@@ -94,7 +95,7 @@ export function Sidebar({
             <>
               <div className="flex items-center gap-2">
                 <Logo variant="wordmark" className="h-6 max-w-[110px] shrink-0" />
-                <span className="text-[10px] font-semibold text-muted-foreground/50 bg-muted/50 px-1.5 py-0.5 rounded-md">v2.4</span>
+                <span className="text-[10px] font-semibold text-muted-foreground/50 bg-muted/50 px-1.5 py-0.5 rounded-md">v{__APP_VERSION__}</span>
               </div>
               <div className="flex items-center gap-0.5">
                 {onToggleCollapse && (
@@ -351,7 +352,7 @@ export function Sidebar({
             </p>
             <button
               className="w-full text-xs font-semibold text-foreground bg-card/80 hover:bg-card border border-border/40 rounded-xl py-1.5 transition-colors"
-              onClick={() => alert('Upgrade plans are coming soon! Contact support@henceflow.com for early access.')}
+              onClick={() => toast.info('Upgrade plans coming soon!', { description: 'Contact support@henceflow.com for early access.' })}
             >
               See plans
             </button>

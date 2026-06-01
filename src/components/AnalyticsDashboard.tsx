@@ -95,7 +95,7 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
     if (!t.dueDate) return false;
     return new Date(t.dueDate) < new Date(new Date().setHours(0, 0, 0, 0)) && !isTaskClosed(t);
   }).length;
-  const myTasks = tasks.filter(t => t.assigneeId === currentUserId || t.creatorId === currentUserId).length;
+  const myTasks = tasks.filter(t => t.assigneeId === currentUserId).length;
 
   // Tasks by status — use stage labels instead of raw IDs
   const statusCounts = tasks.reduce<Record<string, number>>((acc, t) => {
@@ -127,10 +127,10 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
     .sort((a, b) => b.tasks - a.tasks)
     .slice(0, 8);
 
-  // Tasks by assignee
+  // Tasks by assignee (only tasks with an explicit assignee)
   const assigneeCounts = tasks.reduce<Record<string, number>>((acc, t) => {
-    const id = t.assigneeId || t.creatorId;
-    acc[id] = (acc[id] || 0) + 1;
+    if (!t.assigneeId) return acc;
+    acc[t.assigneeId] = (acc[t.assigneeId] || 0) + 1;
     return acc;
   }, {});
   const assigneeData = Object.entries(assigneeCounts)
@@ -188,7 +188,7 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
           glow="oklch(0.78 0.20 55)"
         />
         <StatCard
-          label="My Tasks"
+          label="Assigned to Me"
           value={myTasks}
           icon={<Clock className="w-5 h-5 text-sky-300" />}
           color="bg-sky-500/20 border border-sky-500/20"

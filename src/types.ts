@@ -193,9 +193,6 @@ export interface DatabaseErrorInfo {
   };
 }
 
-/** @deprecated Use DatabaseErrorInfo */
-export type FirestoreErrorInfo = DatabaseErrorInfo;
-
 export interface Notification {
   id: string;
   userId: string;

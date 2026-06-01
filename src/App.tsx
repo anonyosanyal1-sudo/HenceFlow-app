@@ -64,7 +64,7 @@ import { AutomationsDialog } from './components/AutomationsDialog';
 import { PodDialog } from './components/PodDialog';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { Logo } from './components/Logo';
-import { Hash, Filter, Search, Users, Menu, Settings, Milestone as MilestoneIcon, Layers, CheckSquare, Zap, Bookmark, BookmarkPlus, MoreHorizontal } from 'lucide-react';
+import { Hash, Filter, Search, Menu, Settings, Milestone as MilestoneIcon, CheckSquare, Zap, Bookmark, BookmarkPlus, MoreHorizontal } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -73,6 +73,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { motion, AnimatePresence } from 'motion/react';
+import { Toaster, toast } from 'sonner';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {
@@ -195,7 +196,7 @@ function AppContent() {
       if (appUser) {
         ensureUserProfile();
         // Show profile setup for new sign-ups that haven't set a name yet
-        if (event === 'SIGNED_IN' && !session?.user?.user_metadata?.full_name) {
+        if (event === 'SIGNED_IN' && !session?.user?.user_metadata?.full_name && !session?.user?.user_metadata?.name) {
           setProfileSetupOpen(true);
         }
       }
@@ -279,6 +280,7 @@ function AppContent() {
   }, [activeProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
+    setSelectionModeActive(false);
     if (!activePod) {
       setTasks([]);
       setSelectedTaskIds(new Set());
@@ -398,7 +400,7 @@ function AppContent() {
     onShowShortcuts: () => setShortcutsHelpOpen(true),
     onGoTimeline: () => { if (activePod) setActiveView('timeline'); },
     onGoBoard: () => setActiveView('board'),
-    onGoAnalytics: () => { setActiveProject(null); setActivePod(null); setActiveView('analytics'); },
+    onGoAnalytics: () => { setActivePod(null); setActiveView('analytics'); },
   }, !!user);
 
   const handleSaveCompany = async (data: {
@@ -597,6 +599,7 @@ function AppContent() {
       setTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
       setAllTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
       await updateTask(targetProjectId, selectedTask.id, taskData);
+      toast.success('Task updated');
       addActivityLog(selectedTask.id, targetProjectId, 'task_updated').catch(() => {});
       executeAutomations(targetProjectId, selectedTask.id, taskData);
     } else {
@@ -625,6 +628,7 @@ function AppContent() {
         const newId = await createTask(targetPodId, targetProjectId, taskData);
         setTasks(prev => prev.map(t => t.id === tempId ? { ...t, id: newId } : t));
         setAllTasks(prev => prev.map(t => t.id === tempId ? { ...t, id: newId } : t));
+        toast.success('Task created');
         addActivityLog(newId, targetProjectId, 'task_created').catch(() => {});
       } catch (err) {
         setTasks(prev => prev.filter(t => t.id !== tempId));
@@ -639,7 +643,7 @@ function AppContent() {
     setTasks(prev => prev.filter(t => t.id !== taskId));
     setAllTasks(prev => prev.filter(t => t.id !== taskId));
     deleteTask(targetProjectId, taskId)
-      .then(() => addActivityLog(taskId, targetProjectId, 'task_deleted').catch(() => {}))
+      .then(() => toast.success('Task deleted'))
       .catch(() => {});
   };
 
@@ -922,7 +926,7 @@ function AppContent() {
                     notifications={notifications}
                     onNotificationsChange={setNotifications}
                     onTaskClick={(taskId) => {
-                      const task = tasks.find(t => t.id === taskId);
+                      const task = allTasks.find(t => t.id === taskId);
                       if (task) { setSelectedTask(task); setTaskDialogOpen(true); }
                     }}
                   />
@@ -937,7 +941,7 @@ function AppContent() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9 pr-10 h-9 w-44 bg-muted/40 border-border/30 text-sm placeholder:text-muted-foreground/40 rounded-xl focus-visible:ring-primary/40"
                     />
-                    <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground/30 font-mono pointer-events-none">⌘K</kbd>
+                    <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground/30 font-mono pointer-events-none">/</kbd>
                   </div>
 
                   {/* Filters */}
@@ -961,9 +965,10 @@ function AppContent() {
                         <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                           value={filterPriority || ''} onChange={(e) => setFilterPriority(e.target.value || null)}>
                           <option value="">All Priorities</option>
-                          <option value="low">Low</option>
-                          <option value="medium">Medium</option>
+                          <option value="urgent">Urgent</option>
                           <option value="high">High</option>
+                          <option value="medium">Medium</option>
+                          <option value="low">Low</option>
                         </select>
                       </div>
                       <div className="space-y-2">
@@ -1286,6 +1291,8 @@ function AppContent() {
           open={shortcutsHelpOpen}
           onOpenChange={setShortcutsHelpOpen}
         />
+
+        <Toaster richColors position="bottom-right" />
 
         {/* Bulk action bar */}
         <BulkActionBar

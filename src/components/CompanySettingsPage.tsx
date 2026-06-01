@@ -97,7 +97,7 @@ export function CompanySettingsPage({
     onSave({
       name,
       location: location.trim() || undefined,
-      website: website.trim() ? `https://${website.trim()}` : undefined,
+      website: website.trim() ? `https://${website.trim().replace(/^https?:\/\//, '')}` : undefined,
       industry: industry.trim() || undefined,
       memberIds,
       adminIds,
@@ -179,13 +179,20 @@ export function CompanySettingsPage({
     setInviteOpen(false);
   };
 
+  const [, forceUpdate] = React.useReducer(x => x + 1, 0);
+  React.useEffect(() => {
+    if (!lastSaved) return;
+    const id = setInterval(forceUpdate, 30000);
+    return () => clearInterval(id);
+  }, [lastSaved]);
   const lastSavedText = React.useMemo(() => {
     if (!lastSaved) return null;
     const mins = Math.floor((Date.now() - lastSaved.getTime()) / 60000);
     if (mins < 1) return 'just now';
     if (mins === 1) return '1 minute ago';
     return `${mins} minutes ago`;
-  }, [lastSaved]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastSaved, forceUpdate]);
 
   const visibleUsers = users.filter(u => memberIds.includes(u.uid) || u.uid === company.ownerId);
 
@@ -224,10 +231,7 @@ export function CompanySettingsPage({
                 <p className="text-sm font-medium text-foreground">Company logo</p>
                 <p className="text-xs text-muted-foreground">SVG, PNG, or JPG up to 2MB. Square works best.</p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Button variant="outline" size="sm" className="h-9 border-border/60">Upload</Button>
-                <Button variant="ghost" size="sm" className="h-9 text-muted-foreground">Remove</Button>
-              </div>
+              <p className="text-xs text-muted-foreground/50 italic shrink-0">Logo upload coming soon</p>
             </div>
 
             {/* Company name */}
