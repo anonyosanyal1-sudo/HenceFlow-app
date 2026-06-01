@@ -160,6 +160,7 @@ function AppContent() {
   const [swimlaneBy, setSwimlaneBy] = React.useState<SwimlaneBy>(null);
   const [selectedTaskIds, setSelectedTaskIds] = React.useState<Set<string>>(new Set());
   const [selectionModeActive, setSelectionModeActive] = React.useState(false);
+  const [bulkLoading, setBulkLoading] = React.useState(false);
   const [milestones, setMilestones] = React.useState<Milestone[]>([]);
   const [customFieldDefs, setCustomFieldDefs] = React.useState<CustomFieldDefinition[]>([]);
   const [taskTemplates, setTaskTemplates] = React.useState<TaskTemplate[]>([]);
@@ -172,6 +173,8 @@ function AppContent() {
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const [savedFilters, setSavedFilters] = React.useState<SavedFilter[]>([]);
   const [automations, setAutomations] = React.useState<AutomationRule[]>([]);
+  const automationsRef = React.useRef<AutomationRule[]>([]);
+  React.useEffect(() => { automationsRef.current = automations; }, [automations]);
   const [automationsDialogOpen, setAutomationsDialogOpen] = React.useState(false);
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = React.useState(false);
   const [savingFilter, setSavingFilter] = React.useState(false);
@@ -203,6 +206,9 @@ function AppContent() {
         if (event === 'SIGNED_IN' && !session?.user?.user_metadata?.full_name && !session?.user?.user_metadata?.name) {
           setProfileSetupOpen(true);
         }
+      }
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        toast.error('Your session has expired. Please sign in again.');
       }
     });
 
@@ -365,10 +371,18 @@ function AppContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [milestoneDialogOpen]);
 
-  // Refresh task data when tab regains focus (catches missed real-time events)
+  // Refresh task data when tab regains focus only after extended absence (>60s).
+  // Realtime handles in-session updates; this is a fallback for missed events.
+  const hiddenAtRef = React.useRef<number | null>(null);
   React.useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === 'visible' && activePod) {
+      if (document.visibilityState === 'hidden') {
+        hiddenAtRef.current = Date.now();
+        return;
+      }
+      const hiddenMs = hiddenAtRef.current ? Date.now() - hiddenAtRef.current : 0;
+      hiddenAtRef.current = null;
+      if (hiddenMs > 60_000 && activePod) {
         loadPodData(activePod.id);
       }
     };
@@ -421,7 +435,7 @@ function AppContent() {
     onShowShortcuts: () => setShortcutsHelpOpen(true),
     onGoTimeline: () => { if (activePod) setActiveView('timeline'); },
     onGoBoard: () => setActiveView('board'),
-    onGoAnalytics: () => { setActivePod(null); setActiveView('analytics'); },
+    onGoAnalytics: () => { setActiveView('analytics'); },
   }, !!user);
 
   const handleSaveCompany = async (data: {
@@ -561,21 +575,22 @@ function AppContent() {
       company.ownerId !== user.uid),
   [company, user]);
 
+  const companyUserIds = React.useMemo(
+    () => (company ? [...new Set([company.ownerId, ...(company.memberIds ?? [])])] : []),
+    [company?.ownerId, company?.memberIds?.join(',')], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   const companyUsers = React.useMemo(() => {
-    if (!company) return [];
-    // Include owner even if not in memberIds, then company members
-    const ownerUser = users.find(u => u.uid === company.ownerId);
-    const memberUsers = users.filter(u => company.memberIds?.includes(u.uid));
-    const all = ownerUser ? [ownerUser, ...memberUsers.filter(u => u.uid !== company.ownerId)] : memberUsers;
-    return all;
-  }, [users, company]);
+    return users.filter(u => companyUserIds.includes(u.uid))
+      .sort((a, b) => (a.uid === company?.ownerId ? -1 : b.uid === company?.ownerId ? 1 : 0));
+  }, [users, companyUserIds, company?.ownerId]);
 
   const executeAutomations = React.useCallback(async (
     projectId: string,
     taskId: string,
     updates: Partial<Task>,
   ) => {
-    const rules = automations.filter(r => r.isActive && r.projectId === projectId);
+    const rules = automationsRef.current.filter(r => r.isActive && r.projectId === projectId);
     for (const rule of rules) {
       let triggered = false;
       if (rule.triggerType === 'status_changed' && updates.status !== undefined) {
@@ -592,8 +607,8 @@ function AppContent() {
         actionUpdates.status = rule.actionValue as TaskStatus;
       } else if (rule.actionType === 'set_priority' && rule.actionValue) {
         actionUpdates.priority = rule.actionValue as TaskPriority;
-      } else if (rule.actionType === 'set_assignee') {
-        actionUpdates.assigneeId = rule.actionValue || undefined;
+      } else if (rule.actionType === 'set_assignee' && rule.actionValue) {
+        actionUpdates.assigneeId = rule.actionValue;
       }
 
       if (Object.keys(actionUpdates).length > 0) {
@@ -602,8 +617,7 @@ function AppContent() {
         updateTask(projectId, taskId, actionUpdates).catch(() => {});
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [automations]);
+  }, []);
 
   const handleDeleteProject = async (projectId: string) => {
     const prevProjects = projects;
@@ -624,13 +638,21 @@ function AppContent() {
     const targetProjectId = selectedTask?.projectId ?? activeProject?.id;
     if (!targetPodId || !targetProjectId) return;
     if (selectedTask) {
+      const prevTasks = tasks;
+      const prevAllTasks = allTasks;
       const updatedTask = { ...selectedTask, ...taskData };
       setTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
       setAllTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
-      await updateTask(targetProjectId, selectedTask.id, taskData);
-      toast.success('Task updated');
-      addActivityLog(selectedTask.id, targetProjectId, 'task_updated').catch(() => {});
-      executeAutomations(targetProjectId, selectedTask.id, taskData);
+      try {
+        await updateTask(targetProjectId, selectedTask.id, taskData);
+        toast.success('Task updated');
+        addActivityLog(selectedTask.id, targetProjectId, 'task_updated').catch(() => {});
+        executeAutomations(targetProjectId, selectedTask.id, taskData);
+      } catch {
+        setTasks(prevTasks);
+        setAllTasks(prevAllTasks);
+        toast.error('Failed to save task');
+      }
     } else {
       const tempId = `temp-${Date.now()}`;
       const tempTask: Task = {
@@ -659,9 +681,10 @@ function AppContent() {
         setAllTasks(prev => prev.map(t => t.id === tempId ? { ...t, id: newId } : t));
         toast.success('Task created');
         addActivityLog(newId, targetProjectId, 'task_created').catch(() => {});
-      } catch (err) {
+      } catch {
         setTasks(prev => prev.filter(t => t.id !== tempId));
         setAllTasks(prev => prev.filter(t => t.id !== tempId));
+        toast.error('Failed to create task');
       }
     }
   };
@@ -928,12 +951,13 @@ function AppContent() {
                     <div className="flex items-center gap-1.5 min-w-0">
                       <button
                         onClick={() => setActivePod(null)}
-                        className="text-muted-foreground/60 hover:text-muted-foreground text-xs font-medium truncate hidden sm:block transition-colors"
+                        className="text-muted-foreground/60 hover:text-muted-foreground text-xs font-medium truncate hidden sm:block transition-colors max-w-[120px]"
+                        title={activeProject.name}
                       >
                         {activeProject.name}
                       </button>
                       <span className="text-muted-foreground/30 hidden sm:block text-xs">/</span>
-                      <span className="font-bold text-foreground text-sm truncate leading-tight">
+                      <span className="font-bold text-foreground text-sm truncate leading-tight max-w-[160px]" title={activePod.name}>
                         {activePod.name}
                       </span>
                       <button
@@ -1250,12 +1274,21 @@ function AppContent() {
                     .then(() => executeAutomations(activeProject.id, taskId, { status: newStatus }))
                     .catch(() => {
                       if (prevStatus !== undefined) applyStatus(prevStatus);
+                      toast.error('Failed to update status');
                     });
                 }}
                 onSelectionChange={setSelectedTaskIds}
                 onInlineEdit={async (taskId, newTitle) => {
-                  setTasks(prev => prev.map(t => t.id === taskId ? { ...t, title: newTitle } : t));
-                  await updateTask(activeProject.id, taskId, { title: newTitle });
+                  const prev = tasks.find(t => t.id === taskId)?.title;
+                  setTasks(pv => pv.map(t => t.id === taskId ? { ...t, title: newTitle } : t));
+                  setAllTasks(pv => pv.map(t => t.id === taskId ? { ...t, title: newTitle } : t));
+                  updateTask(activeProject.id, taskId, { title: newTitle }).catch(() => {
+                    if (prev !== undefined) {
+                      setTasks(pv => pv.map(t => t.id === taskId ? { ...t, title: prev } : t));
+                      setAllTasks(pv => pv.map(t => t.id === taskId ? { ...t, title: prev } : t));
+                    }
+                    toast.error('Failed to rename task');
+                  });
                 }}
               />
             )}
@@ -1360,48 +1393,63 @@ function AppContent() {
         {/* Bulk action bar */}
         <BulkActionBar
           selectedIds={selectedTaskIds}
-          onClear={() => setSelectedTaskIds(new Set())}
+          loading={bulkLoading}
+          onClear={() => { setSelectedTaskIds(new Set()); setBulkLoading(false); }}
           stages={activePod?.stages?.length ? activePod.stages : DEFAULT_STAGES}
           users={companyUsers}
           milestones={milestones}
           onMoveToStage={async (status) => {
+            if (isViewer) { toast.error('Viewers cannot edit tasks'); return; }
             const ids = Array.from(selectedTaskIds);
             const prev = tasks;
+            setBulkLoading(true);
             setTasks(t => t.map(x => ids.includes(x.id) ? { ...x, status } : x));
-            bulkUpdateTasks(ids, { status }).catch(() => { setTasks(prev); toast.error('Bulk update failed'); });
-            setSelectedTaskIds(new Set());
+            bulkUpdateTasks(ids, { status })
+              .catch(() => { setTasks(prev); toast.error('Bulk update failed'); })
+              .finally(() => { setBulkLoading(false); setSelectedTaskIds(new Set()); });
           }}
           onAssign={async (assigneeId) => {
+            if (isViewer) { toast.error('Viewers cannot edit tasks'); return; }
             const ids = Array.from(selectedTaskIds);
             const prev = tasks;
+            setBulkLoading(true);
             setTasks(t => t.map(x => ids.includes(x.id) ? { ...x, assigneeId: assigneeId ?? undefined } : x));
-            bulkUpdateTasks(ids, { assigneeId: assigneeId ?? undefined }).catch(() => { setTasks(prev); toast.error('Bulk update failed'); });
-            setSelectedTaskIds(new Set());
+            bulkUpdateTasks(ids, { assigneeId: assigneeId ?? undefined })
+              .catch(() => { setTasks(prev); toast.error('Bulk update failed'); })
+              .finally(() => { setBulkLoading(false); setSelectedTaskIds(new Set()); });
           }}
           onSetPriority={async (priority: TaskPriority) => {
+            if (isViewer) { toast.error('Viewers cannot edit tasks'); return; }
             const ids = Array.from(selectedTaskIds);
             const prev = tasks;
+            setBulkLoading(true);
             setTasks(t => t.map(x => ids.includes(x.id) ? { ...x, priority } : x));
-            bulkUpdateTasks(ids, { priority }).catch(() => { setTasks(prev); toast.error('Bulk update failed'); });
-            setSelectedTaskIds(new Set());
+            bulkUpdateTasks(ids, { priority })
+              .catch(() => { setTasks(prev); toast.error('Bulk update failed'); })
+              .finally(() => { setBulkLoading(false); setSelectedTaskIds(new Set()); });
           }}
           onSetMilestone={async (milestoneId) => {
+            if (isViewer) { toast.error('Viewers cannot edit tasks'); return; }
             const ids = Array.from(selectedTaskIds);
             const prev = tasks;
+            setBulkLoading(true);
             setTasks(t => t.map(x => ids.includes(x.id) ? { ...x, milestoneId: milestoneId ?? undefined } : x));
-            bulkUpdateTasks(ids, { milestoneId: milestoneId ?? undefined }).catch(() => { setTasks(prev); toast.error('Bulk update failed'); });
-            setSelectedTaskIds(new Set());
+            bulkUpdateTasks(ids, { milestoneId: milestoneId ?? undefined })
+              .catch(() => { setTasks(prev); toast.error('Bulk update failed'); })
+              .finally(() => { setBulkLoading(false); setSelectedTaskIds(new Set()); });
           }}
           onDelete={async () => {
+            if (isViewer) { toast.error('Viewers cannot delete tasks'); return; }
             const ids = Array.from(selectedTaskIds);
             const prevTasks = tasks;
             const prevAll = allTasks;
+            setBulkLoading(true);
             setTasks(t => t.filter(x => !ids.includes(x.id)));
             setAllTasks(t => t.filter(x => !ids.includes(x.id)));
             bulkDeleteTasks(ids)
               .then(() => toast.success(`${ids.length} tasks deleted`))
-              .catch(() => { setTasks(prevTasks); setAllTasks(prevAll); toast.error('Bulk delete failed'); });
-            setSelectedTaskIds(new Set());
+              .catch(() => { setTasks(prevTasks); setAllTasks(prevAll); toast.error('Bulk delete failed'); })
+              .finally(() => { setBulkLoading(false); setSelectedTaskIds(new Set()); });
           }}
         />
       </main>

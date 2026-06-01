@@ -190,6 +190,7 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
         <StatCard
           label="Assigned to Me"
           value={myTasks}
+          sub={myTasks === 0 ? 'None assigned to you' : undefined}
           icon={<Clock className="w-5 h-5 text-sky-300" />}
           color="bg-sky-500/20 border border-sky-500/20"
           glow="oklch(0.73 0.21 210)"

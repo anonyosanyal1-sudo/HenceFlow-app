@@ -60,10 +60,15 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
 
   const handleRemove = async (depId: string) => {
     setError(null);
+    const prevBlockedBy = blockedBy;
+    const prevBlocking = blocking;
+    setBlockedBy(prev => prev.filter(d => d.id !== depId));
+    setBlocking(prev => prev.filter(d => d.id !== depId));
     try {
       await removeDependency(depId);
-      load();
     } catch (e: any) {
+      setBlockedBy(prevBlockedBy);
+      setBlocking(prevBlocking);
       setError(e?.message ?? 'Failed to remove dependency');
     }
   };
@@ -96,6 +101,7 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
                 </span>
                 <button
                   onClick={() => handleRemove(dep.id)}
+                  aria-label="Remove dependency"
                   className="opacity-0 group-hover:opacity-100 text-muted-foreground/50 hover:text-red-400 transition-all"
                 >
                   <X className="w-3 h-3" />
@@ -114,10 +120,17 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
           {blocking.map(dep => {
             const t = getTask(dep.taskId);
             return (
-              <div key={dep.id} className="flex items-center gap-2">
+              <div key={dep.id} className="flex items-center gap-2 group">
                 <span className="text-xs flex-1 text-muted-foreground truncate">
                   {t?.title ?? dep.taskId.slice(0, 8)}
                 </span>
+                <button
+                  onClick={() => handleRemove(dep.id)}
+                  aria-label="Remove dependency"
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground/50 hover:text-red-400 transition-all"
+                >
+                  <X className="w-3 h-3" />
+                </button>
               </div>
             );
           })}

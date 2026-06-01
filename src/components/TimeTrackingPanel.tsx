@@ -23,10 +23,12 @@ function formatMinutes(mins: number): string {
 export function TimeTrackingPanel({ taskId, projectId, currentUserId, users }: TimeTrackingPanelProps) {
   const [entries, setEntries] = React.useState<TimeEntry[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
   const [hours, setHours] = React.useState('');
   const [minutes, setMinutes] = React.useState('');
   const [note, setNote] = React.useState('');
   const [saving, setSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
 
   // Live timer state
   const [timerRunning, setTimerRunning] = React.useState(false);
@@ -35,9 +37,15 @@ export function TimeTrackingPanel({ taskId, projectId, currentUserId, users }: T
 
   const load = React.useCallback(async () => {
     setLoading(true);
-    const data = await getTimeEntries(taskId);
-    setEntries(data);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const data = await getTimeEntries(taskId);
+      setEntries(data);
+    } catch {
+      setLoadError('Failed to load time entries');
+    } finally {
+      setLoading(false);
+    }
   }, [taskId]);
 
   React.useEffect(() => { load(); }, [load]);
@@ -62,17 +70,27 @@ export function TimeTrackingPanel({ taskId, projectId, currentUserId, users }: T
     const totalMins = (parseInt(hours || '0') * 60) + parseInt(minutes || '0');
     if (totalMins <= 0) return;
     setSaving(true);
-    await logTime(taskId, projectId, totalMins, note.trim() || undefined);
-    setHours('');
-    setMinutes('');
-    setNote('');
-    setSaving(false);
-    load();
+    setSaveError(null);
+    try {
+      await logTime(taskId, projectId, totalMins, note.trim() || undefined);
+      setHours('');
+      setMinutes('');
+      setNote('');
+      load();
+    } catch {
+      setSaveError('Failed to log time');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
-    await deleteTimeEntry(id);
-    load();
+    try {
+      await deleteTimeEntry(id);
+      load();
+    } catch {
+      // entry will reappear on next load
+    }
   };
 
   const total = entries.reduce((sum, e) => sum + e.minutes, 0);
@@ -87,8 +105,15 @@ export function TimeTrackingPanel({ taskId, projectId, currentUserId, users }: T
     return [h, m, sec].map(n => String(n).padStart(2, '0')).join(':');
   };
 
+  if (loadError) {
+    return <p className="text-xs text-red-400 bg-red-500/10 rounded-lg px-3 py-2 mt-2">{loadError}</p>;
+  }
+
   return (
     <div className="space-y-4">
+      {saveError && (
+        <p className="text-xs text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{saveError}</p>
+      )}
       {/* Summary */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-muted/40 rounded-xl p-3 text-center">
@@ -163,7 +188,7 @@ export function TimeTrackingPanel({ taskId, projectId, currentUserId, users }: T
                 {entry.note && <span className="text-muted-foreground/50"> · {entry.note}</span>}
               </span>
               <span className="text-muted-foreground/40 shrink-0">
-                {formatDistanceToNow(new Date(entry.loggedAt), { addSuffix: true })}
+                {entry.loggedAt ? formatDistanceToNow(new Date(entry.loggedAt), { addSuffix: true }) : ''}
               </span>
               {entry.userId === currentUserId && (
                 <button

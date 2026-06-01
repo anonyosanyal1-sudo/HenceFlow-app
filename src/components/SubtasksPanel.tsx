@@ -69,6 +69,7 @@ export function SubtasksPanel({ subtasks, onChange, readOnly }: SubtasksPanelPro
             {!readOnly && (
               <button
                 onClick={() => remove(s.id)}
+                aria-label="Remove subtask"
                 className="opacity-0 group-hover:opacity-100 text-muted-foreground/50 hover:text-red-400 transition-all"
               >
                 <X className="w-3 h-3" />
@@ -85,6 +86,7 @@ export function SubtasksPanel({ subtasks, onChange, readOnly }: SubtasksPanelPro
             onChange={e => setNewTitle(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addSubtask()}
             placeholder="Add subtask…"
+            maxLength={200}
             className="h-8 text-sm bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary"
           />
           <Button

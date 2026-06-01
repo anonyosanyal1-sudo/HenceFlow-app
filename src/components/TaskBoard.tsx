@@ -136,6 +136,7 @@ function TaskCard({ task, index, users, milestones, selected, selectionMode, onC
                     ref={inputRef}
                     className="text-sm font-semibold text-foreground leading-snug w-full bg-transparent border-b border-primary outline-none"
                     value={editTitle}
+                    maxLength={200}
                     onChange={e => setEditTitle(e.target.value)}
                     onKeyDown={e => {
                       if (e.key === 'Enter') {
@@ -145,6 +146,7 @@ function TaskCard({ task, index, users, milestones, selected, selectionMode, onC
                       if (e.key === 'Escape') { setEditing(false); setEditTitle(task.title); }
                     }}
                     onBlur={() => {
+                      if (snapshot.isDragging) return;
                       setEditing(false);
                       if (editTitle.trim() && editTitle !== task.title) onInlineEdit?.(task.id, editTitle.trim());
                     }}
@@ -267,6 +269,11 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
               snapshot.isDraggingOver ? "bg-primary/5 rounded-xl" : ""
             )}
           >
+            {tasks.length === 0 && !snapshot.isDraggingOver && (
+              <div className="flex items-center justify-center h-12 text-[11px] text-muted-foreground/30 italic select-none">
+                Drop tasks here
+              </div>
+            )}
             {tasks.map((task, index) => (
               <TaskCard
                 key={task.id}
