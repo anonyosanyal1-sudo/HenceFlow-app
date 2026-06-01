@@ -152,6 +152,7 @@ export function TaskDialog({
     if (tpl.template.status) setStatus(tpl.template.status);
     if (tpl.template.assigneeId) setAssigneeId(tpl.template.assigneeId);
     if (tpl.template.recurrenceRule) setRecurrenceRule(tpl.template.recurrenceRule);
+    if (tpl.template.subtasks?.length) setLocalSubtasks(tpl.template.subtasks as import('../types').Subtask[]);
   };
 
   const handleSaveTemplate = async () => {
@@ -172,7 +173,7 @@ export function TaskDialog({
   if (!task) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent showCloseButton={false} className="sm:max-w-[580px] bg-card border-border p-0 gap-0 overflow-hidden">
+        <DialogContent showCloseButton={false} className="max-w-[95vw] sm:max-w-[580px] bg-card border-border p-0 gap-0 overflow-hidden">
           <DialogDescription className="sr-only">Create a new task</DialogDescription>
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border/30">

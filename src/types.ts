@@ -109,7 +109,7 @@ export interface Comment {
   userId: string;
   content: string;
   attachments?: string[];
-  createdAt: any;
+  createdAt: string;
   likes?: string[];
   dislikes?: string[];
   isEdited?: boolean;
@@ -223,6 +223,7 @@ export interface SavedFilter {
     filterCreator?: string | null;
     filterPriority?: string | null;
     filterDueDate?: string | null;
+    swimlaneBy?: string | null;
   };
   createdAt: string;
 }
