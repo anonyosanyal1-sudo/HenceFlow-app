@@ -89,11 +89,17 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
 
   const isTaskClosed = (t: Task) => t.status === (projectClosedStage.get(t.projectId) ?? 'closed');
 
+  const todayMidnight = React.useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
   const totalTasks = tasks.length;
   const closedTasks = tasks.filter(isTaskClosed).length;
   const overdueTasks = tasks.filter(t => {
     if (!t.dueDate) return false;
-    return new Date(t.dueDate) < new Date(new Date().setHours(0, 0, 0, 0)) && !isTaskClosed(t);
+    return new Date(t.dueDate) < todayMidnight && !isTaskClosed(t);
   }).length;
   const myTasks = tasks.filter(t => t.assigneeId === currentUserId).length;
 
@@ -190,6 +196,7 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
         <StatCard
           label="Assigned to Me"
           value={myTasks}
+          sub={myTasks === 0 ? 'None assigned to you' : undefined}
           icon={<Clock className="w-5 h-5 text-sky-300" />}
           color="bg-sky-500/20 border border-sky-500/20"
           glow="oklch(0.73 0.21 210)"

@@ -82,6 +82,16 @@ export function TaskDialog({
   const [watchers, setWatchers] = React.useState<TaskWatcher[]>([]);
   const isWatching = watchers.some(w => w.userId === currentUserId);
   const [isDirty, setIsDirty] = React.useState(false);
+  const [confirmDiscard, setConfirmDiscard] = React.useState(false);
+
+  const requestClose = (open: boolean) => {
+    if (!open && isDirty && task) {
+      setConfirmDiscard(true);
+      return;
+    }
+    setConfirmDiscard(false);
+    onOpenChange(open);
+  };
 
   const projectId = task?.projectId || activeProjectId || '';
 
@@ -158,10 +168,15 @@ export function TaskDialog({
   const handleSaveTemplate = async () => {
     if (!templateName.trim() || !projectId) return;
     setSavingTemplate(true);
-    await createTaskTemplate(projectId, templateName.trim(), { title, description, priority, status, assigneeId, recurrenceRule });
-    setTemplateName('');
-    setSavingTemplate(false);
-    setShowTemplateSave(false);
+    try {
+      await createTaskTemplate(projectId, templateName.trim(), { title, description, priority, status, assigneeId, recurrenceRule });
+      setTemplateName('');
+      setShowTemplateSave(false);
+    } catch {
+      // keep the dialog open so the user can retry
+    } finally {
+      setSavingTemplate(false);
+    }
   };
 
   const assignee = users.find(u => u.uid === assigneeId);
@@ -204,6 +219,7 @@ export function TaskDialog({
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Task title…"
+              maxLength={200}
               className="text-lg font-semibold bg-transparent border-none focus-visible:ring-0 shadow-none px-0 placeholder:text-muted-foreground/40 text-foreground h-auto py-0"
               autoFocus
             />
@@ -320,8 +336,8 @@ export function TaskDialog({
 
   // ─── EDIT MODE ────────────────────────────────────────────────────────────────
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="sm:max-w-[920px] h-[88vh] flex flex-col bg-card border-border p-0 gap-0 overflow-hidden">
+    <Dialog open={open} onOpenChange={requestClose}>
+      <DialogContent showCloseButton={false} className="max-w-[95vw] sm:max-w-[920px] h-[88vh] flex flex-col bg-card border-border p-0 gap-0 overflow-hidden">
         <DialogDescription className="sr-only">Edit task details</DialogDescription>
 
         {/* ── Top header (shrink-0) ────────────────────────────────────── */}
@@ -361,7 +377,7 @@ export function TaskDialog({
                   </button>
                 )
               )}
-              <button onClick={() => onOpenChange(false)} className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-muted/50 transition-colors">
+              <button onClick={() => requestClose(false)} aria-label="Close" className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-muted/50 transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -371,6 +387,7 @@ export function TaskDialog({
           <Input
             value={title}
             onChange={e => { setTitle(e.target.value); markDirty(); }}
+            maxLength={200}
             className="text-xl font-bold bg-transparent border-none focus-visible:ring-0 shadow-none px-0 placeholder:text-muted-foreground/30 text-foreground h-auto py-0 mb-0"
             placeholder="Task title…"
           />
@@ -623,7 +640,14 @@ export function TaskDialog({
 
           {/* ── Footer ──────────────────────────────────────────────── */}
           <div className="shrink-0 flex items-center justify-end gap-2 px-6 py-4 border-t border-border/30 bg-card">
-            <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-muted-foreground">
+            {confirmDiscard && (
+              <div className="flex items-center gap-2 mr-auto text-xs text-amber-400">
+                <span>Discard unsaved changes?</span>
+                <button onClick={() => { setConfirmDiscard(false); setIsDirty(false); onOpenChange(false); }} className="font-semibold underline hover:text-amber-300">Discard</button>
+                <button onClick={() => setConfirmDiscard(false)} className="text-muted-foreground hover:text-foreground">Keep editing</button>
+              </div>
+            )}
+            <Button variant="ghost" onClick={() => requestClose(false)} className="text-muted-foreground">
               Cancel
             </Button>
             <Button

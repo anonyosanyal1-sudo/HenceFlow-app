@@ -243,6 +243,7 @@ export function CompanySettingsPage({
               <Input
                 value={name}
                 onChange={e => { setName(e.target.value); mark(); }}
+                maxLength={100}
                 className="bg-background border-border/60 focus-visible:ring-1 focus-visible:ring-primary"
               />
             </div>

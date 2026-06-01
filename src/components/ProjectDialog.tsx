@@ -130,6 +130,7 @@ export function ProjectDialog({
                 placeholder="e.g. Website Redesign"
                 value={name}
                 onChange={e => setName(e.target.value)}
+                maxLength={100}
                 className="h-10"
                 autoFocus
               />

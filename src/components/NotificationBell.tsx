@@ -87,7 +87,7 @@ export function NotificationBell({ notifications, onNotificationsChange, onTaskC
                   <p className="text-xs font-semibold text-foreground leading-tight">{n.title}</p>
                   <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5 line-clamp-2">{n.message}</p>
                   <p className="text-[10px] text-muted-foreground/50 mt-1">
-                    {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                    {n.createdAt ? (() => { try { return formatDistanceToNow(new Date(n.createdAt), { addSuffix: true }); } catch { return ''; } })() : ''}
                   </p>
                 </div>
                 <button

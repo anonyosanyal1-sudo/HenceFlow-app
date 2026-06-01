@@ -99,7 +99,10 @@ export function GanttView({ tasks, stages, users, onTaskClick }: GanttViewProps)
               </button>
               <button
                 onClick={scrollToToday}
-                className="px-1.5 h-5 rounded text-[9px] font-semibold text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors"
+                className={cn(
+                  "px-1.5 h-5 rounded text-[9px] font-semibold transition-colors",
+                  offset === 0 ? "text-primary bg-primary/10" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/60"
+                )}
               >
                 Today
               </button>
@@ -181,7 +184,7 @@ export function GanttView({ tasks, stages, users, onTaskClick }: GanttViewProps)
                         )}
                         style={{ left: bar.left, width: bar.width }}
                         onClick={() => onTaskClick(task)}
-                        title={`${task.title} — due ${format(end, 'MMM d')}`}
+                        title={bar.width >= DAY_W ? `${task.title} — due ${format(end, 'MMM d')}` : task.title}
                       >
                         <span className="text-[9px] text-white font-bold truncate">{bar.width > 60 ? task.title : ''}</span>
                       </div>

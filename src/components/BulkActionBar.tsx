@@ -1,5 +1,6 @@
 import React from 'react';
 import { Task, TaskStatus, TaskPriority, UserProfile, Stage, Milestone } from '../types';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -19,11 +20,12 @@ interface BulkActionBarProps {
   onSetPriority: (priority: TaskPriority) => void;
   onSetMilestone: (milestoneId: string | null) => void;
   onDelete: () => void;
+  loading?: boolean;
 }
 
 export function BulkActionBar({
   selectedIds, onClear, stages, users, milestones,
-  onMoveToStage, onAssign, onSetPriority, onSetMilestone, onDelete,
+  onMoveToStage, onAssign, onSetPriority, onSetMilestone, onDelete, loading = false,
 }: BulkActionBarProps) {
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const count = selectedIds.size;
@@ -38,9 +40,9 @@ export function BulkActionBar({
           transition={{ type: 'spring', damping: 20, stiffness: 200 }}
           className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
         >
-          <div className="flex items-center gap-3 bg-card border border-border shadow-2xl rounded-2xl px-4 py-3">
+          <div className={cn("flex items-center gap-3 bg-card border border-border shadow-2xl rounded-2xl px-4 py-3", loading && "opacity-60 pointer-events-none")}>
             <span className="text-sm font-bold text-foreground min-w-[60px]">
-              {count} selected
+              {loading ? 'Working…' : `${count} selected`}
             </span>
             <div className="w-px h-6 bg-border" />
 

@@ -127,7 +127,7 @@ export function PodDialog({ open, onOpenChange, pod, users, currentUserId, onSav
           <TabsContent value="general" className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 pt-4 mt-0 space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pod Name *</label>
-              <Input placeholder="e.g. Frontend Team" value={name} onChange={e => setName(e.target.value)} className="h-10" autoFocus />
+              <Input placeholder="e.g. Frontend Team" value={name} onChange={e => setName(e.target.value)} maxLength={100} className="h-10" autoFocus />
             </div>
 
             <div className="space-y-1.5">

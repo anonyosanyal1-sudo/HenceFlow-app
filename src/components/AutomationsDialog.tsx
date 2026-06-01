@@ -21,14 +21,12 @@ const TRIGGER_LABELS: Record<string, string> = {
   status_changed: 'Status changed to',
   priority_changed: 'Priority changed to',
   assignee_changed: 'Assigned to',
-  due_date_overdue: 'Due date is overdue',
 };
 
 const ACTION_LABELS: Record<string, string> = {
   set_assignee: 'Assign to',
   set_priority: 'Set priority to',
   set_status: 'Set status to',
-  notify_watchers: 'Notify watchers',
 };
 
 const PRIORITY_OPTIONS = ['low', 'medium', 'high', 'urgent'];
@@ -84,9 +82,6 @@ export function AutomationsDialog({ open, onOpenChange, projectId, automations, 
           {PRIORITY_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
       );
-    }
-    if (triggerType === 'due_date_overdue') {
-      return <span className="flex-1 flex items-center text-xs text-muted-foreground italic px-2">No value needed</span>;
     }
     return <Input className="flex-1 h-9" placeholder="Value" value={triggerValue} onChange={e => setTriggerValue(e.target.value)} />;
   };
@@ -168,7 +163,7 @@ export function AutomationsDialog({ open, onOpenChange, projectId, automations, 
               <select className="flex-1 h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground" value={actionType} onChange={e => setActionType(e.target.value)}>
                 {Object.entries(ACTION_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
-              {actionType !== 'notify_watchers' && <ActionValueSelect />}
+              <ActionValueSelect />
             </div>
             <Button className="w-full h-9" onClick={handleCreate} disabled={saving || !name.trim()}>
               <Plus className="w-4 h-4 mr-2" />

@@ -142,7 +142,7 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
                       </span>
                       <span className="text-[10px] text-muted-foreground flex items-center">
                         <Clock className="w-2.5 h-2.5 mr-1" />
-                        {comment.createdAt ? formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true }) : 'just now'}
+                        {comment.createdAt ? (() => { try { return formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true }); } catch { return 'just now'; } })() : 'just now'}
                       </span>
                     </div>
                     {isMe && (
@@ -234,6 +234,7 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
           <Textarea
             placeholder="Write a comment… (Ctrl+Enter to send)"
             value={newComment}
+            maxLength={2000}
             onChange={(e) => setNewComment(e.target.value)}
             className={cn(
               "min-h-[80px] bg-muted/30 border-border focus-visible:ring-1 focus-visible:ring-primary rounded-xl pr-14 text-sm resize-none shadow-sm text-foreground",
