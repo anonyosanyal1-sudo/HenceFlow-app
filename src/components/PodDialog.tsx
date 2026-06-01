@@ -160,7 +160,12 @@ export function PodDialog({ open, onOpenChange, pod, users, currentUserId, onSav
                       className="flex items-center gap-3 p-2 hover:bg-muted/50 rounded-md transition-colors cursor-pointer"
                       onClick={() => toggleMember(u.uid)}
                     >
-                      <Checkbox checked={members.includes(u.uid)} className="border-primary data-[state=checked]:bg-primary" />
+                      <Checkbox
+                        checked={members.includes(u.uid)}
+                        onCheckedChange={() => toggleMember(u.uid)}
+                        onClick={e => e.stopPropagation()}
+                        className="border-primary data-[state=checked]:bg-primary"
+                      />
                       <UserAvatar photoURL={u.photoURL} displayName={u.displayName} className="w-7 h-7 text-xs shrink-0" />
                       <div className="flex flex-col flex-1 min-w-0">
                         <span className="text-sm font-medium text-foreground truncate">{u.displayName || 'Anonymous'}</span>
