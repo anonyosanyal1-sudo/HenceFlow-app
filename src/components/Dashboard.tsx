@@ -457,6 +457,7 @@ export function Dashboard({
           <div className="py-3 space-y-2">
             <p className="text-sm text-foreground">Type <span className="font-bold">{projectToDelete?.name}</span> to confirm:</p>
             <Input value={deleteConfirmName} onChange={e => setDeleteConfirmName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && deleteConfirmName.trim() === projectToDelete?.name && projectToDelete) { onDeleteProject(projectToDelete.id); setProjectToDelete(null); setDeleteConfirmName(''); } }}
               placeholder="Pod name"
               className="bg-muted/50 border-border focus-visible:ring-1 focus-visible:ring-red-500" />
           </div>

@@ -14,9 +14,10 @@ interface MilestoneDialogProps {
   onOpenChange: (open: boolean) => void;
   projectId: string;
   milestones: Milestone[];
+  onMilestoneDeleted?: (milestoneId: string) => void;
 }
 
-export function MilestoneDialog({ open, onOpenChange, projectId, milestones }: MilestoneDialogProps) {
+export function MilestoneDialog({ open, onOpenChange, projectId, milestones, onMilestoneDeleted }: MilestoneDialogProps) {
   const [newName, setNewName] = React.useState('');
   const [newDate, setNewDate] = React.useState('');
   const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -48,6 +49,7 @@ export function MilestoneDialog({ open, onOpenChange, projectId, milestones }: M
 
   const handleDelete = async (milestoneId: string) => {
     await deleteMilestone(milestoneId);
+    onMilestoneDeleted?.(milestoneId);
   };
 
   return (

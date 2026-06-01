@@ -21,11 +21,12 @@ interface BulkActionBarProps {
   onSetMilestone: (milestoneId: string | null) => void;
   onDelete: () => void;
   loading?: boolean;
+  isViewer?: boolean;
 }
 
 export function BulkActionBar({
   selectedIds, onClear, stages, users, milestones,
-  onMoveToStage, onAssign, onSetPriority, onSetMilestone, onDelete, loading = false,
+  onMoveToStage, onAssign, onSetPriority, onSetMilestone, onDelete, loading = false, isViewer = false,
 }: BulkActionBarProps) {
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const count = selectedIds.size;
@@ -40,9 +41,9 @@ export function BulkActionBar({
           transition={{ type: 'spring', damping: 20, stiffness: 200 }}
           className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
         >
-          <div className={cn("flex items-center gap-3 bg-card border border-border shadow-2xl rounded-2xl px-4 py-3", loading && "opacity-60 pointer-events-none")}>
+          <div className={cn("flex items-center gap-3 bg-card border border-border shadow-2xl rounded-2xl px-4 py-3", (loading || isViewer) && "opacity-60 pointer-events-none")}>
             <span className="text-sm font-bold text-foreground min-w-[60px]">
-              {loading ? 'Working…' : `${count} selected`}
+              {loading ? 'Working…' : isViewer ? `${count} selected (read-only)` : `${count} selected`}
             </span>
             <div className="w-px h-6 bg-border" />
 

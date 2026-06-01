@@ -64,7 +64,7 @@ import { AutomationsDialog } from './components/AutomationsDialog';
 import { PodDialog } from './components/PodDialog';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { Logo } from './components/Logo';
-import { Hash, Filter, Search, Menu, Settings, Milestone as MilestoneIcon, CheckSquare, Zap, Bookmark, BookmarkPlus, MoreHorizontal } from 'lucide-react';
+import { Hash, Filter, Search, Menu, Settings, Milestone as MilestoneIcon, CheckSquare, Zap, Bookmark, BookmarkPlus, MoreHorizontal, Lock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -72,6 +72,10 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog as UiDialog, DialogContent as UiDialogContent, DialogHeader as UiDialogHeader,
+  DialogTitle as UiDialogTitle, DialogDescription as UiDialogDescription, DialogFooter as UiDialogFooter,
+} from '@/components/ui/dialog';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
 
@@ -201,12 +205,17 @@ function AppContent() {
   const [showCompanySettings, setShowCompanySettings] = React.useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = React.useState(false);
   const [profileSetupOpen, setProfileSetupOpen] = React.useState(false);
+  const [passwordRecoveryOpen, setPasswordRecoveryOpen] = React.useState(false);
 
   React.useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const appUser = session?.user ? toAppUser(session.user) : null;
       setUser(appUser);
       setLoading(false);
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecoveryOpen(true);
+        return;
+      }
       if (appUser) {
         ensureUserProfile();
         // Show profile setup for new sign-ups that haven't set a name yet
@@ -298,6 +307,8 @@ function AppContent() {
       setCustomFieldDefs([]);
       setTaskTemplates([]);
       setSelectedTaskIds(new Set());
+      setSelectedTask(null);
+      setTaskDialogOpen(false);
       return;
     }
     loadPods(activeProject.id);
@@ -343,7 +354,7 @@ function AppContent() {
   React.useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchQuery), 150);
     return () => clearTimeout(id);
-  }, [searchQuery]);
+  }, [searchQuery]); // searchQuery is the correct dep here
 
   React.useEffect(() => {
     if (!user) { setNotifications([]); return; }
@@ -361,7 +372,16 @@ function AppContent() {
 
   React.useEffect(() => {
     if (!activeProject) { setAutomations([]); return; }
-    fetchAutomations(activeProject.id).then(setAutomations).catch(() => {});
+    fetchAutomations(activeProject.id).then(rules => {
+      setAutomations(rules);
+      // Warn about automations that reference a user who's no longer a company member
+      const memberIds = new Set(companyUserIds);
+      rules.forEach(rule => {
+        if (rule.actionType === 'set_assignee' && rule.actionValue && !memberIds.has(rule.actionValue)) {
+          toast.warning(`Automation "${rule.name}" assigns to a user who is no longer a member.`);
+        }
+      });
+    }).catch(() => {});
   }, [activeProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refresh custom fields when the project settings dialog closes
@@ -437,6 +457,8 @@ function AppContent() {
       if (activeProjectId) loadPods(activeProjectId);
     } else if (type === 'companies:changed') {
       loadCompany();
+    } else if (type === 'notifications:changed') {
+      fetchNotifications().then(setNotifications).catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId, activePodId]));
@@ -593,8 +615,9 @@ function AppContent() {
   [company, user]);
 
   const companyUserIds = React.useMemo(
-    () => (company ? [...new Set([company.ownerId, ...(company.memberIds ?? [])])] : []),
-    [company?.ownerId, company?.memberIds?.join(',')], // eslint-disable-line react-hooks/exhaustive-deps
+    () => (company ? [...new Set([company.ownerId, ...(company.memberIds ?? []), ...(company.viewerIds ?? [])])] : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [company?.ownerId, company?.memberIds?.join(','), company?.viewerIds?.join(',')],
   );
 
   const companyUsers = React.useMemo(() => {
@@ -706,9 +729,9 @@ function AppContent() {
     }
   };
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleDeleteTask = async (taskId: string, projectId?: string) => {
     if (isViewer) { toast.error('Viewers cannot delete tasks'); return; }
-    const targetProjectId = selectedTask?.projectId ?? activeProject?.id;
+    const targetProjectId = projectId ?? selectedTask?.projectId ?? activeProject?.id;
     if (!targetProjectId) return;
     const prevTasks = tasks;
     const prevAllTasks = allTasks;
@@ -958,284 +981,310 @@ function AppContent() {
           </div>
         ) : (
           <>
-            {/* Toolbar */}
-            <div className="border-b border-border/40 px-4 md:px-6 h-14 bg-card/50 backdrop-blur-sm shrink-0 flex items-center justify-between gap-3">
+            {/* ── Toolbar ─────────────────────────────────────────────────── */}
+            <div className="border-b border-border/40 bg-card/60 backdrop-blur-sm shrink-0">
+              {/* Main row */}
+              <div className="flex items-center h-14 px-4 md:px-5 gap-2">
 
-                {/* Left: workspace name + meta */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="lg:hidden shrink-0 h-8 w-8">
-                    <Menu className="w-4 h-4" />
-                  </Button>
-                  <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <button
-                        onClick={() => setActivePod(null)}
-                        className="text-muted-foreground/60 hover:text-muted-foreground text-xs font-medium truncate hidden sm:block transition-colors max-w-[120px]"
-                        title={activeProject.name}
-                      >
-                        {activeProject.name}
-                      </button>
-                      <span className="text-muted-foreground/30 hidden sm:block text-xs">/</span>
-                      <span className="font-bold text-foreground text-sm truncate leading-tight max-w-[160px]" title={activePod.name}>
-                        {activePod.name}
-                      </span>
-                      <button
-                        className="text-muted-foreground/40 hover:text-muted-foreground transition-colors shrink-0"
-                        onClick={() => { setSelectedPodForEdit(activePod); setPodDialogOpen(true); }}
-                      >
-                        <Settings className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground/50 mt-0.5">
-                      <span>{[...new Set(activePod.members ?? [])].length || 1} members</span>
-                      <span className="opacity-40">·</span>
-                      <span>{tasks.length} tasks</span>
-                      <span className="opacity-40">·</span>
-                      <span className="flex items-center gap-1 text-emerald-400/80">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        Live
-                      </span>
-                    </div>
-                  </div>
+                {/* Mobile hamburger */}
+                <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="lg:hidden shrink-0 h-8 w-8 mr-1">
+                  <Menu className="w-4 h-4" />
+                </Button>
+
+                {/* ── Breadcrumb ── */}
+                <div className="flex items-center gap-1.5 min-w-0 mr-2">
+                  <button
+                    onClick={() => setActivePod(null)}
+                    className="hidden sm:flex items-center gap-1 text-xs font-medium text-muted-foreground/60 hover:text-muted-foreground transition-colors truncate max-w-[110px]"
+                    title={activeProject.name}
+                  >
+                    {activeProject.name}
+                  </button>
+                  <span className="hidden sm:block text-muted-foreground/25 text-xs select-none">/</span>
+                  <span className="font-semibold text-foreground text-sm truncate max-w-[140px] leading-none" title={activePod.name}>
+                    {activePod.name}
+                  </span>
+                  <button
+                    title="Pod settings"
+                    className="shrink-0 h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/60 transition-colors"
+                    onClick={() => { setSelectedPodForEdit(activePod); setPodDialogOpen(true); }}
+                  >
+                    <Settings className="w-3 h-3" />
+                  </button>
                 </div>
 
-                {/* Right: controls */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <NotificationBell
-                    notifications={notifications}
-                    onNotificationsChange={setNotifications}
-                    onTaskClick={(taskId) => {
-                      const task = allTasks.find(t => t.id === taskId);
-                      if (task) { setSelectedTask(task); setTaskDialogOpen(true); }
-                    }}
+                {/* ── Meta badges (desktop) ── */}
+                <div className="hidden lg:flex items-center gap-2 shrink-0">
+                  <span className="text-[11px] text-muted-foreground/50 bg-muted/40 px-2 py-0.5 rounded-full">
+                    {tasks.length} tasks
+                  </span>
+                  <span className="flex items-center gap-1 text-[11px] text-emerald-400/70 bg-emerald-400/8 px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Live
+                  </span>
+                </div>
+
+                {/* ── Spacer ── */}
+                <div className="flex-1" />
+
+                {/* ── Search (desktop) ── */}
+                <div className="relative hidden md:block">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40 pointer-events-none" />
+                  <Input
+                    ref={searchInputRef}
+                    placeholder="Search tasks…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8 pr-8 h-8 w-48 bg-muted/40 border-border/30 text-sm placeholder:text-muted-foreground/40 rounded-lg focus-visible:ring-primary/40"
                   />
+                  {searchQuery ? (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground transition-colors text-xs leading-none"
+                    >✕</button>
+                  ) : (
+                    <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground/30 font-mono pointer-events-none">/</kbd>
+                  )}
+                </div>
 
-                  {/* Mobile search toggle */}
-                  <button
-                    className="md:hidden h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                    onClick={() => setMobileSearchOpen(o => !o)}
-                    aria-label="Search"
-                  >
-                    <Search className="w-4 h-4" />
-                  </button>
+                {/* ── Mobile search toggle ── */}
+                <button
+                  className="md:hidden h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  onClick={() => setMobileSearchOpen(o => !o)}
+                  aria-label="Search"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
 
-                  {/* Search */}
-                  <div className="relative hidden md:block">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40 pointer-events-none" />
-                    <Input
-                      ref={searchInputRef}
-                      placeholder="Search tasks…"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 pr-10 h-9 w-44 bg-muted/40 border-border/30 text-sm placeholder:text-muted-foreground/40 rounded-xl focus-visible:ring-primary/40"
-                    />
-                    <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground/30 font-mono pointer-events-none">/</kbd>
-                  </div>
+                {/* ── Divider ── */}
+                <div className="hidden md:block w-px h-5 bg-border/50 mx-1" />
 
-                  {/* Filters */}
-                  <Popover>
-                    <PopoverTrigger className={buttonVariants({
-                      variant: "outline",
-                      size: "sm",
-                      className: "h-9 gap-1.5 border-border/40 bg-muted/30 hover:bg-muted/60 font-medium text-muted-foreground hover:text-foreground rounded-xl"
-                    })}>
-                      <Filter className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Filters</span>
-                      {[filterPriority, filterAssignee, filterCreator, filterDueDate].filter(Boolean).length > 0 && (
-                        <span className="bg-primary text-primary-foreground min-w-[16px] h-[16px] rounded-full text-[10px] font-bold flex items-center justify-center px-1">
-                          {[filterPriority, filterAssignee, filterCreator, filterDueDate].filter(Boolean).length}
-                        </span>
-                      )}
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-64 p-4 space-y-4">
-                      <div className="space-y-2">
-                        <h4 className="font-semibold text-sm text-foreground">Priority</h4>
-                        <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                          value={filterPriority || ''} onChange={(e) => setFilterPriority(e.target.value || null)}>
-                          <option value="">All Priorities</option>
-                          <option value="urgent">Urgent</option>
-                          <option value="high">High</option>
-                          <option value="medium">Medium</option>
-                          <option value="low">Low</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="font-semibold text-sm text-foreground">Assignee</h4>
-                        <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                          value={filterAssignee || ''} onChange={(e) => setFilterAssignee(e.target.value || null)}>
-                          <option value="">Any Assignee</option>
-                          {companyUsers.map(u => <option key={u.uid} value={u.uid}>{u.displayName}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="font-semibold text-sm text-foreground">Creator</h4>
-                        <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                          value={filterCreator || ''} onChange={(e) => setFilterCreator(e.target.value || null)}>
-                          <option value="">Any Creator</option>
-                          {companyUsers.map(u => <option key={u.uid} value={u.uid}>{u.displayName}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="font-semibold text-sm text-foreground">Due Date</h4>
-                        <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                          value={filterDueDate || ''} onChange={(e) => setFilterDueDate(e.target.value || null)}>
-                          <option value="">Any Date</option>
-                          <option value="today">Today</option>
-                          <option value="week">This Week</option>
-                          <option value="overdue">Overdue</option>
-                        </select>
-                      </div>
-                      {activeView === 'board' && (
-                        <div className="space-y-2 border-t border-border/40 pt-3">
-                          <h4 className="font-semibold text-sm text-foreground">Swimlane</h4>
-                          <div className="flex gap-1.5">
-                            {([['Off', null], ['Assignee', 'assignee'], ['Priority', 'priority']] as [string, SwimlaneBy][]).map(([label, val]) => (
-                              <button key={label} onClick={() => setSwimlaneBy(val)}
-                                className={cn("flex-1 px-2 h-8 rounded-lg text-xs font-semibold transition-all border",
-                                  swimlaneBy === val ? "bg-primary/10 text-primary border-primary/30" : "text-muted-foreground border-border/40 hover:bg-muted/50")}>
-                                {label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {(filterPriority || filterAssignee || filterCreator || searchQuery || filterDueDate || swimlaneBy) && (
-                        <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground hover:text-foreground"
-                          onClick={() => { setSearchQuery(''); setFilterPriority(null); setFilterAssignee(null); setFilterCreator(null); setFilterDueDate(null); setSwimlaneBy(null); }}>
-                          Clear all filters
-                        </Button>
-                      )}
-                    </PopoverContent>
-                  </Popover>
+                {/* ── Board / Timeline tab ── */}
+                <div className="hidden md:flex items-center bg-muted/50 border border-border/30 rounded-lg p-0.5 gap-0.5">
+                  {(['Board', 'Timeline'] as const).map(label => {
+                    const val = label.toLowerCase() as 'board' | 'timeline';
+                    return (
+                      <button key={label} onClick={() => setActiveView(val)}
+                        className={cn(
+                          "px-3 h-7 rounded-md text-xs font-semibold transition-all",
+                          activeView === val
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground/60 hover:text-muted-foreground"
+                        )}>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                  {/* Board / Timeline */}
-                  <div className="hidden md:flex items-center bg-muted/40 border border-border/30 rounded-xl p-1 gap-0.5">
-                    {(['Board', 'Timeline'] as const).map(label => {
-                      const val = label.toLowerCase() as 'board' | 'timeline';
-                      return (
-                        <button key={label} onClick={() => setActiveView(val)}
-                          className={cn("px-2.5 h-7 rounded-lg text-xs font-semibold transition-all",
-                            activeView === val ? "bg-card text-foreground shadow-sm" : "text-muted-foreground/50 hover:text-muted-foreground")}>
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* More: bulk select, milestones, automations, saved filters */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "sm", className: "h-9 w-9 p-0 border-border/40 bg-muted/30 hover:bg-muted/60 rounded-xl hidden md:flex items-center justify-center" })}>
-                      <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52 p-2 rounded-xl border-border bg-popover">
-                      <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5"
-                        onClick={() => { if (selectionModeActive) { setSelectionModeActive(false); setSelectedTaskIds(new Set()); } else setSelectionModeActive(true); }}>
-                        <CheckSquare className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-sm font-medium">{selectionModeActive ? 'Exit select mode' : 'Select tasks'}</span>
-                        {selectionModeActive && selectedTaskIds.size > 0 && (
-                          <span className="ml-auto text-xs text-primary font-bold">{selectedTaskIds.size}</span>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5" onClick={() => setMilestoneDialogOpen(true)}>
-                        <MilestoneIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-sm font-medium">Milestones</span>
-                        {milestones.length > 0 && <span className="ml-auto text-xs text-muted-foreground">{milestones.length}</span>}
-                      </DropdownMenuItem>
-                      {activeProject && (
-                        <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5" onClick={() => setAutomationsDialogOpen(true)}>
-                          <Zap className="w-3.5 h-3.5 text-muted-foreground" />
-                          <span className="text-sm font-medium">Automations</span>
-                        </DropdownMenuItem>
-                      )}
-                      {savedFilters.length > 0 && (
-                        <>
-                          <DropdownMenuSeparator />
-                          {savedFilters.map(sf => (
-                            <DropdownMenuItem key={sf.id} className="rounded-lg h-9 cursor-pointer gap-2.5"
-                              onClick={() => {
-                                const f = sf.filters;
-                                if (f.searchQuery !== undefined) setSearchQuery(f.searchQuery || '');
-                                setFilterAssignee(f.filterAssignee ?? null);
-                                setFilterCreator(f.filterCreator ?? null);
-                                setFilterPriority(f.filterPriority ?? null);
-                                setFilterDueDate(f.filterDueDate ?? null);
-                                if (f.swimlaneBy !== undefined) setSwimlaneBy(f.swimlaneBy as SwimlaneBy ?? null);
-                              }}>
-                              <Bookmark className="w-3.5 h-3.5 text-muted-foreground" />
-                              <span className="text-sm font-medium truncate">{sf.name}</span>
-                              <button className="ml-auto text-muted-foreground/50 hover:text-rose-400 text-xs p-0.5"
-                                onClick={e => { e.stopPropagation(); deleteSavedFilter(sf.id).then(() => setSavedFilters(prev => prev.filter(x => x.id !== sf.id))); }}>✕</button>
-                            </DropdownMenuItem>
+                {/* ── Filter ── */}
+                <Popover>
+                  <PopoverTrigger className={buttonVariants({
+                    variant: "outline",
+                    size: "sm",
+                    className: cn(
+                      "h-8 gap-1.5 border-border/40 bg-muted/30 hover:bg-muted/60 font-medium text-muted-foreground hover:text-foreground rounded-lg px-3",
+                      [filterPriority, filterAssignee, filterCreator, filterDueDate].some(Boolean) && "border-primary/40 text-primary"
+                    )
+                  })}>
+                    <Filter className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline text-xs">Filter</span>
+                    {[filterPriority, filterAssignee, filterCreator, filterDueDate].filter(Boolean).length > 0 && (
+                      <span className="bg-primary text-primary-foreground min-w-[16px] h-[16px] rounded-full text-[9px] font-bold flex items-center justify-center px-1">
+                        {[filterPriority, filterAssignee, filterCreator, filterDueDate].filter(Boolean).length}
+                      </span>
+                    )}
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-64 p-4 space-y-4">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm text-foreground">Priority</h4>
+                      <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        value={filterPriority || ''} onChange={(e) => setFilterPriority(e.target.value || null)}>
+                        <option value="">All Priorities</option>
+                        <option value="urgent">Urgent</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm text-foreground">Assignee</h4>
+                      <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        value={filterAssignee || ''} onChange={(e) => setFilterAssignee(e.target.value || null)}>
+                        <option value="">Any Assignee</option>
+                        {companyUsers.map(u => <option key={u.uid} value={u.uid}>{u.displayName}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm text-foreground">Creator</h4>
+                      <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        value={filterCreator || ''} onChange={(e) => setFilterCreator(e.target.value || null)}>
+                        <option value="">Any Creator</option>
+                        {companyUsers.map(u => <option key={u.uid} value={u.uid}>{u.displayName}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm text-foreground">Due Date</h4>
+                      <select className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        value={filterDueDate || ''} onChange={(e) => setFilterDueDate(e.target.value || null)}>
+                        <option value="">Any Date</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="overdue">Overdue</option>
+                      </select>
+                    </div>
+                    {activeView === 'board' && (
+                      <div className="space-y-2 border-t border-border/40 pt-3">
+                        <h4 className="font-semibold text-sm text-foreground">Swimlane</h4>
+                        <div className="flex gap-1.5">
+                          {([['Off', null], ['Assignee', 'assignee'], ['Priority', 'priority']] as [string, SwimlaneBy][]).map(([label, val]) => (
+                            <button key={label} onClick={() => setSwimlaneBy(val)}
+                              className={cn("flex-1 px-2 h-8 rounded-lg text-xs font-semibold transition-all border",
+                                swimlaneBy === val ? "bg-primary/10 text-primary border-primary/30" : "text-muted-foreground border-border/40 hover:bg-muted/50")}>
+                              {label}
+                            </button>
                           ))}
-                        </>
-                      )}
-                      <DropdownMenuSeparator />
-                      {showFilterNameInput ? (
-                        <div className="px-2 py-1.5 space-y-2" onClick={e => e.stopPropagation()}>
-                          <input
-                            autoFocus
-                            placeholder="Filter name…"
-                            value={filterNameInput}
-                            onChange={e => setFilterNameInput(e.target.value)}
-                            onKeyDown={async e => {
-                              if (e.key === 'Enter' && filterNameInput.trim() && activeProject) {
-                                setSavingFilter(true);
-                                const sf = await createSavedFilter(activeProject.id, filterNameInput.trim(), { searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate, swimlaneBy });
-                                setSavedFilters(prev => [...prev, sf]);
-                                setSavingFilter(false);
-                                setFilterNameInput('');
-                                setShowFilterNameInput(false);
-                              } else if (e.key === 'Escape') {
-                                setFilterNameInput('');
-                                setShowFilterNameInput(false);
-                              }
-                            }}
-                            className="w-full h-8 px-2.5 rounded-lg bg-muted/50 border border-border/40 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                          />
-                          <div className="flex gap-1.5">
-                            <button
-                              className="flex-1 h-7 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
-                              disabled={!filterNameInput.trim() || savingFilter}
-                              onClick={async () => {
-                                if (!filterNameInput.trim() || !activeProject) return;
-                                setSavingFilter(true);
-                                const sf = await createSavedFilter(activeProject.id, filterNameInput.trim(), { searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate, swimlaneBy });
-                                setSavedFilters(prev => [...prev, sf]);
-                                setSavingFilter(false);
-                                setFilterNameInput('');
-                                setShowFilterNameInput(false);
-                              }}
-                            >
-                              Save
-                            </button>
-                            <button
-                              className="flex-1 h-7 rounded-lg bg-muted text-muted-foreground text-xs"
-                              onClick={() => { setFilterNameInput(''); setShowFilterNameInput(false); }}
-                            >
-                              Cancel
-                            </button>
-                          </div>
                         </div>
-                      ) : (
-                        <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5"
-                          onClick={() => setShowFilterNameInput(true)}>
-                          <BookmarkPlus className="w-3.5 h-3.5 text-muted-foreground" />
-                          <span className="text-sm font-medium">Save filters</span>
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                      </div>
+                    )}
+                    {(filterPriority || filterAssignee || filterCreator || searchQuery || filterDueDate || swimlaneBy) && (
+                      <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => { setSearchQuery(''); setFilterPriority(null); setFilterAssignee(null); setFilterCreator(null); setFilterDueDate(null); setSwimlaneBy(null); }}>
+                        Clear all filters
+                      </Button>
+                    )}
+                  </PopoverContent>
+                </Popover>
 
-                  {/* New task */}
+                {/* ── More menu ── */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "sm", className: "h-8 w-8 p-0 border-border/40 bg-muted/30 hover:bg-muted/60 rounded-lg hidden md:flex items-center justify-center" })}>
+                    <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52 p-2 rounded-xl border-border bg-popover">
+                    <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5"
+                      onClick={() => { if (selectionModeActive) { setSelectionModeActive(false); setSelectedTaskIds(new Set()); } else setSelectionModeActive(true); }}>
+                      <CheckSquare className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-sm font-medium">{selectionModeActive ? 'Exit select mode' : 'Select tasks'}</span>
+                      {selectionModeActive && selectedTaskIds.size > 0 && (
+                        <span className="ml-auto text-xs text-primary font-bold">{selectedTaskIds.size}</span>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5" onClick={() => setMilestoneDialogOpen(true)}>
+                      <MilestoneIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-sm font-medium">Milestones</span>
+                      {milestones.length > 0 && <span className="ml-auto text-xs text-muted-foreground">{milestones.length}</span>}
+                    </DropdownMenuItem>
+                    {activeProject && (
+                      <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5" onClick={() => setAutomationsDialogOpen(true)}>
+                        <Zap className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-sm font-medium">Automations</span>
+                      </DropdownMenuItem>
+                    )}
+                    {savedFilters.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        {savedFilters.map(sf => (
+                          <DropdownMenuItem key={sf.id} className="rounded-lg h-9 cursor-pointer gap-2.5"
+                            onClick={() => {
+                              const f = sf.filters;
+                              if (f.searchQuery !== undefined) setSearchQuery(f.searchQuery || '');
+                              setFilterAssignee(f.filterAssignee ?? null);
+                              setFilterCreator(f.filterCreator ?? null);
+                              setFilterPriority(f.filterPriority ?? null);
+                              setFilterDueDate(f.filterDueDate ?? null);
+                              if (f.swimlaneBy !== undefined) setSwimlaneBy(f.swimlaneBy as SwimlaneBy ?? null);
+                            }}>
+                            <Bookmark className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-sm font-medium truncate">{sf.name}</span>
+                            <button className="ml-auto text-muted-foreground/50 hover:text-rose-400 text-xs p-0.5"
+                              onClick={e => { e.stopPropagation(); deleteSavedFilter(sf.id).then(() => setSavedFilters(prev => prev.filter(x => x.id !== sf.id))); }}>✕</button>
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                    <DropdownMenuSeparator />
+                    {showFilterNameInput ? (
+                      <div className="px-2 py-1.5 space-y-2" onClick={e => e.stopPropagation()}>
+                        <input
+                          autoFocus
+                          placeholder="Filter name…"
+                          value={filterNameInput}
+                          onChange={e => setFilterNameInput(e.target.value)}
+                          onKeyDown={async e => {
+                            if (e.key === 'Enter' && filterNameInput.trim() && activeProject) {
+                              setSavingFilter(true);
+                              const sf = await createSavedFilter(activeProject.id, filterNameInput.trim(), { searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate, swimlaneBy });
+                              setSavedFilters(prev => [...prev, sf]);
+                              setSavingFilter(false);
+                              setFilterNameInput('');
+                              setShowFilterNameInput(false);
+                            } else if (e.key === 'Escape') {
+                              setFilterNameInput('');
+                              setShowFilterNameInput(false);
+                            }
+                          }}
+                          className="w-full h-8 px-2.5 rounded-lg bg-muted/50 border border-border/40 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                        />
+                        <div className="flex gap-1.5">
+                          <button
+                            className="flex-1 h-7 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
+                            disabled={!filterNameInput.trim() || savingFilter}
+                            onClick={async () => {
+                              if (!filterNameInput.trim() || !activeProject) return;
+                              setSavingFilter(true);
+                              const sf = await createSavedFilter(activeProject.id, filterNameInput.trim(), { searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate, swimlaneBy });
+                              setSavedFilters(prev => [...prev, sf]);
+                              setSavingFilter(false);
+                              setFilterNameInput('');
+                              setShowFilterNameInput(false);
+                            }}
+                          >
+                            Save
+                          </button>
+                          <button
+                            className="flex-1 h-7 rounded-lg bg-muted text-muted-foreground text-xs"
+                            onClick={() => { setFilterNameInput(''); setShowFilterNameInput(false); }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5"
+                        onClick={() => setShowFilterNameInput(true)}>
+                        <BookmarkPlus className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-sm font-medium">Save filters</span>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* ── Divider ── */}
+                <div className="w-px h-5 bg-border/50 mx-1 hidden md:block" />
+
+                {/* ── Notifications ── */}
+                <NotificationBell
+                  notifications={notifications}
+                  onNotificationsChange={setNotifications}
+                  onTaskClick={(taskId) => {
+                    const task = allTasks.find(t => t.id === taskId);
+                    if (task) { setSelectedTask(task); setTaskDialogOpen(true); }
+                  }}
+                />
+
+                {/* ── New task ── */}
+                {!isViewer && (
                   <Button
-                    className="h-9 px-4 font-bold text-primary-foreground shadow-md shadow-primary/25 border-0 hover:opacity-90 transition-opacity gap-1.5 rounded-xl"
+                    className="h-8 px-3 font-semibold text-primary-foreground shadow-md shadow-primary/20 border-0 hover:opacity-90 transition-opacity gap-1.5 rounded-lg text-xs"
                     style={{ background: 'linear-gradient(135deg, oklch(0.67 0.30 285), oklch(0.60 0.26 310))' }}
                     onClick={() => { if (!activePod) return; setSelectedTask(null); setDefaultStatus('todo'); setTaskDialogOpen(true); }}
                   >
-                    <span className="text-base leading-none font-light">+</span>
+                    <span className="text-sm leading-none font-light">+</span>
                     <span className="hidden sm:inline">New task</span>
                   </Button>
-                </div>
+                )}
+              </div>
             </div>
 
             {/* Mobile search bar */}
@@ -1272,6 +1321,7 @@ function AppContent() {
                 selectedTaskIds={selectedTaskIds}
                 selectionMode={selectionModeActive}
                 swimlaneBy={swimlaneBy}
+                isViewer={isViewer}
                 onTaskClick={(task) => {
                   setSelectedTask(task);
                   setTaskDialogOpen(true);
@@ -1403,6 +1453,11 @@ function AppContent() {
             onOpenChange={setMilestoneDialogOpen}
             projectId={activeProject.id}
             milestones={milestones}
+            onMilestoneDeleted={(milestoneId) => {
+              setMilestones(prev => prev.filter(m => m.id !== milestoneId));
+              setTasks(prev => prev.map(t => t.milestoneId === milestoneId ? { ...t, milestoneId: undefined } : t));
+              setAllTasks(prev => prev.map(t => t.milestoneId === milestoneId ? { ...t, milestoneId: undefined } : t));
+            }}
           />
         )}
 
@@ -1423,12 +1478,19 @@ function AppContent() {
           onOpenChange={setShortcutsHelpOpen}
         />
 
+        {/* Password Recovery Dialog */}
+        <PasswordRecoveryDialog
+          open={passwordRecoveryOpen}
+          onClose={() => setPasswordRecoveryOpen(false)}
+        />
+
         <Toaster richColors position="bottom-right" />
 
         {/* Bulk action bar */}
         <BulkActionBar
           selectedIds={selectedTaskIds}
           loading={bulkLoading}
+          isViewer={isViewer}
           onClear={() => { setSelectedTaskIds(new Set()); setBulkLoading(false); }}
           stages={activePod?.stages?.length ? activePod.stages : DEFAULT_STAGES}
           users={companyUsers}
@@ -1489,5 +1551,65 @@ function AppContent() {
         />
       </main>
     </div>
+  );
+}
+
+function PasswordRecoveryDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [newPassword, setNewPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleSave = async () => {
+    setError(null);
+    if (!newPassword || newPassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (newPassword !== confirmPassword) { setError('Passwords do not match.'); return; }
+    setSaving(true);
+    const { error: err } = await supabase.auth.updateUser({ password: newPassword });
+    setSaving(false);
+    if (err) { setError(err.message); return; }
+    toast.success('Password updated successfully.');
+    setNewPassword('');
+    setConfirmPassword('');
+    onClose();
+  };
+
+  return (
+    <UiDialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <UiDialogContent className="sm:max-w-[380px] bg-card border-border">
+        <UiDialogHeader>
+          <UiDialogTitle className="flex items-center gap-2">
+            <Lock className="w-4 h-4" /> Set new password
+          </UiDialogTitle>
+          <UiDialogDescription>
+            Enter and confirm your new password to complete the reset.
+          </UiDialogDescription>
+        </UiDialogHeader>
+        <div className="space-y-3 py-2">
+          {error && <p className="text-xs text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
+          <Input
+            type="password"
+            placeholder="New password"
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+            className="h-9 bg-muted/50 border-border/50"
+          />
+          <Input
+            type="password"
+            placeholder="Confirm new password"
+            value={confirmPassword}
+            onChange={e => setConfirmPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSave()}
+            className="h-9 bg-muted/50 border-border/50"
+          />
+        </div>
+        <UiDialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving || !newPassword.trim()}>
+            {saving ? 'Saving…' : 'Update password'}
+          </Button>
+        </UiDialogFooter>
+      </UiDialogContent>
+    </UiDialog>
   );
 }

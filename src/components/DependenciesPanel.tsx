@@ -47,8 +47,31 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
       ).slice(0, 5)
     : [];
 
+  // BFS to detect if adding task → dependsOnId would create a cycle.
+  const wouldCreateCycle = (newDepId: string): boolean => {
+    // Walk "blocking" edges starting from newDepId to see if we reach task.id.
+    const visited = new Set<string>();
+    const queue = [newDepId];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (current === task.id) return true;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      // Find tasks that current blocks (i.e. current is a dependency of them).
+      const downstreamIds = blocking
+        .filter(d => d.taskId === current)
+        .map(d => d.dependsOnId);
+      queue.push(...downstreamIds);
+    }
+    return false;
+  };
+
   const handleAdd = async (dependsOnId: string) => {
     setError(null);
+    if (wouldCreateCycle(dependsOnId)) {
+      setError('This dependency would create a circular reference.');
+      return;
+    }
     try {
       await addDependency(task.id, dependsOnId);
       setSearch('');

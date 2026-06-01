@@ -16,9 +16,10 @@ const PROJECT_SCOPED_TABLES: { table: string; event: string }[] = [
 ];
 
 const GLOBAL_TABLES: { table: string; event: string }[] = [
-  { table: 'pods',      event: 'pods:changed' },
-  { table: 'companies', event: 'companies:changed' },
-  { table: 'projects',  event: 'projects:changed' },
+  { table: 'pods',          event: 'pods:changed' },
+  { table: 'companies',     event: 'companies:changed' },
+  { table: 'projects',      event: 'projects:changed' },
+  { table: 'notifications', event: 'notifications:changed' },
 ];
 
 export function useServerEvents(
