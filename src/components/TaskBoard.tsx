@@ -316,9 +316,8 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
 export function TaskBoard({
   tasks, stages, users = [], milestones = [],
   selectedTaskIds = new Set(), selectionMode = false, swimlaneBy = null,
-
+  isViewer = false,
   onTaskClick, onAddTask, onStatusChange, onSwimlaneChange, onSelectionChange, onInlineEdit,
-
 }: TaskBoardProps) {
 
   const onDragEnd = (result: DropResult) => {
