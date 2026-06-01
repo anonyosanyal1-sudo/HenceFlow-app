@@ -62,6 +62,14 @@ function TaskCard({ task, index, users, milestones, selected, selectionMode, isV
   const todayStr = new Date().toISOString().split('T')[0];
   const isOverdue = task.dueDate && (task.dueDate.split('T')[0]) < todayStr;
   const isToday = (task.dueDate?.split('T')[0]) === todayStr;
+
+  // SLA: days since last status update (proxy via updatedAt)
+  const daysInStage = React.useMemo(() => {
+    if (!task.updatedAt || task.status === 'closed') return 0;
+    return Math.floor((Date.now() - new Date(task.updatedAt).getTime()) / 86400_000);
+  }, [task.updatedAt, task.status]);
+  const slaWarning = daysInStage >= 3;
+  const slaCritical = daysInStage >= 7;
   const milestone = task.milestoneId ? milestones.find(m => m.id === task.milestoneId) : undefined;
   const completedSubtasks = (task.subtasks ?? []).filter(s => s.completed).length;
   const totalSubtasks = (task.subtasks ?? []).length;
@@ -123,6 +131,16 @@ function TaskCard({ task, index, users, milestones, selected, selectionMode, isV
                     {pCfg.label}
                   </div>
                   <div className="flex items-center gap-1.5">
+                    {slaWarning && (
+                      <span
+                        title={`In this stage for ${daysInStage} days`}
+                        className={cn("flex items-center gap-0.5 text-[10px] font-bold px-1 py-0.5 rounded",
+                          slaCritical ? "text-red-400 bg-red-500/10" : "text-amber-400 bg-amber-500/10"
+                        )}
+                      >
+                        <Clock className="w-2.5 h-2.5" />{daysInStage}d
+                      </span>
+                    )}
                     {task.recurrenceRule && (
                       <span title={`Recurring ${task.recurrenceRule}`}><RefreshCw className="w-3 h-3 text-muted-foreground/40" /></span>
                     )}

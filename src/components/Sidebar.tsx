@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Layout, LogOut, ChevronRight, Plus, MoreVertical, Edit2,
   ChevronDown, BarChart3, UserCircle, Sun, Moon,
-  Sparkles, PanelLeft, Layers,
+  Sparkles, PanelLeft, Layers, Map, Target, Inbox, User,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { UserAvatar } from './UserAvatar';
@@ -22,7 +22,8 @@ interface SidebarProps {
   pods: Pod[];
   activeProject: Project | null;
   activePod: Pod | null;
-  activeView?: 'board' | 'analytics' | 'timeline';
+  activeView?: 'board' | 'analytics' | 'timeline' | 'calendar';
+  activeGlobalView?: 'my-work' | 'roadmap' | null;
   onProjectSelect: (project: Project) => void;
   onPodSelect: (pod: Pod) => void;
   onNewProject: () => void;
@@ -32,6 +33,8 @@ interface SidebarProps {
   onLogout: () => void;
   onAnalyticsSelect?: () => void;
   onDashboardSelect?: () => void;
+  onMyWorkSelect?: () => void;
+  onRoadmapSelect?: () => void;
   onEditProfile?: () => void;
   onCompanySettings?: () => void;
   user: AppUser | null;
@@ -45,15 +48,19 @@ interface SidebarProps {
 
 export function Sidebar({
   company, projects, pods, activeProject, activePod, activeView = 'board',
+  activeGlobalView,
   onProjectSelect, onPodSelect, onNewProject, onEditProject,
   onNewPod, onEditPod,
-  onLogout, onAnalyticsSelect, onDashboardSelect, onEditProfile,
+  onLogout, onAnalyticsSelect, onDashboardSelect, onMyWorkSelect, onRoadmapSelect,
+  onEditProfile,
   onCompanySettings, user, onClose, className, isCollapsed = false,
   onToggleCollapse, theme, onToggleTheme,
 }: SidebarProps) {
 
-  const isDashboard = !activeProject && !activePod && activeView === 'board';
-  const isAnalytics = activeView === 'analytics';
+  const isDashboard = !activeProject && !activePod && activeView === 'board' && !activeGlobalView;
+  const isAnalytics = activeView === 'analytics' && !activeGlobalView;
+  const isMyWork = activeGlobalView === 'my-work';
+  const isRoadmap = activeGlobalView === 'roadmap';
 
   // Track which projects are expanded in the sidebar
   const [expandedProjectIds, setExpandedProjectIds] = React.useState<Set<string>>(() => {
@@ -161,6 +168,22 @@ export function Sidebar({
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger render={
+                  <Button variant="ghost" className={cn("w-full justify-center px-0 h-9 relative rounded-xl", isMyWork ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")} onClick={onMyWorkSelect}>
+                    <User className="w-4 h-4" />
+                  </Button>
+                } />
+                <TooltipContent side="right" sideOffset={10}>My Work</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger render={
+                  <Button variant="ghost" className={cn("w-full justify-center px-0 h-9 relative rounded-xl", isRoadmap ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")} onClick={onRoadmapSelect}>
+                    <Map className="w-4 h-4" />
+                  </Button>
+                } />
+                <TooltipContent side="right" sideOffset={10}>Roadmap</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger render={
                   <Button variant="ghost" className={cn("w-full justify-center px-0 h-9 relative rounded-xl", isAnalytics ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")} onClick={onAnalyticsSelect}>
                     <BarChart3 className="w-4 h-4" />
                   </Button>
@@ -179,6 +202,26 @@ export function Sidebar({
               >
                 <Layout className="w-4 h-4 shrink-0" />
                 Dashboard
+              </button>
+              <button
+                onClick={onMyWorkSelect}
+                className={cn(
+                  "w-full flex items-center gap-2.5 px-3 h-9 rounded-xl text-sm font-semibold transition-all",
+                  isMyWork ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <User className="w-4 h-4 shrink-0" />
+                My Work
+              </button>
+              <button
+                onClick={onRoadmapSelect}
+                className={cn(
+                  "w-full flex items-center gap-2.5 px-3 h-9 rounded-xl text-sm font-semibold transition-all",
+                  isRoadmap ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <Map className="w-4 h-4 shrink-0" />
+                Roadmap
               </button>
               <button
                 onClick={onAnalyticsSelect}
