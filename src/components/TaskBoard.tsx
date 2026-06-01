@@ -22,6 +22,7 @@ interface TaskBoardProps {
   onTaskClick: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
+  onSwimlaneChange?: (taskId: string, newAssigneeId: string | null, newPriority: TaskPriority | null) => void;
   onSelectionChange?: (ids: Set<string>) => void;
   onInlineEdit?: (taskId: string, newTitle: string) => void;
 }
@@ -315,8 +316,9 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
 export function TaskBoard({
   tasks, stages, users = [], milestones = [],
   selectedTaskIds = new Set(), selectionMode = false, swimlaneBy = null,
-  isViewer = false,
-  onTaskClick, onAddTask, onStatusChange, onSelectionChange, onInlineEdit,
+
+  onTaskClick, onAddTask, onStatusChange, onSwimlaneChange, onSelectionChange, onInlineEdit,
+
 }: TaskBoardProps) {
 
   const onDragEnd = (result: DropResult) => {
@@ -324,15 +326,28 @@ export function TaskBoard({
     const { destination, source, draggableId } = result;
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
-    // In swimlane mode, droppableIds have format "groupKey:stageId"
-    const destStatus = destination.droppableId.includes(':')
-      ? destination.droppableId.split(':').slice(1).join(':')
-      : destination.droppableId;
-    const srcStatus = source.droppableId.includes(':')
-      ? source.droppableId.split(':').slice(1).join(':')
-      : source.droppableId;
-    if (destStatus !== srcStatus) {
-      onStatusChange(draggableId, destStatus as TaskStatus);
+
+    // In swimlane mode droppableIds are "groupKey:stageId"
+    const extractParts = (id: string) => {
+      const colonIdx = id.indexOf(':');
+      return colonIdx === -1
+        ? { group: null, status: id }
+        : { group: id.slice(0, colonIdx), status: id.slice(colonIdx + 1) };
+    };
+
+    const dest = extractParts(destination.droppableId);
+    const src = extractParts(source.droppableId);
+
+    if (dest.status !== src.status) {
+      onStatusChange(draggableId, dest.status as TaskStatus);
+    }
+
+    if (swimlaneBy && dest.group !== null && src.group !== null && dest.group !== src.group) {
+      const newAssigneeId = swimlaneBy === 'assignee'
+        ? (dest.group === '__unassigned__' ? null : dest.group)
+        : null;
+      const newPriority = swimlaneBy === 'priority' ? dest.group as TaskPriority : null;
+      onSwimlaneChange?.(draggableId, newAssigneeId, newPriority);
     }
   };
 

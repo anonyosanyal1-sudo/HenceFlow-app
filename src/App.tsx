@@ -246,7 +246,8 @@ function AppContent() {
 
   const loadPods = React.useCallback(async (projectId: string) => {
     const podList = await fetchPods(projectId).catch(() => [] as Pod[]);
-    setPods(podList);
+    // Merge: replace only pods belonging to this project, keep others
+    setPods(prev => [...prev.filter(p => p.projectId !== projectId), ...podList]);
     // Keep activePod in sync so stage changes from other users propagate
     setActivePod(prev => {
       if (!prev) return prev;
@@ -299,7 +300,7 @@ function AppContent() {
 
   React.useEffect(() => {
     if (!activeProject) {
-      setPods([]);
+      // Don't clear pods — sidebar needs them for navigation
       setActivePod(null);
       setTasks([]);
       setMilestones([]);
@@ -325,6 +326,15 @@ function AppContent() {
   }, [activePod?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => { loadAllTasks(); }, [loadAllTasks]);
+
+  // Keep sidebar pods populated regardless of active view
+  React.useEffect(() => {
+    if (projects.length === 0) { setPods([]); return; }
+    Promise.all(projects.map(p => fetchPods(p.id).catch(() => [] as Pod[]))).then(results => {
+      setPods(results.flat());
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects.map(p => p.id).join(',')]);
 
   React.useEffect(() => {
     if (!user) return;
@@ -1347,6 +1357,22 @@ function AppContent() {
                       setAllTasks(pv => pv.map(t => t.id === taskId ? { ...t, title: prev } : t));
                     }
                     toast.error('Failed to rename task');
+                  });
+                }}
+                onSwimlaneChange={(taskId, newAssigneeId, newPriority) => {
+                  const task = tasks.find(t => t.id === taskId);
+                  const updates: Partial<Task> = {};
+                  if (swimlaneBy === 'assignee') updates.assigneeId = newAssigneeId ?? undefined;
+                  else if (swimlaneBy === 'priority' && newPriority) updates.priority = newPriority;
+                  if (!Object.keys(updates).length) return;
+                  setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+                  setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+                  updateTask(activeProject.id, taskId, updates).catch(() => {
+                    if (task) {
+                      setTasks(prev => prev.map(t => t.id === taskId ? task : t));
+                      setAllTasks(prev => prev.map(t => t.id === taskId ? task : t));
+                    }
+                    toast.error('Failed to update task');
                   });
                 }}
               />
