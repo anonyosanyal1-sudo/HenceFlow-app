@@ -25,18 +25,22 @@ const PAD_DAYS = 3;
 
 export function GanttView({ tasks, stages, users, onTaskClick }: GanttViewProps) {
   const today = React.useMemo(() => new Date(), []);
-  const [offset, setOffset] = React.useState(0); // week offset for navigation
+  const [offset, setOffset] = React.useState(0);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
 
   const tasksWithDates = React.useMemo(
     () => tasks.filter(t => t.dueDate).map(t => {
       const due = parseISO(t.dueDate!);
+      // Use today as bar start if no meaningful start date exists,
+      // capped to at most 7 days before due to avoid very long bars.
       const created = t.createdAt ? parseISO(t.createdAt) : addDays(due, -1);
-      return { task: t, start: created, end: due };
+      const minStart = addDays(due, -7);
+      const start = max([created, minStart]);
+      return { task: t, start, end: due };
     }),
     [tasks]
   );
 
-  // Compute window: cover all tasks + today, with padding, min 28 days
   const { windowStart, DAYS } = React.useMemo(() => {
     const baseStart = addDays(startOfWeek(today, { weekStartsOn: 1 }), offset * 7);
     if (tasksWithDates.length === 0) {
@@ -49,7 +53,6 @@ export function GanttView({ tasks, stages, users, onTaskClick }: GanttViewProps)
     const paddedStart = subDays(earliest, PAD_DAYS);
     const paddedEnd = addDays(latest, PAD_DAYS);
     const span = Math.max(MIN_DAYS, differenceInDays(paddedEnd, paddedStart) + 1);
-    // When navigating, respect manual offset; otherwise auto-fit
     if (offset !== 0) return { windowStart: baseStart, DAYS: MIN_DAYS };
     return { windowStart: paddedStart, DAYS: span };
   }, [tasksWithDates, today, offset]);
@@ -69,8 +72,19 @@ export function GanttView({ tasks, stages, users, onTaskClick }: GanttViewProps)
 
   const todayOffset = differenceInDays(today, windowStart);
 
+  // Scroll to today when the user clicks "Today"
+  const scrollToToday = () => {
+    setOffset(0);
+    requestAnimationFrame(() => {
+      if (!scrollRef.current) return;
+      const labelW = 224; // 56px per tailwind unit × 4
+      const todayPx = labelW + todayOffset * DAY_W - scrollRef.current.clientWidth / 2;
+      scrollRef.current.scrollLeft = Math.max(0, todayPx);
+    });
+  };
+
   return (
-    <div className="flex-1 overflow-auto p-4">
+    <div ref={scrollRef} className="flex-1 overflow-auto p-4">
       <div className="min-w-max">
         {/* Header */}
         <div className="flex sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
@@ -84,7 +98,7 @@ export function GanttView({ tasks, stages, users, onTaskClick }: GanttViewProps)
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => setOffset(0)}
+                onClick={scrollToToday}
                 className="px-1.5 h-5 rounded text-[9px] font-semibold text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors"
               >
                 Today
@@ -167,7 +181,7 @@ export function GanttView({ tasks, stages, users, onTaskClick }: GanttViewProps)
                         )}
                         style={{ left: bar.left, width: bar.width }}
                         onClick={() => onTaskClick(task)}
-                        title={`${task.title} — ${format(start, 'MMM d')} → ${format(end, 'MMM d')}`}
+                        title={`${task.title} — due ${format(end, 'MMM d')}`}
                       >
                         <span className="text-[9px] text-white font-bold truncate">{bar.width > 60 ? task.title : ''}</span>
                       </div>

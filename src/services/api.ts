@@ -606,7 +606,7 @@ export const createMilestone = async (projectId: string, name: string, dueDate?:
 export const updateMilestone = async (milestoneId: string, updates: Partial<Milestone>) => {
   const payload: Record<string, any> = {};
   if (updates.name !== undefined) payload.name = updates.name;
-  payload.due_date = updates.dueDate ?? null;
+  if (updates.dueDate !== undefined) payload.due_date = updates.dueDate ?? null;
   const { error } = await supabase.from('milestones').update(payload).eq('id', milestoneId);
   if (error) throw new Error(error.message);
 };

@@ -314,7 +314,7 @@ export function TaskBoard({
     const srcStatus = source.droppableId.includes(':')
       ? source.droppableId.split(':').slice(1).join(':')
       : source.droppableId;
-    if (destStatus !== srcStatus || destination.droppableId !== source.droppableId) {
+    if (destStatus !== srcStatus) {
       onStatusChange(draggableId, destStatus as TaskStatus);
     }
   };

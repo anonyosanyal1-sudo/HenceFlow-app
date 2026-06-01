@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase';
 
 export type ServerEventHandler = (type: string, data: Record<string, unknown>) => void;
 
-// Tables scoped to a project_id
+// Tables with a project_id column — one shared channel per table (no per-project filter).
+// The handler receives a projectId from the payload and can ignore irrelevant projects.
 const PROJECT_SCOPED_TABLES: { table: string; event: string }[] = [
   { table: 'tasks',                    event: 'tasks:changed' },
   { table: 'milestones',               event: 'milestones:changed' },
@@ -14,8 +15,6 @@ const PROJECT_SCOPED_TABLES: { table: string; event: string }[] = [
   { table: 'activity_logs',            event: 'activity_logs:changed' },
 ];
 
-// Tables that are global (no project_id filter).
-// 'projects' is here because the projects table has no project_id column.
 const GLOBAL_TABLES: { table: string; event: string }[] = [
   { table: 'pods',      event: 'pods:changed' },
   { table: 'companies', event: 'companies:changed' },
@@ -29,6 +28,10 @@ export function useServerEvents(
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
 
+  const projectIdsRef = useRef(projectIds);
+  projectIdsRef.current = projectIds;
+
+  // Stable key: only re-subscribe when the set of project IDs actually changes.
   const key = projectIds.slice().sort().join(',');
 
   useEffect(() => {
@@ -36,29 +39,27 @@ export function useServerEvents(
 
     const channels: ReturnType<typeof supabase.channel>[] = [];
 
-    // Per-project channels for project-scoped tables
-    for (const pid of projectIds) {
-      for (const { table, event } of PROJECT_SCOPED_TABLES) {
-        const channel = supabase
-          .channel(`${table}:${pid}`)
-          .on(
-            'postgres_changes' as any,
-            {
-              event: '*',
-              schema: 'public',
-              table,
-              filter: `project_id=eq.${pid}`,
-            },
-            (payload: Record<string, unknown>) => {
-              onEventRef.current(event, payload);
-            },
-          )
-          .subscribe();
-        channels.push(channel);
-      }
+    // One channel per project-scoped table (global, filtered client-side by projectId).
+    // This is O(tables) instead of O(projects × tables).
+    for (const { table, event } of PROJECT_SCOPED_TABLES) {
+      const channel = supabase
+        .channel(`global_table:${table}`)
+        .on(
+          'postgres_changes' as any,
+          { event: '*', schema: 'public', table },
+          (payload: Record<string, unknown>) => {
+            // Only fire for projects we're watching
+            const record = (payload.new ?? payload.old ?? {}) as Record<string, unknown>;
+            const pid = record.project_id as string | undefined;
+            if (pid && !projectIdsRef.current.includes(pid)) return;
+            onEventRef.current(event, { ...payload, projectId: pid });
+          },
+        )
+        .subscribe();
+      channels.push(channel);
     }
 
-    // Single channel for global tables
+    // One channel per global table.
     for (const { table, event } of GLOBAL_TABLES) {
       const channel = supabase
         .channel(`global:${table}`)
