@@ -60,7 +60,7 @@ interface TaskCardProps {
 function TaskCard({ task, index, users, milestones, selected, selectionMode, isViewer, onClick, onToggleSelect, onInlineEdit }: TaskCardProps) {
   const pCfg = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
   const todayStr = new Date().toISOString().split('T')[0];
-  const isOverdue = task.dueDate && (task.dueDate.split('T')[0]) < todayStr;
+  const isOverdue = task.dueDate && task.status !== 'closed' && (task.dueDate.split('T')[0]) < todayStr;
   const isToday = (task.dueDate?.split('T')[0]) === todayStr;
 
   // SLA: days since last status update (proxy via updatedAt)
@@ -289,7 +289,7 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
             {...provided.droppableProps}
             ref={provided.innerRef}
             className={cn(
-              "flex-1 flex flex-col gap-2.5 px-3 min-h-[60px] transition-all duration-150",
+              "flex-1 flex flex-col gap-2.5 px-3 pb-3 min-h-[60px] transition-all duration-150",
               snapshot.isDraggingOver ? "bg-primary/5 rounded-xl" : ""
             )}
           >

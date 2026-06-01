@@ -1,5 +1,5 @@
 import React from 'react';
-import { Task, TaskDependency, DependencyRelationType } from '../types';
+import { Task, TaskRelation, DependencyRelationType } from '../types';
 import { getDependencies, addDependency, removeDependency } from '../services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,8 +18,8 @@ interface DependenciesPanelProps {
 }
 
 export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
-  const [blockedBy, setBlockedBy] = React.useState<TaskDependency[]>([]);
-  const [blocking, setBlocking] = React.useState<TaskDependency[]>([]);
+  const [blockedBy, setBlockedBy] = React.useState<TaskRelation[]>([]);
+  const [blocking, setBlocking] = React.useState<TaskRelation[]>([]);
   const [search, setSearch] = React.useState('');
   const [relationType, setRelationType] = React.useState<DependencyRelationType>('blocks');
   const [loading, setLoading] = React.useState(true);
@@ -124,8 +124,10 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
           </p>
           {blockedBy.map(dep => {
             const t = getTask(dep.dependsOnId);
+            const rt = RELATION_TYPES.find(r => r.value === dep.relationType) ?? RELATION_TYPES[0];
             return (
               <div key={dep.id} className="flex items-center gap-2 group">
+                <rt.icon className={cn("w-3 h-3 shrink-0", rt.color)} />
                 <span className="text-xs flex-1 text-muted-foreground truncate">
                   {t?.title ?? dep.dependsOnId.slice(0, 8)}
                 </span>
@@ -149,8 +151,10 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
           </p>
           {blocking.map(dep => {
             const t = getTask(dep.taskId);
+            const rt = RELATION_TYPES.find(r => r.value === dep.relationType) ?? RELATION_TYPES[0];
             return (
               <div key={dep.id} className="flex items-center gap-2 group">
+                <rt.icon className={cn("w-3 h-3 shrink-0", rt.color)} />
                 <span className="text-xs flex-1 text-muted-foreground truncate">
                   {t?.title ?? dep.taskId.slice(0, 8)}
                 </span>

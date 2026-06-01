@@ -28,6 +28,7 @@ interface TaskDialogProps {
   onOpenChange: (open: boolean) => void;
   task?: Task | null;
   defaultStatus?: TaskStatus;
+  defaultDueDate?: string;
   users: UserProfile[];
   stages: Stage[];
   activeProjectId?: string;
@@ -64,7 +65,7 @@ function stageColorDot(stages: Stage[], stageId: string) {
 }
 
 export function TaskDialog({
-  open, onOpenChange, task, defaultStatus, users, stages, activeProjectId,
+  open, onOpenChange, task, defaultStatus, defaultDueDate = '', users, stages, activeProjectId,
   milestones = [], customFieldDefs = [], templates = [], allTasks = [],
   sprints = [],
   currentUserId = '', onSave, onDelete, onDuplicate,
@@ -147,7 +148,7 @@ export function TaskDialog({
       setStatus(defaultStatus || 'todo');
       setPriority('medium');
       setAssigneeId(undefined);
-      setDueDate('');
+      setDueDate(defaultDueDate || '');
       setMilestoneId(undefined);
       setRecurrenceRule(undefined);
       setLocalSubtasks([]);
@@ -157,7 +158,7 @@ export function TaskDialog({
       setShowTemplateSave(false);
     }
     setIsDirty(false);
-  }, [task, defaultStatus, open]);
+  }, [task, defaultStatus, defaultDueDate, open]);
 
   const isDescriptionTooLong = description.length > MAX_DESCRIPTION_LENGTH;
 
