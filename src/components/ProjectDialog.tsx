@@ -150,7 +150,17 @@ export function ProjectDialog({
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Project Manager</label>
               <Select value={managerId} onValueChange={setManagerId}>
                 <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Select manager" />
+                  {(() => {
+                    const mgr = users.find(u => u.uid === managerId);
+                    return mgr ? (
+                      <div className="flex items-center gap-2">
+                        <UserAvatar photoURL={mgr.photoURL} displayName={mgr.displayName} className="w-5 h-5 text-[9px]" />
+                        <span>{mgr.displayName || mgr.email}</span>
+                      </div>
+                    ) : (
+                      <SelectValue placeholder="Select manager" />
+                    );
+                  })()}
                 </SelectTrigger>
                 <SelectContent>
                   {users.map(u => (
@@ -184,6 +194,8 @@ export function ProjectDialog({
                         <Checkbox
                           checked={isSelected}
                           disabled={isOwner}
+                          onCheckedChange={() => toggleMember(user.uid)}
+                          onClick={e => e.stopPropagation()}
                           className="border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
                         />
                         <UserAvatar photoURL={user.photoURL} displayName={user.displayName} className="h-7 w-7 text-xs shadow-sm shrink-0" />
