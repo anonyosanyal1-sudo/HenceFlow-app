@@ -33,7 +33,7 @@ export function GanttView({ tasks, stages, users, onTaskClick }: GanttViewProps)
       const due = parseISO(t.dueDate!);
       // Use today as bar start if no meaningful start date exists,
       // capped to at most 7 days before due to avoid very long bars.
-      const created = t.createdAt ? parseISO(t.createdAt) : addDays(due, -1);
+      const created = t.createdAt ? parseISO(t.createdAt) : new Date();
       const minStart = addDays(due, -7);
       const start = max([created, minStart]);
       return { task: t, start, end: due };

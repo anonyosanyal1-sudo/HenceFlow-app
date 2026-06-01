@@ -36,8 +36,11 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
   const refetchComments = React.useCallback(() => {
     fetchComments(taskId).then(data => {
       setComments(data);
+      setErrorMsg(null);
       setTimeout(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
-    }).catch(() => {});
+    }).catch(() => {
+      setErrorMsg('Failed to load comments. Please refresh.');
+    });
   }, [taskId]);
 
   React.useEffect(() => { refetchComments(); }, [refetchComments]);

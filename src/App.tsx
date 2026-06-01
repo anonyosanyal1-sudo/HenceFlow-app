@@ -138,13 +138,16 @@ function AppContent() {
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [activeProject, setActiveProject] = React.useState<Project | null>(null);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() =>
+    localStorage.getItem('hf-sidebar-collapsed') === 'true'
+  );
   const [tasks, setTasks] = React.useState<Task[]>([]);
   const [allTasks, setAllTasks] = React.useState<Task[]>([]);
   const [users, setUsers] = React.useState<UserProfile[]>([]);
   
   // Search and Filter States
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [filterAssignee, setFilterAssignee] = React.useState<string | null>(null);
   const [filterCreator, setFilterCreator] = React.useState<string | null>(null);
   const [filterPriority, setFilterPriority] = React.useState<string | null>(null);
@@ -174,6 +177,7 @@ function AppContent() {
   const [savingFilter, setSavingFilter] = React.useState(false);
   const [filterNameInput, setFilterNameInput] = React.useState('');
   const [showFilterNameInput, setShowFilterNameInput] = React.useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   // Dialog States
@@ -221,6 +225,11 @@ function AppContent() {
   const loadPods = React.useCallback(async (projectId: string) => {
     const podList = await fetchPods(projectId).catch(() => [] as Pod[]);
     setPods(podList);
+    // Keep activePod in sync so stage changes from other users propagate
+    setActivePod(prev => {
+      if (!prev) return prev;
+      return podList.find(p => p.id === prev.id) ?? prev;
+    });
   }, []);
 
   const loadProjects = React.useCallback(async () => {
@@ -252,7 +261,9 @@ function AppContent() {
     if (projects.length === 0) { setAllTasks([]); return; }
     const results = await Promise.all(projects.map(p => fetchTasks(p.id).catch(() => [] as Task[])));
     setAllTasks(results.flat());
-  }, [projects]);
+  // Depend on a stable string key so array reference changes don't re-trigger fetches
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects.map(p => p.id).join(',')]);
 
   React.useEffect(() => {
     if (!user) { setCompany(null); setPods([]); setCompanyLoaded(false); return; }
@@ -289,7 +300,7 @@ function AppContent() {
     loadPodData(activePod.id);
   }, [activePod?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  React.useEffect(() => { loadAllTasks(); }, [projects]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { loadAllTasks(); }, [loadAllTasks]);
 
   React.useEffect(() => {
     if (!user) return;
@@ -302,7 +313,17 @@ function AppContent() {
   }, [theme]);
 
   React.useEffect(() => {
-    if (!user) return;
+    localStorage.setItem('hf-sidebar-collapsed', String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
+
+  // Debounce search to avoid filtering on every keystroke
+  React.useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchQuery), 150);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
+
+  React.useEffect(() => {
+    if (!user) { setNotifications([]); return; }
     fetchNotifications().then(setNotifications).catch(() => {});
     const interval = setInterval(() => {
       fetchNotifications().then(setNotifications).catch(() => {});
@@ -366,7 +387,7 @@ function AppContent() {
   const activePodId = activePod?.id;
   useServerEvents(projectIdsForSSE, React.useCallback((type: string, data: Record<string, unknown>) => {
     const pid = data.projectId as string | undefined;
-    if (type === 'tasks:changed') {
+    if (type === 'tasks:changed' || type === 'subtasks:changed') {
       if (activePodId) loadPodData(activePodId);
       loadAllTasks();
     } else if (type === 'milestones:changed') {
@@ -533,6 +554,13 @@ function AppContent() {
     await archiveProject(projectId, archive);
   };
 
+  const isViewer = React.useMemo(() =>
+    !!(company && user &&
+      company.viewerIds?.includes(user.uid) &&
+      !company.adminIds?.includes(user.uid) &&
+      company.ownerId !== user.uid),
+  [company, user]);
+
   const companyUsers = React.useMemo(() => {
     if (!company) return [];
     // Include owner even if not in memberIds, then company members
@@ -591,6 +619,7 @@ function AppContent() {
   };
 
   const handleSaveTask = async (taskData: Partial<Task>) => {
+    if (isViewer) { toast.error('Viewers cannot edit tasks'); return; }
     const targetPodId = selectedTask?.podId ?? activePod?.id;
     const targetProjectId = selectedTask?.projectId ?? activeProject?.id;
     if (!targetPodId || !targetProjectId) return;
@@ -638,20 +667,28 @@ function AppContent() {
   };
 
   const handleDeleteTask = async (taskId: string) => {
+    if (isViewer) { toast.error('Viewers cannot delete tasks'); return; }
     const targetProjectId = selectedTask?.projectId ?? activeProject?.id;
     if (!targetProjectId) return;
+    const prevTasks = tasks;
+    const prevAllTasks = allTasks;
     setTasks(prev => prev.filter(t => t.id !== taskId));
     setAllTasks(prev => prev.filter(t => t.id !== taskId));
+    setSelectedTask(null);
     deleteTask(targetProjectId, taskId)
       .then(() => toast.success('Task deleted'))
-      .catch(() => {});
+      .catch(() => {
+        setTasks(prevTasks);
+        setAllTasks(prevAllTasks);
+        toast.error('Failed to delete task');
+      });
   };
 
   const filteredTasks = React.useMemo(() => {
     return tasks.filter(task => {
       const matchesSearch =
-        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (task.description ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+        task.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        (task.description ?? '').toLowerCase().includes(debouncedSearch.toLowerCase());
       
       const matchesAssignee = !filterAssignee || task.assigneeId === filterAssignee;
       const matchesCreator = !filterCreator || task.creatorId === filterCreator;
@@ -672,8 +709,7 @@ function AppContent() {
           } else if (filterDate === 'week') {
             const startOfToday = new Date();
             startOfToday.setHours(0, 0, 0, 0);
-            const weekEnd = new Date(startOfToday);
-            weekEnd.setDate(startOfToday.getDate() + 7);
+            const weekEnd = new Date(startOfToday.getTime() + 7 * 86400000);
             const taskD = new Date(taskDate);
             matchesDate = taskD >= startOfToday && taskD <= weekEnd;
           }
@@ -682,7 +718,7 @@ function AppContent() {
       
       return matchesSearch && matchesAssignee && matchesCreator && matchesPriority && matchesDate;
     });
-  }, [tasks, searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate]);
+  }, [tasks, debouncedSearch, filterAssignee, filterCreator, filterPriority, filterDueDate]);
 
   if (loading) {
     return (
@@ -931,6 +967,15 @@ function AppContent() {
                     }}
                   />
 
+                  {/* Mobile search toggle */}
+                  <button
+                    className="md:hidden h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                    onClick={() => setMobileSearchOpen(o => !o)}
+                    aria-label="Search"
+                  >
+                    <Search className="w-4 h-4" />
+                  </button>
+
                   {/* Search */}
                   <div className="relative hidden md:block">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40 pointer-events-none" />
@@ -1011,9 +1056,9 @@ function AppContent() {
                           </div>
                         </div>
                       )}
-                      {(filterPriority || filterAssignee || filterCreator || searchQuery || filterDueDate) && (
+                      {(filterPriority || filterAssignee || filterCreator || searchQuery || filterDueDate || swimlaneBy) && (
                         <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground hover:text-foreground"
-                          onClick={() => { setSearchQuery(''); setFilterPriority(null); setFilterAssignee(null); setFilterCreator(null); setFilterDueDate(null); }}>
+                          onClick={() => { setSearchQuery(''); setFilterPriority(null); setFilterAssignee(null); setFilterCreator(null); setFilterDueDate(null); setSwimlaneBy(null); }}>
                           Clear all filters
                         </Button>
                       )}
@@ -1071,6 +1116,7 @@ function AppContent() {
                                 setFilterCreator(f.filterCreator ?? null);
                                 setFilterPriority(f.filterPriority ?? null);
                                 setFilterDueDate(f.filterDueDate ?? null);
+                                if (f.swimlaneBy !== undefined) setSwimlaneBy(f.swimlaneBy as SwimlaneBy ?? null);
                               }}>
                               <Bookmark className="w-3.5 h-3.5 text-muted-foreground" />
                               <span className="text-sm font-medium truncate">{sf.name}</span>
@@ -1091,7 +1137,7 @@ function AppContent() {
                             onKeyDown={async e => {
                               if (e.key === 'Enter' && filterNameInput.trim() && activeProject) {
                                 setSavingFilter(true);
-                                const sf = await createSavedFilter(activeProject.id, filterNameInput.trim(), { searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate });
+                                const sf = await createSavedFilter(activeProject.id, filterNameInput.trim(), { searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate, swimlaneBy });
                                 setSavedFilters(prev => [...prev, sf]);
                                 setSavingFilter(false);
                                 setFilterNameInput('');
@@ -1110,7 +1156,7 @@ function AppContent() {
                               onClick={async () => {
                                 if (!filterNameInput.trim() || !activeProject) return;
                                 setSavingFilter(true);
-                                const sf = await createSavedFilter(activeProject.id, filterNameInput.trim(), { searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate });
+                                const sf = await createSavedFilter(activeProject.id, filterNameInput.trim(), { searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate, swimlaneBy });
                                 setSavedFilters(prev => [...prev, sf]);
                                 setSavingFilter(false);
                                 setFilterNameInput('');
@@ -1148,6 +1194,23 @@ function AppContent() {
                   </Button>
                 </div>
             </div>
+
+            {/* Mobile search bar */}
+            {mobileSearchOpen && (
+              <div className="md:hidden px-4 py-2 border-b border-border/40 bg-card/50 shrink-0">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40 pointer-events-none" />
+                  <Input
+                    ref={searchInputRef}
+                    autoFocus
+                    placeholder="Search tasks…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 h-9 bg-muted/40 border-border/30 text-sm placeholder:text-muted-foreground/40 rounded-xl focus-visible:ring-primary/40 w-full"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Board or Timeline */}
             {activeView === 'timeline' ? (
@@ -1210,7 +1273,7 @@ function AppContent() {
           milestones={milestones}
           customFieldDefs={customFieldDefs}
           templates={taskTemplates}
-          allTasks={tasks}
+          allTasks={allTasks}
           currentUserId={user.uid}
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
@@ -1303,34 +1366,41 @@ function AppContent() {
           milestones={milestones}
           onMoveToStage={async (status) => {
             const ids = Array.from(selectedTaskIds);
-            setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, status } : t));
-            await bulkUpdateTasks(ids, { status });
+            const prev = tasks;
+            setTasks(t => t.map(x => ids.includes(x.id) ? { ...x, status } : x));
+            bulkUpdateTasks(ids, { status }).catch(() => { setTasks(prev); toast.error('Bulk update failed'); });
             setSelectedTaskIds(new Set());
           }}
           onAssign={async (assigneeId) => {
             const ids = Array.from(selectedTaskIds);
-            const update: Partial<Task> = { assigneeId: assigneeId ?? undefined };
-            setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, assigneeId: assigneeId ?? undefined } : t));
-            await bulkUpdateTasks(ids, update);
+            const prev = tasks;
+            setTasks(t => t.map(x => ids.includes(x.id) ? { ...x, assigneeId: assigneeId ?? undefined } : x));
+            bulkUpdateTasks(ids, { assigneeId: assigneeId ?? undefined }).catch(() => { setTasks(prev); toast.error('Bulk update failed'); });
             setSelectedTaskIds(new Set());
           }}
           onSetPriority={async (priority: TaskPriority) => {
             const ids = Array.from(selectedTaskIds);
-            setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, priority } : t));
-            await bulkUpdateTasks(ids, { priority });
+            const prev = tasks;
+            setTasks(t => t.map(x => ids.includes(x.id) ? { ...x, priority } : x));
+            bulkUpdateTasks(ids, { priority }).catch(() => { setTasks(prev); toast.error('Bulk update failed'); });
             setSelectedTaskIds(new Set());
           }}
           onSetMilestone={async (milestoneId) => {
             const ids = Array.from(selectedTaskIds);
-            setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, milestoneId: milestoneId ?? undefined } : t));
-            await bulkUpdateTasks(ids, { milestoneId: milestoneId ?? undefined });
+            const prev = tasks;
+            setTasks(t => t.map(x => ids.includes(x.id) ? { ...x, milestoneId: milestoneId ?? undefined } : x));
+            bulkUpdateTasks(ids, { milestoneId: milestoneId ?? undefined }).catch(() => { setTasks(prev); toast.error('Bulk update failed'); });
             setSelectedTaskIds(new Set());
           }}
           onDelete={async () => {
             const ids = Array.from(selectedTaskIds);
-            setTasks(prev => prev.filter(t => !ids.includes(t.id)));
-            setAllTasks(prev => prev.filter(t => !ids.includes(t.id)));
-            await bulkDeleteTasks(ids);
+            const prevTasks = tasks;
+            const prevAll = allTasks;
+            setTasks(t => t.filter(x => !ids.includes(x.id)));
+            setAllTasks(t => t.filter(x => !ids.includes(x.id)));
+            bulkDeleteTasks(ids)
+              .then(() => toast.success(`${ids.length} tasks deleted`))
+              .catch(() => { setTasks(prevTasks); setAllTasks(prevAll); toast.error('Bulk delete failed'); });
             setSelectedTaskIds(new Set());
           }}
         />

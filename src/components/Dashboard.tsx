@@ -1,5 +1,6 @@
 import React from 'react';
-import { Project, Task, Company, UserProfile, DEFAULT_STAGES } from '../types';
+import { Project, Task, Company, UserProfile } from '../types';
+import { getClosedStageId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -51,7 +52,7 @@ export function Dashboard({
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const today = new Date().toISOString().split('T')[0];
 
-  const closedStageId = DEFAULT_STAGES[DEFAULT_STAGES.length - 1].id;
+  const closedStageId = getClosedStageId();
   const isCompleted = (t: Task) => t.status === closedStageId;
 
   const isOverdue = (t: Task) =>
@@ -91,7 +92,7 @@ export function Dashboard({
 
   // Per-project stats
   const getProjectStats = (project: Project) => {
-    const closedId = project.stages?.[project.stages.length - 1]?.id ?? 'closed';
+    const closedId = getClosedStageId(project);
     const pt = tasks.filter(t => t.projectId === project.id);
     const completed = pt.filter(t => t.status === closedId).length;
     const total = pt.length;
