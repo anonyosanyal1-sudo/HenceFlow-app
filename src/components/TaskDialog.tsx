@@ -81,6 +81,7 @@ export function TaskDialog({
   const [showTemplateSave, setShowTemplateSave] = React.useState(false);
   const [watchers, setWatchers] = React.useState<TaskWatcher[]>([]);
   const isWatching = watchers.some(w => w.userId === currentUserId);
+  const [isDirty, setIsDirty] = React.useState(false);
 
   const projectId = task?.projectId || activeProjectId || '';
 
@@ -131,9 +132,12 @@ export function TaskDialog({
       setIsConfirmingDelete(false);
       setShowTemplateSave(false);
     }
+    setIsDirty(false);
   }, [task, defaultStatus, open]);
 
   const isDescriptionTooLong = description.length > MAX_DESCRIPTION_LENGTH;
+
+  const markDirty = () => setIsDirty(true);
 
   const handleSave = () => {
     if (!title.trim() || isDescriptionTooLong) return;
@@ -365,7 +369,7 @@ export function TaskDialog({
           {/* Title */}
           <Input
             value={title}
-            onChange={e => setTitle(e.target.value)}
+            onChange={e => { setTitle(e.target.value); markDirty(); }}
             className="text-xl font-bold bg-transparent border-none focus-visible:ring-0 shadow-none px-0 placeholder:text-muted-foreground/30 text-foreground h-auto py-0 mb-0"
             placeholder="Task title…"
           />
@@ -406,7 +410,7 @@ export function TaskDialog({
                       </div>
                       <Textarea
                         value={description}
-                        onChange={e => setDescription(e.target.value)}
+                        onChange={e => { setDescription(e.target.value); markDirty(); }}
                         placeholder="Add details, notes, or context…"
                         className={cn(
                           "min-h-[140px] bg-muted/30 border border-border/30 focus-visible:ring-1 focus-visible:ring-primary resize-none text-sm text-foreground rounded-xl",
@@ -419,7 +423,7 @@ export function TaskDialog({
                     <div className="space-y-2">
                       <SubtasksPanel
                         subtasks={localSubtasks}
-                        onChange={setLocalSubtasks}
+                        onChange={(subs) => { setLocalSubtasks(subs); markDirty(); }}
                       />
                     </div>
 
@@ -440,7 +444,7 @@ export function TaskDialog({
                     <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-3">Properties</p>
 
                     <PropertyRow label="Status">
-                      <Select value={status} onValueChange={(v: TaskStatus) => setStatus(v)}>
+                      <Select value={status} onValueChange={(v: TaskStatus) => { setStatus(v); markDirty(); }}>
                         <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1.5 w-full justify-start">
                           <div className={cn("w-2 h-2 rounded-full shrink-0", stageDot)} />
                           <span className="text-foreground font-medium text-sm">{stageLabel}</span>
@@ -459,7 +463,7 @@ export function TaskDialog({
                     </PropertyRow>
 
                     <PropertyRow label="Priority">
-                      <Select value={priority} onValueChange={(v: TaskPriority) => setPriority(v)}>
+                      <Select value={priority} onValueChange={(v: TaskPriority) => { setPriority(v); markDirty(); }}>
                         <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1.5 w-full justify-start">
                           <div className={cn("w-2 h-2 rounded-full shrink-0", pc.dot)} />
                           <span className={cn("font-medium text-sm", pc.color)}>{pc.label}</span>
@@ -478,7 +482,7 @@ export function TaskDialog({
                     </PropertyRow>
 
                     <PropertyRow label="Assignee">
-                      <Select value={assigneeId || 'unassigned'} onValueChange={v => setAssigneeId(v === 'unassigned' ? undefined : v)}>
+                      <Select value={assigneeId || 'unassigned'} onValueChange={v => { setAssigneeId(v === 'unassigned' ? undefined : v); markDirty(); }}>
                         <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1.5 w-full justify-start">
                           {assignee ? (
                             <div className="flex items-center gap-1.5">
@@ -507,14 +511,14 @@ export function TaskDialog({
                       <Input
                         type="date"
                         value={dueDate}
-                        onChange={e => setDueDate(e.target.value)}
+                        onChange={e => { setDueDate(e.target.value); markDirty(); }}
                         className="h-8 bg-transparent border-none focus-visible:ring-0 shadow-none text-sm px-0 text-foreground font-medium w-full"
                       />
                     </PropertyRow>
 
                     {milestones.length > 0 && (
                       <PropertyRow label="Milestone">
-                        <Select value={milestoneId ?? 'none'} onValueChange={v => setMilestoneId(v === 'none' ? undefined : v)}>
+                        <Select value={milestoneId ?? 'none'} onValueChange={v => { setMilestoneId(v === 'none' ? undefined : v); markDirty(); }}>
                           <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1 w-full justify-start">
                             <MilestoneIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                             <span className="text-foreground text-sm truncate">{milestoneId ? milestones.find(m => m.id === milestoneId)?.name : <span className="text-muted-foreground italic">None</span>}</span>
@@ -528,7 +532,7 @@ export function TaskDialog({
                     )}
 
                     <PropertyRow label="Recurrence">
-                      <Select value={recurrenceRule ?? 'none'} onValueChange={v => setRecurrenceRule(v === 'none' ? undefined : v as RecurrenceRule)}>
+                      <Select value={recurrenceRule ?? 'none'} onValueChange={v => { setRecurrenceRule(v === 'none' ? undefined : v as RecurrenceRule); markDirty(); }}>
                         <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1 w-full justify-start">
                           <RefreshCw className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                           <span className="text-foreground text-sm">{recurrenceRule ? RECURRENCE_OPTIONS.find(o => o.value === recurrenceRule)?.label : <span className="text-muted-foreground italic">None</span>}</span>
@@ -623,7 +627,7 @@ export function TaskDialog({
             </Button>
             <Button
               onClick={handleSave}
-              disabled={!title.trim() || isDescriptionTooLong}
+              disabled={!title.trim() || isDescriptionTooLong || !isDirty}
               className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 rounded-xl shadow-sm shadow-primary/20"
             >
               Save changes
