@@ -17,7 +17,7 @@ import { TimeTrackingPanel } from './TimeTrackingPanel';
 import { ActivityLogPanel } from './ActivityLogPanel';
 import { CustomFieldsPanel } from './CustomFieldsPanel';
 import { cn } from '@/lib/utils';
-import { updateSubtasks, createTaskTemplate, fetchWatchers, watchTask, unwatchTask, addActivityLog } from '../services/api';
+import { createTaskTemplate, fetchWatchers, watchTask, unwatchTask } from '../services/api';
 import { Milestone as MilestoneIcon, RefreshCw, LayoutTemplate, Eye, EyeOff, Trash2, X, Hash } from 'lucide-react';
 import { TaskWatcher } from '../types';
 import { UserAvatar } from './UserAvatar';
@@ -137,7 +137,7 @@ export function TaskDialog({
 
   const handleSave = () => {
     if (!title.trim() || isDescriptionTooLong) return;
-    onSave({ title, description, status, priority, assigneeId, dueDate: dueDate || undefined, milestoneId: milestoneId || undefined, recurrenceRule: recurrenceRule || undefined });
+    onSave({ title, description, status, priority, assigneeId, dueDate: dueDate || undefined, milestoneId: milestoneId || undefined, recurrenceRule: recurrenceRule || undefined, subtasks: localSubtasks });
     onOpenChange(false);
   };
 
@@ -419,16 +419,7 @@ export function TaskDialog({
                     <div className="space-y-2">
                       <SubtasksPanel
                         subtasks={localSubtasks}
-                        onChange={(newSubtasks) => {
-                          const pid = task.projectId || activeProjectId || '';
-                          const prev = localSubtasks;
-                          setLocalSubtasks(newSubtasks);
-                          updateSubtasks(task.id, newSubtasks, pid).catch(() => {});
-                          const added = newSubtasks.find(s => !prev.some(p => p.id === s.id));
-                          const toggled = newSubtasks.find(s => { const old = prev.find(p => p.id === s.id); return old && old.completed !== s.completed; });
-                          if (added) addActivityLog(task.id, pid, 'subtask_added', { newValue: added.title }).catch(() => {});
-                          else if (toggled) addActivityLog(task.id, pid, 'subtask_completed', { newValue: toggled.title }).catch(() => {});
-                        }}
+                        onChange={setLocalSubtasks}
                       />
                     </div>
 

@@ -10,6 +10,9 @@ interface ShortcutHandlers {
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers, enabled = true) {
+  const handlersRef = React.useRef(handlers);
+  handlersRef.current = handlers;
+
   const pendingKey = React.useRef<string | null>(null);
   const pendingTimer = React.useRef<number | null>(null);
 
@@ -33,9 +36,9 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers, enabled = true)
       if (pendingKey.current === 'g') {
         if (pendingTimer.current) clearTimeout(pendingTimer.current);
         pendingKey.current = null;
-        if (e.key === 't') { handlers.onGoTimeline?.(); return; }
-        if (e.key === 'b') { handlers.onGoBoard?.(); return; }
-        if (e.key === 'a') { handlers.onGoAnalytics?.(); return; }
+        if (e.key === 't') { handlersRef.current.onGoTimeline?.(); return; }
+        if (e.key === 'b') { handlersRef.current.onGoBoard?.(); return; }
+        if (e.key === 'a') { handlersRef.current.onGoAnalytics?.(); return; }
       }
 
       switch (e.key) {
@@ -45,14 +48,14 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers, enabled = true)
           break;
         case 'n':
         case 'N':
-          handlers.onNewTask?.();
+          handlersRef.current.onNewTask?.();
           break;
         case '/':
           e.preventDefault();
-          handlers.onFocusSearch?.();
+          handlersRef.current.onFocusSearch?.();
           break;
         case '?':
-          handlers.onShowShortcuts?.();
+          handlersRef.current.onShowShortcuts?.();
           break;
         case 'Escape':
           break;
@@ -64,5 +67,5 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers, enabled = true)
       window.removeEventListener('keydown', onKeyDown);
       if (pendingTimer.current) clearTimeout(pendingTimer.current);
     };
-  }, [enabled, handlers]);
+  }, [enabled]);
 }

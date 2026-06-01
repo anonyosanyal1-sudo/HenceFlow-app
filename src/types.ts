@@ -71,6 +71,7 @@ export interface Project {
   managerId?: string;
   members: string[];
   color: string;
+  stages?: Stage[];
   isArchived?: boolean;
   createdAt: string;
 }

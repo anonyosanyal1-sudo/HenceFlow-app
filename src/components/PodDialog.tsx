@@ -195,7 +195,7 @@ export function PodDialog({ open, onOpenChange, pod, users, currentUserId, onSav
                     placeholder="Stage name"
                   />
                   <Popover>
-                    <PopoverTrigger asChild>
+                    <PopoverTrigger>
                       <Button variant="outline" size="sm" className="h-7 px-2 text-xs shrink-0">Color</Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-52 p-2" align="end">

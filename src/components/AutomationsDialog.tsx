@@ -21,6 +21,7 @@ const TRIGGER_LABELS: Record<string, string> = {
   status_changed: 'Status changed to',
   priority_changed: 'Priority changed to',
   assignee_changed: 'Assigned to',
+  due_date_overdue: 'Due date is overdue',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -83,6 +84,9 @@ export function AutomationsDialog({ open, onOpenChange, projectId, automations, 
           {PRIORITY_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
       );
+    }
+    if (triggerType === 'due_date_overdue') {
+      return <span className="flex-1 flex items-center text-xs text-muted-foreground italic px-2">No value needed</span>;
     }
     return <Input className="flex-1 h-9" placeholder="Value" value={triggerValue} onChange={e => setTriggerValue(e.target.value)} />;
   };

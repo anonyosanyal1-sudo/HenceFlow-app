@@ -171,6 +171,8 @@ function AppContent() {
   const [automationsDialogOpen, setAutomationsDialogOpen] = React.useState(false);
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = React.useState(false);
   const [savingFilter, setSavingFilter] = React.useState(false);
+  const [filterNameInput, setFilterNameInput] = React.useState('');
+  const [showFilterNameInput, setShowFilterNameInput] = React.useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   // Dialog States
@@ -331,6 +333,14 @@ function AppContent() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [podDialogOpen]);
+
+  // Refresh milestones when milestone dialog closes
+  React.useEffect(() => {
+    if (!milestoneDialogOpen && activeProject) {
+      fetchMilestones(activeProject.id).then(setMilestones).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [milestoneDialogOpen]);
 
   // Refresh task data when tab regains focus (catches missed real-time events)
   React.useEffect(() => {
@@ -587,6 +597,7 @@ function AppContent() {
       setTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
       setAllTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
       await updateTask(targetProjectId, selectedTask.id, taskData);
+      addActivityLog(selectedTask.id, targetProjectId, 'task_updated').catch(() => {});
       executeAutomations(targetProjectId, selectedTask.id, taskData);
     } else {
       const tempId = `temp-${Date.now()}`;
@@ -625,10 +636,11 @@ function AppContent() {
   const handleDeleteTask = async (taskId: string) => {
     const targetProjectId = selectedTask?.projectId ?? activeProject?.id;
     if (!targetProjectId) return;
-    addActivityLog(taskId, targetProjectId, 'task_deleted').catch(() => {});
     setTasks(prev => prev.filter(t => t.id !== taskId));
     setAllTasks(prev => prev.filter(t => t.id !== taskId));
-    deleteTask(targetProjectId, taskId).catch(() => {});
+    deleteTask(targetProjectId, taskId)
+      .then(() => addActivityLog(taskId, targetProjectId, 'task_deleted').catch(() => {}))
+      .catch(() => {});
   };
 
   const filteredTasks = React.useMemo(() => {
@@ -654,11 +666,12 @@ function AppContent() {
           } else if (filterDate === 'today') {
             matchesDate = taskDate === new Date().toISOString().split('T')[0];
           } else if (filterDate === 'week') {
-            const now = new Date();
-            const weekEnd = new Date();
-            weekEnd.setDate(now.getDate() + 7);
+            const startOfToday = new Date();
+            startOfToday.setHours(0, 0, 0, 0);
+            const weekEnd = new Date(startOfToday);
+            weekEnd.setDate(startOfToday.getDate() + 7);
             const taskD = new Date(taskDate);
-            matchesDate = taskD >= new Date(now.setHours(0,0,0,0)) && taskD <= weekEnd;
+            matchesDate = taskD >= startOfToday && taskD <= weekEnd;
           }
         }
       }
@@ -1063,19 +1076,59 @@ function AppContent() {
                         </>
                       )}
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5"
-                        disabled={savingFilter}
-                        onClick={async () => {
-                          const name = prompt('Filter name:');
-                          if (!name || !activeProject) return;
-                          setSavingFilter(true);
-                          const sf = await createSavedFilter(activeProject.id, name, { searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate });
-                          setSavedFilters(prev => [...prev, sf]);
-                          setSavingFilter(false);
-                        }}>
-                        <BookmarkPlus className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-sm font-medium">Save filters</span>
-                      </DropdownMenuItem>
+                      {showFilterNameInput ? (
+                        <div className="px-2 py-1.5 space-y-2" onClick={e => e.stopPropagation()}>
+                          <input
+                            autoFocus
+                            placeholder="Filter name…"
+                            value={filterNameInput}
+                            onChange={e => setFilterNameInput(e.target.value)}
+                            onKeyDown={async e => {
+                              if (e.key === 'Enter' && filterNameInput.trim() && activeProject) {
+                                setSavingFilter(true);
+                                const sf = await createSavedFilter(activeProject.id, filterNameInput.trim(), { searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate });
+                                setSavedFilters(prev => [...prev, sf]);
+                                setSavingFilter(false);
+                                setFilterNameInput('');
+                                setShowFilterNameInput(false);
+                              } else if (e.key === 'Escape') {
+                                setFilterNameInput('');
+                                setShowFilterNameInput(false);
+                              }
+                            }}
+                            className="w-full h-8 px-2.5 rounded-lg bg-muted/50 border border-border/40 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                          />
+                          <div className="flex gap-1.5">
+                            <button
+                              className="flex-1 h-7 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
+                              disabled={!filterNameInput.trim() || savingFilter}
+                              onClick={async () => {
+                                if (!filterNameInput.trim() || !activeProject) return;
+                                setSavingFilter(true);
+                                const sf = await createSavedFilter(activeProject.id, filterNameInput.trim(), { searchQuery, filterAssignee, filterCreator, filterPriority, filterDueDate });
+                                setSavedFilters(prev => [...prev, sf]);
+                                setSavingFilter(false);
+                                setFilterNameInput('');
+                                setShowFilterNameInput(false);
+                              }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              className="flex-1 h-7 rounded-lg bg-muted text-muted-foreground text-xs"
+                              onClick={() => { setFilterNameInput(''); setShowFilterNameInput(false); }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5"
+                          onClick={() => setShowFilterNameInput(true)}>
+                          <BookmarkPlus className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="text-sm font-medium">Save filters</span>
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
 

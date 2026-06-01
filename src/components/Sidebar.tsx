@@ -349,7 +349,10 @@ export function Sidebar({
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               Unlimited projects, advanced analytics &amp; AI assist.
             </p>
-            <button className="w-full text-xs font-semibold text-foreground bg-card/80 hover:bg-card border border-border/40 rounded-xl py-1.5 transition-colors">
+            <button
+              className="w-full text-xs font-semibold text-foreground bg-card/80 hover:bg-card border border-border/40 rounded-xl py-1.5 transition-colors"
+              onClick={() => alert('Upgrade plans are coming soon! Contact support@henceflow.com for early access.')}
+            >
               See plans
             </button>
           </div>

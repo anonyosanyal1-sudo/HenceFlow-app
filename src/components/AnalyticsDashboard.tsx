@@ -279,7 +279,7 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
           {projectTaskData.length > 0 && (
             <Card className="bg-card border-border">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-foreground">Tasks per Pod</CardTitle>
+                <CardTitle className="text-base font-semibold text-foreground">Tasks per Project</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
