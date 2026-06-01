@@ -56,13 +56,18 @@ function StatCard({ label, value, sub, icon, color, glow }: { label: string; val
   );
 }
 
+// Theme-aware chart styling — references CSS variables so charts remain
+// legible in both dark and light mode (previously hardcoded dark oklch values).
 const CustomTooltipStyle = {
-  backgroundColor: 'oklch(0.13 0.020 270)',
-  border: '1px solid oklch(0.22 0.025 270)',
+  backgroundColor: 'var(--popover)',
+  border: '1px solid var(--border)',
   borderRadius: '8px',
-  color: 'oklch(0.95 0.01 270)',
+  color: 'var(--popover-foreground)',
   fontSize: '12px',
 };
+
+const AXIS_TICK = { fill: 'var(--muted-foreground)', fontSize: 10 };
+const GRID_STROKE = 'var(--border)';
 
 // Returns the last stage ID for a project (the "done" stage).
 function getClosedStageId(project?: Project) {
@@ -226,9 +231,9 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={statusData} margin={{ top: 4, right: 4, left: -20, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.22 0.025 270)" />
-                    <XAxis dataKey="name" tick={{ fill: 'oklch(0.55 0.025 270)', fontSize: 10 }} />
-                    <YAxis tick={{ fill: 'oklch(0.55 0.025 270)', fontSize: 10 }} allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+                    <XAxis dataKey="name" tick={AXIS_TICK} />
+                    <YAxis tick={AXIS_TICK} allowDecimals={false} />
                     <Tooltip contentStyle={CustomTooltipStyle} />
                     <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                       {statusData.map((_, i) => (
@@ -291,11 +296,11 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={projectTaskData} layout="vertical" margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.22 0.025 270)" horizontal={false} />
-                    <XAxis type="number" tick={{ fill: 'oklch(0.55 0.025 270)', fontSize: 10 }} allowDecimals={false} />
-                    <YAxis dataKey="name" type="category" tick={{ fill: 'oklch(0.55 0.025 270)', fontSize: 10 }} width={80} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} horizontal={false} />
+                    <XAxis type="number" tick={AXIS_TICK} allowDecimals={false} />
+                    <YAxis dataKey="name" type="category" tick={AXIS_TICK} width={80} />
                     <Tooltip contentStyle={CustomTooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 11, color: 'oklch(0.55 0.025 270)' }} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: 'var(--muted-foreground)' }} />
                     <Bar dataKey="tasks" name="Total" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
                     <Bar dataKey="closed" name="Closed" fill="#10b981" radius={[0, 4, 4, 0]} />
                   </BarChart>
@@ -313,9 +318,9 @@ export function AnalyticsDashboard({ tasks, projects, users, currentUserId, acti
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={assigneeData} margin={{ top: 4, right: 4, left: -20, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.22 0.025 270)" />
-                    <XAxis dataKey="name" tick={{ fill: 'oklch(0.55 0.025 270)', fontSize: 10 }} />
-                    <YAxis tick={{ fill: 'oklch(0.55 0.025 270)', fontSize: 10 }} allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+                    <XAxis dataKey="name" tick={AXIS_TICK} />
+                    <YAxis tick={AXIS_TICK} allowDecimals={false} />
                     <Tooltip contentStyle={CustomTooltipStyle} />
                     <Bar dataKey="count" name="Tasks" radius={[4, 4, 0, 0]}>
                       {assigneeData.map((_, i) => (

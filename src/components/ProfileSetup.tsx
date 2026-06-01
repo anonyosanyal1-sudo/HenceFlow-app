@@ -53,7 +53,12 @@ export function ProfileSetup({ open, onOpenChange, currentDisplayName, currentPh
     }
   }, [open, currentDisplayName, currentPhotoURL]);
 
-  const photoURL = selectedEmoji ? `emoji:${selectedEmoji}` : (currentPhotoURL?.startsWith('emoji:') ? currentPhotoURL : null);
+  // When an emoji is selected, persist it. When cleared (null), persist null so the
+  // "Clear" button can actually remove an existing emoji avatar — but preserve a
+  // non-emoji (e.g. OAuth) photo URL that this dialog doesn't manage.
+  const photoURL = selectedEmoji
+    ? `emoji:${selectedEmoji}`
+    : (currentPhotoURL && !currentPhotoURL.startsWith('emoji:') ? currentPhotoURL : null);
 
   const handleSave = async () => {
     if (!name.trim()) {

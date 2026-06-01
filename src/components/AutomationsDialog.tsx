@@ -83,7 +83,28 @@ export function AutomationsDialog({ open, onOpenChange, projectId, automations, 
         </select>
       );
     }
+    if (triggerType === 'assignee_changed') {
+      return (
+        <select className="flex-1 h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground" value={triggerValue} onChange={e => setTriggerValue(e.target.value)}>
+          <option value="">Anyone</option>
+          {users.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>)}
+        </select>
+      );
+    }
     return <Input className="flex-1 h-9" placeholder="Value" value={triggerValue} onChange={e => setTriggerValue(e.target.value)} />;
+  };
+
+  // Resolve a stored trigger/action value (stage id, priority, or user uid) to a human label.
+  const resolveValueLabel = (type: string, value?: string) => {
+    if (!value) return '';
+    if (type === 'status_changed' || type === 'set_status') {
+      return stages.find(s => s.id === value)?.label ?? value;
+    }
+    if (type === 'assignee_changed' || type === 'set_assignee') {
+      const u = users.find(u => u.uid === value);
+      return u?.displayName || u?.email || value;
+    }
+    return value; // priority values are already human-readable
   };
 
   const ActionValueSelect = () => {
@@ -133,7 +154,7 @@ export function AutomationsDialog({ open, onOpenChange, projectId, automations, 
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground">{rule.name}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      When {TRIGGER_LABELS[rule.triggerType] || rule.triggerType} {rule.triggerValue || '—'} → {ACTION_LABELS[rule.actionType] || rule.actionType} {rule.actionValue || ''}
+                      When {TRIGGER_LABELS[rule.triggerType] || rule.triggerType} {resolveValueLabel(rule.triggerType, rule.triggerValue) || '—'} → {ACTION_LABELS[rule.actionType] || rule.actionType} {resolveValueLabel(rule.actionType, rule.actionValue)}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -152,7 +173,7 @@ export function AutomationsDialog({ open, onOpenChange, projectId, automations, 
           {/* Create new */}
           <div className="space-y-3 border border-border/50 rounded-xl p-4 bg-muted/10">
             <h4 className="text-sm font-bold text-foreground">New Rule</h4>
-            <Input placeholder="Rule name" value={name} onChange={e => setName(e.target.value)} className="h-9" />
+            <Input placeholder="Rule name" value={name} onChange={e => setName(e.target.value)} className="h-9" maxLength={80} />
             <div className="flex gap-2">
               <select className="flex-1 h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground" value={triggerType} onChange={e => setTriggerType(e.target.value)}>
                 {Object.entries(TRIGGER_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}

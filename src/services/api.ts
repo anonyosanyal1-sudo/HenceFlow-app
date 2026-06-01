@@ -68,6 +68,7 @@ function mapProject(r: Record<string, any>): Project {
     members: r.members ?? [],
     color: r.color,
     isArchived: r.is_archived ?? false,
+    stages: r.stages ?? undefined,
     createdAt: r.created_at,
   };
 }
@@ -410,6 +411,7 @@ export const createProject = async (companyId: string, data: Partial<Project>): 
       manager_id: data.managerId ?? userId,
       members: data.members ?? [],
       color: data.color ?? '#6366f1',
+      stages: data.stages ?? null,
     })
     .select('id')
     .single();
@@ -425,6 +427,7 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
   if (updates.color !== undefined) payload.color = updates.color;
   if (updates.managerId !== undefined) payload.manager_id = updates.managerId;
   if (updates.isArchived !== undefined) payload.is_archived = updates.isArchived;
+  if (updates.stages !== undefined) payload.stages = updates.stages;
   const { error } = await supabase.from('projects').update(payload).eq('id', projectId);
   if (error) throw new Error(error.message);
 };
@@ -470,7 +473,9 @@ export const createTask = async (podId: string, projectId: string, data: Partial
       tags: data.tags ?? [],
       subtasks: data.subtasks ?? [],
       recurrence_rule: data.recurrenceRule ?? null,
+      recurrence_parent_id: data.recurrenceParentId ?? null,
       milestone_id: data.milestoneId ?? null,
+      sprint_id: data.sprintId ?? null,
     })
     .select('id')
     .single();
@@ -1201,19 +1206,29 @@ export const deleteIntakeForm = async (formId: string): Promise<void> => {
   if (error) throw new Error(error.message);
 };
 
+// Public, unauthenticated endpoint — apply defensive length caps before insert so a
+// malicious submitter cannot store oversized payloads (see security_spec.md).
+const INTAKE_FIELD_MAX = 5000;
+const INTAKE_NAME_MAX = 200;
+const INTAKE_EMAIL_MAX = 254;
+
 export const submitIntakeForm = async (
   formId: string,
   data: Record<string, string>,
   submitterName?: string,
   submitterEmail?: string,
 ): Promise<string> => {
+  const cappedData: Record<string, string> = {};
+  for (const [key, value] of Object.entries(data ?? {})) {
+    cappedData[key.slice(0, 200)] = String(value ?? '').slice(0, INTAKE_FIELD_MAX);
+  }
   const { data: row, error } = await supabase
     .from('intake_submissions')
     .insert({
       form_id: formId,
-      submitter_name: submitterName ?? null,
-      submitter_email: submitterEmail ?? null,
-      data,
+      submitter_name: submitterName ? submitterName.slice(0, INTAKE_NAME_MAX) : null,
+      submitter_email: submitterEmail ? submitterEmail.slice(0, INTAKE_EMAIL_MAX) : null,
+      data: cappedData,
     })
     .select('id')
     .single();
