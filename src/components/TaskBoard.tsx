@@ -448,6 +448,7 @@ export function TaskBoard({
                   milestones={milestones}
                   selectedTaskIds={selectedTaskIds}
                   selectionMode={selectionMode}
+                  isViewer={isViewer}
                   onTaskClick={onTaskClick}
                   onAddTask={onAddTask}
                   onToggleSelect={handleToggleSelect}
