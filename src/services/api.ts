@@ -970,15 +970,17 @@ export const deleteAutomation = async (ruleId: string) => {
 
 // ── Export ────────────────────────────────────────────────────────────────────
 
-export const exportTasksCSV = async (projectId: string) => {
-  const tasks = await fetchTasks(projectId);
+export const exportTasksCSV = async (projectId: string, preloadedTasks?: Task[]) => {
+  const tasks = preloadedTasks ?? await fetchTasks(projectId);
   const headers = [
     'id', 'title', 'status', 'priority', 'assigneeId', 'creatorId',
     'dueDate', 'tags', 'milestoneId', 'createdAt', 'updatedAt',
   ];
+  // Escape CSV cell and neutralise formula-injection characters (=, +, -, @).
   const escape = (v: any) => {
-    const s = v === undefined || v === null ? '' : String(v);
-    return s.includes(',') || s.includes('"') || s.includes('\n')
+    let s = v === undefined || v === null ? '' : String(v);
+    if (/^[=+\-@]/.test(s)) s = `\t${s}`;
+    return s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\t')
       ? `"${s.replace(/"/g, '""')}"`
       : s;
   };

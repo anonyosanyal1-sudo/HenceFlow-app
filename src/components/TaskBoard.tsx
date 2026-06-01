@@ -18,6 +18,7 @@ interface TaskBoardProps {
   selectedTaskIds?: Set<string>;
   selectionMode?: boolean;
   swimlaneBy?: SwimlaneBy;
+  isViewer?: boolean;
   onTaskClick: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
@@ -49,12 +50,13 @@ interface TaskCardProps {
   milestones: Milestone[];
   selected: boolean;
   selectionMode: boolean;
+  isViewer?: boolean;
   onClick: (task: Task) => void;
   onToggleSelect: (id: string) => void;
   onInlineEdit?: (taskId: string, newTitle: string) => void;
 }
 
-function TaskCard({ task, index, users, milestones, selected, selectionMode, onClick, onToggleSelect, onInlineEdit }: TaskCardProps) {
+function TaskCard({ task, index, users, milestones, selected, selectionMode, isViewer, onClick, onToggleSelect, onInlineEdit }: TaskCardProps) {
   const pCfg = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
   const todayStr = new Date().toISOString().split('T')[0];
   const isOverdue = task.dueDate && (task.dueDate.split('T')[0]) < todayStr;
@@ -155,7 +157,7 @@ function TaskCard({ task, index, users, milestones, selected, selectionMode, onC
                 ) : (
                   <h4
                     className="text-sm font-semibold text-foreground leading-snug cursor-pointer"
-                    onDoubleClick={e => { e.stopPropagation(); setEditing(true); setEditTitle(task.title); }}
+                    onDoubleClick={e => { if (isViewer) return; e.stopPropagation(); setEditing(true); setEditTitle(task.title); }}
                   >{task.title}</h4>
                 )}
 
@@ -230,6 +232,7 @@ interface ColumnProps {
   milestones: Milestone[];
   selectedTaskIds: Set<string>;
   selectionMode: boolean;
+  isViewer?: boolean;
   swimlaneLabel?: string;
   droppableId?: string;
   onTaskClick: (task: Task) => void;
@@ -238,7 +241,7 @@ interface ColumnProps {
   onInlineEdit?: (taskId: string, newTitle: string) => void;
 }
 
-function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode, droppableId, onTaskClick, onAddTask, onToggleSelect, onInlineEdit }: ColumnProps) {
+function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode, isViewer, droppableId, onTaskClick, onAddTask, onToggleSelect, onInlineEdit }: ColumnProps) {
   const bgColorRaw = col.color.split(' ').find(c => c.startsWith('bg-'));
   const bgColor = bgColorRaw ? bgColorRaw.split('/')[0] : 'bg-violet-500';
 
@@ -252,11 +255,13 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
             {tasks.length}
           </span>
         </div>
-        <div className="flex items-center gap-0.5 shrink-0">
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 rounded-lg" onClick={() => onAddTask(col.id)}>
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+        {!isViewer && (
+          <div className="flex items-center gap-0.5 shrink-0">
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 rounded-lg" onClick={() => onAddTask(col.id)}>
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
       </div>
 
       <Droppable droppableId={droppableId ?? col.id}>
@@ -283,6 +288,7 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
                 milestones={milestones}
                 selected={selectedTaskIds.has(task.id)}
                 selectionMode={selectionMode}
+                isViewer={isViewer}
                 onClick={onTaskClick}
                 onToggleSelect={onToggleSelect}
                 onInlineEdit={onInlineEdit}
@@ -293,13 +299,15 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
         )}
       </Droppable>
 
-      <button
-        className="flex items-center justify-center gap-1.5 mx-3 my-3 py-2 text-xs text-muted-foreground/40 hover:text-muted-foreground/80 transition-colors rounded-lg hover:bg-muted/30 font-medium"
-        onClick={() => onAddTask(col.id)}
-      >
-        <Plus className="w-3.5 h-3.5" />
-        Add task
-      </button>
+      {!isViewer && (
+        <button
+          className="flex items-center justify-center gap-1.5 mx-3 my-3 py-2 text-xs text-muted-foreground/40 hover:text-muted-foreground/80 transition-colors rounded-lg hover:bg-muted/30 font-medium"
+          onClick={() => onAddTask(col.id)}
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add task
+        </button>
+      )}
     </div>
   );
 }
@@ -307,10 +315,12 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
 export function TaskBoard({
   tasks, stages, users = [], milestones = [],
   selectedTaskIds = new Set(), selectionMode = false, swimlaneBy = null,
+  isViewer = false,
   onTaskClick, onAddTask, onStatusChange, onSelectionChange, onInlineEdit,
 }: TaskBoardProps) {
 
   const onDragEnd = (result: DropResult) => {
+    if (isViewer) return;
     const { destination, source, draggableId } = result;
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
@@ -351,6 +361,7 @@ export function TaskBoard({
                 selectedTaskIds={selectedTaskIds}
                 selectionMode={selectionMode}
                 onTaskClick={onTaskClick}
+                isViewer={isViewer}
                 onAddTask={onAddTask}
                 onToggleSelect={handleToggleSelect}
                 onInlineEdit={onInlineEdit}

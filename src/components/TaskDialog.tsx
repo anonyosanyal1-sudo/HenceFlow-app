@@ -550,16 +550,23 @@ export function TaskDialog({
                     )}
 
                     <PropertyRow label="Recurrence">
-                      <Select value={recurrenceRule ?? 'none'} onValueChange={v => { setRecurrenceRule(v === 'none' ? undefined : v as RecurrenceRule); markDirty(); }}>
-                        <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1 w-full justify-start">
-                          <RefreshCw className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                          <span className="text-foreground text-sm">{recurrenceRule ? RECURRENCE_OPTIONS.find(o => o.value === recurrenceRule)?.label : <span className="text-muted-foreground italic">None</span>}</span>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none" className="text-sm italic text-muted-foreground">None</SelectItem>
-                          {RECURRENCE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex flex-col gap-0.5 w-full">
+                        <Select value={recurrenceRule ?? 'none'} onValueChange={v => { setRecurrenceRule(v === 'none' ? undefined : v as RecurrenceRule); markDirty(); }}>
+                          <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1 w-full justify-start">
+                            <RefreshCw className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            <span className="text-foreground text-sm">{recurrenceRule ? RECURRENCE_OPTIONS.find(o => o.value === recurrenceRule)?.label : <span className="text-muted-foreground italic">None</span>}</span>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none" className="text-sm italic text-muted-foreground">None</SelectItem>
+                            {RECURRENCE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        {recurrenceRule && (
+                          <span className="text-[10px] text-amber-400/80 flex items-center gap-1 pl-0.5">
+                            ⚠ Recurring instance spawning is server-side — coming soon
+                          </span>
+                        )}
+                      </div>
                     </PropertyRow>
 
                     {/* Template save */}
