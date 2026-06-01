@@ -11,14 +11,15 @@ const PROJECT_SCOPED_TABLES: { table: string; event: string }[] = [
   { table: 'time_entries',             event: 'time_entries:changed' },
   { table: 'custom_field_definitions', event: 'custom_fields:changed' },
   { table: 'task_templates',           event: 'templates:changed' },
-  { table: 'projects',                 event: 'projects:changed' },
   { table: 'activity_logs',            event: 'activity_logs:changed' },
 ];
 
-// Tables that are global (no project_id filter)
+// Tables that are global (no project_id filter).
+// 'projects' is here because the projects table has no project_id column.
 const GLOBAL_TABLES: { table: string; event: string }[] = [
   { table: 'pods',      event: 'pods:changed' },
   { table: 'companies', event: 'companies:changed' },
+  { table: 'projects',  event: 'projects:changed' },
 ];
 
 export function useServerEvents(

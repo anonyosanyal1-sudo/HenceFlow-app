@@ -999,6 +999,8 @@ export const exportTasksCSV = async (projectId: string) => {
   const a = document.createElement('a');
   a.href = url;
   a.download = `tasks_${projectId}.csv`;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };

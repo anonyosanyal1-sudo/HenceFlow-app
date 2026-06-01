@@ -309,7 +309,7 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
               errorMsg && "border-red-500 focus-visible:ring-red-500"
             )}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 handleSubmit(e);
               }
@@ -328,8 +328,9 @@ export function TaskComments({ projectId, taskId, users }: TaskCommentsProps) {
               type="button"
               variant="outline"
               size="icon"
-              className="h-8 w-8 rounded-lg border-border bg-card hover:bg-muted text-muted-foreground"
-              onClick={() => fileInputRef.current?.click()}
+              disabled
+              title="File attachments are not yet supported"
+              className="h-8 w-8 rounded-lg border-border bg-card text-muted-foreground/30 cursor-not-allowed"
             >
               <Paperclip className="w-4 h-4" />
             </Button>

@@ -1,12 +1,12 @@
 import React from 'react';
-import { Project, Task, Company, UserProfile } from '../types';
+import { Project, Task, Company, UserProfile, DEFAULT_STAGES } from '../types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { UserAvatar } from './UserAvatar';
 import {
   Settings, Trash2, Plus, AlertCircle, Users, TrendingUp,
-  ArrowUpRight, Zap, ChevronRight, Search, Bell,
+  ChevronRight, Search,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -46,11 +46,13 @@ export function Dashboard({
   const [projectToDelete, setProjectToDelete] = React.useState<Project | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = React.useState('');
   const [workspaceFilter, setWorkspaceFilter] = React.useState<'all' | 'active' | 'archived'>('all');
+  const [searchQuery, setSearchQuery] = React.useState('');
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const today = new Date().toISOString().split('T')[0];
 
-  const isCompleted = (t: Task) => t.status === 'closed';
+  const closedStageId = DEFAULT_STAGES[DEFAULT_STAGES.length - 1].id;
+  const isCompleted = (t: Task) => t.status === closedStageId;
 
   const isOverdue = (t: Task) =>
     !!t.dueDate && t.dueDate < today && !isCompleted(t);
@@ -114,7 +116,7 @@ export function Dashboard({
     if (workspaceFilter === 'archived') return p.isArchived === true;
     if (workspaceFilter === 'active') return !p.isArchived;
     return true;
-  });
+  }).filter(p => !searchQuery.trim() || p.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   // ── Stats cards ─────────────────────────────────────────────────────────────
   const stats = [
@@ -159,7 +161,9 @@ export function Dashboard({
           <div className="relative hidden md:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40 pointer-events-none" />
             <input
-              placeholder="Search…"
+              placeholder="Search pods…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
               className="pl-9 pr-10 h-9 w-52 rounded-xl bg-muted/40 border border-border/30 text-sm placeholder:text-muted-foreground/40 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
             />
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground/30 font-mono pointer-events-none">⌘K</kbd>
@@ -170,9 +174,6 @@ export function Dashboard({
             title="Company Settings"
           >
             <Settings className="w-4 h-4" />
-          </button>
-          <button className="h-9 w-9 flex items-center justify-center rounded-xl text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors">
-            <Bell className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -270,6 +271,11 @@ export function Dashboard({
                     </div>
                   );
                 })}
+                {projects.length > 5 && (
+                  <p className="text-xs text-muted-foreground/40 text-center pt-1">
+                    and {projects.length - 5} more pod{projects.length - 5 !== 1 ? 's' : ''}
+                  </p>
+                )}
                 {projects.length === 0 && (
                   <p className="text-xs text-muted-foreground/40 italic text-center py-4">No pods yet</p>
                 )}

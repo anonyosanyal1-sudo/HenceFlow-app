@@ -1,7 +1,7 @@
 import React from 'react';
 import { Task, TaskStatus, TaskPriority, Stage, UserProfile, Milestone } from '../types';
 import { CardContent } from '@/components/ui/card';
-import { Plus, MoreHorizontal, Clock, Calendar, RefreshCw, Milestone as MilestoneIcon, CheckSquare } from 'lucide-react';
+import { Plus, Clock, Calendar, RefreshCw, Milestone as MilestoneIcon, CheckSquare } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -56,8 +56,9 @@ interface TaskCardProps {
 
 function TaskCard({ task, index, users, milestones, selected, selectionMode, onClick, onToggleSelect, onInlineEdit }: TaskCardProps) {
   const pCfg = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
-  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date(new Date().setHours(0, 0, 0, 0));
-  const isToday = task.dueDate === new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isOverdue = task.dueDate && (task.dueDate.split('T')[0]) < todayStr;
+  const isToday = (task.dueDate?.split('T')[0]) === todayStr;
   const milestone = task.milestoneId ? milestones.find(m => m.id === task.milestoneId) : undefined;
   const completedSubtasks = (task.subtasks ?? []).filter(s => s.completed).length;
   const totalSubtasks = (task.subtasks ?? []).length;
@@ -252,9 +253,6 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
         <div className="flex items-center gap-0.5 shrink-0">
           <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 rounded-lg" onClick={() => onAddTask(col.id)}>
             <Plus className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 rounded-lg">
-            <MoreHorizontal className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
