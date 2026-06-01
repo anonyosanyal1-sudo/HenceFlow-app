@@ -153,6 +153,13 @@ function AppContent() {
   const [filterPriority, setFilterPriority] = React.useState<string | null>(null);
   const [filterDueDate, setFilterDueDate] = React.useState<string | null>(null);
 
+  // Stable "today" reference that updates once per minute so overdue/today filters stay fresh.
+  const [todayTs, setTodayTs] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const id = setInterval(() => setTodayTs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   // View state
   const [activeView, setActiveView] = React.useState<'board' | 'analytics' | 'timeline'>('board');
 
@@ -708,15 +715,19 @@ function AppContent() {
   };
 
   const filteredTasks = React.useMemo(() => {
+    const todayMidnight = new Date(todayTs);
+    todayMidnight.setHours(0, 0, 0, 0);
+    const todayStr = todayMidnight.toISOString().split('T')[0];
+
     return tasks.filter(task => {
       const matchesSearch =
         task.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
         (task.description ?? '').toLowerCase().includes(debouncedSearch.toLowerCase());
-      
+
       const matchesAssignee = !filterAssignee || task.assigneeId === filterAssignee;
       const matchesCreator = !filterCreator || task.creatorId === filterCreator;
       const matchesPriority = !filterPriority || task.priority === filterPriority;
-      
+
       let matchesDate = true;
       if (filterDueDate) {
         if (!task.dueDate) {
@@ -724,24 +735,22 @@ function AppContent() {
         } else {
           const taskDate = task.dueDate.split('T')[0];
           const filterDate = filterDueDate;
-          
+
           if (filterDate === 'overdue') {
-            matchesDate = new Date(taskDate) < new Date(new Date().setHours(0,0,0,0));
+            matchesDate = new Date(taskDate) < todayMidnight;
           } else if (filterDate === 'today') {
-            matchesDate = taskDate === new Date().toISOString().split('T')[0];
+            matchesDate = taskDate === todayStr;
           } else if (filterDate === 'week') {
-            const startOfToday = new Date();
-            startOfToday.setHours(0, 0, 0, 0);
-            const weekEnd = new Date(startOfToday.getTime() + 7 * 86400000);
+            const weekEnd = new Date(todayMidnight.getTime() + 7 * 86400000);
             const taskD = new Date(taskDate);
-            matchesDate = taskD >= startOfToday && taskD <= weekEnd;
+            matchesDate = taskD >= todayMidnight && taskD <= weekEnd;
           }
         }
       }
-      
+
       return matchesSearch && matchesAssignee && matchesCreator && matchesPriority && matchesDate;
     });
-  }, [tasks, debouncedSearch, filterAssignee, filterCreator, filterPriority, filterDueDate]);
+  }, [tasks, debouncedSearch, filterAssignee, filterCreator, filterPriority, filterDueDate, todayTs]);
 
   if (loading) {
     return (
