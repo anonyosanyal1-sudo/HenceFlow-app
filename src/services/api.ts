@@ -4,6 +4,7 @@ import {
   TaskDependency, TimeEntry, Milestone, ActivityLog,
   CustomFieldDefinition, CustomFieldValue, TaskTemplate, Subtask,
   Notification, TaskWatcher, SavedFilter, AutomationRule,
+  Sprint, Goal, IntakeForm, IntakeSubmission, TaskApproval, DependencyRelationType,
 } from '../types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -88,6 +89,79 @@ function mapTask(r: Record<string, any>): Task {
     recurrenceRule: r.recurrence_rule ?? undefined,
     recurrenceParentId: r.recurrence_parent_id ?? undefined,
     milestoneId: r.milestone_id ?? undefined,
+    sprintId: r.sprint_id ?? undefined,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+function mapSprint(r: Record<string, any>): Sprint {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    name: r.name,
+    goal: r.goal ?? undefined,
+    startDate: r.start_date ?? undefined,
+    endDate: r.end_date ?? undefined,
+    status: r.status,
+    createdAt: r.created_at,
+  };
+}
+
+function mapGoal(r: Record<string, any>): Goal {
+  return {
+    id: r.id,
+    companyId: r.company_id,
+    projectId: r.project_id ?? undefined,
+    title: r.title,
+    description: r.description ?? undefined,
+    targetValue: r.target_value ?? undefined,
+    currentValue: r.current_value ?? 0,
+    unit: r.unit ?? '%',
+    dueDate: r.due_date ?? undefined,
+    status: r.status,
+    createdBy: r.created_by,
+    createdAt: r.created_at,
+  };
+}
+
+function mapIntakeForm(r: Record<string, any>): IntakeForm {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    podId: r.pod_id ?? undefined,
+    name: r.name,
+    description: r.description ?? undefined,
+    fields: r.fields ?? [],
+    isPublic: r.is_public,
+    defaultPriority: r.default_priority,
+    defaultStatus: r.default_status,
+    token: r.token,
+    createdAt: r.created_at,
+  };
+}
+
+function mapIntakeSubmission(r: Record<string, any>): IntakeSubmission {
+  return {
+    id: r.id,
+    formId: r.form_id,
+    taskId: r.task_id ?? undefined,
+    submitterName: r.submitter_name ?? undefined,
+    submitterEmail: r.submitter_email ?? undefined,
+    data: r.data ?? {},
+    createdAt: r.created_at,
+  };
+}
+
+function mapTaskApproval(r: Record<string, any>): TaskApproval {
+  return {
+    id: r.id,
+    taskId: r.task_id,
+    projectId: r.project_id,
+    requestedBy: r.requested_by,
+    approverId: r.approver_id,
+    status: r.status,
+    note: r.note ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -415,6 +489,7 @@ export const updateTask = async (_projectId: string, taskId: string, updates: Pa
   if (updates.subtasks !== undefined) payload.subtasks = updates.subtasks;
   if ('recurrenceRule' in updates) payload.recurrence_rule = updates.recurrenceRule ?? null;
   if ('milestoneId' in updates) payload.milestone_id = updates.milestoneId ?? null;
+  if ('sprintId' in updates) payload.sprint_id = updates.sprintId ?? null;
   const { error } = await supabase.from('tasks').update(payload).eq('id', taskId);
   if (error) throw new Error(error.message);
 };
@@ -539,10 +614,10 @@ export const getDependencies = async (taskId: string): Promise<{ blockedBy: Task
   };
 };
 
-export const addDependency = async (taskId: string, dependsOnId: string): Promise<string> => {
+export const addDependency = async (taskId: string, dependsOnId: string, relationType: DependencyRelationType = 'blocks'): Promise<string> => {
   const { data: row, error } = await supabase
     .from('task_dependencies')
-    .insert({ task_id: taskId, depends_on_id: dependsOnId })
+    .insert({ task_id: taskId, depends_on_id: dependsOnId, relation_type: relationType })
     .select('id')
     .single();
   if (error) throw new Error(error.message);
@@ -965,6 +1040,230 @@ export const updateAutomation = async (ruleId: string, updates: Partial<Automati
 
 export const deleteAutomation = async (ruleId: string) => {
   const { error } = await supabase.from('automation_rules').delete().eq('id', ruleId);
+  if (error) throw new Error(error.message);
+};
+
+// ── Sprints ───────────────────────────────────────────────────────────────────
+
+export const fetchSprints = async (projectId: string): Promise<Sprint[]> => {
+  const { data, error } = await supabase
+    .from('sprints')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapSprint);
+};
+
+export const createSprint = async (projectId: string, data: Omit<Sprint, 'id' | 'projectId' | 'createdAt'>): Promise<Sprint> => {
+  const { data: row, error } = await supabase
+    .from('sprints')
+    .insert({
+      project_id: projectId,
+      name: data.name,
+      goal: data.goal ?? null,
+      start_date: data.startDate ?? null,
+      end_date: data.endDate ?? null,
+      status: data.status,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return mapSprint(row);
+};
+
+export const updateSprint = async (sprintId: string, data: Partial<Sprint>): Promise<void> => {
+  const payload: Record<string, any> = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.goal !== undefined) payload.goal = data.goal ?? null;
+  if (data.startDate !== undefined) payload.start_date = data.startDate ?? null;
+  if (data.endDate !== undefined) payload.end_date = data.endDate ?? null;
+  if (data.status !== undefined) payload.status = data.status;
+  const { error } = await supabase.from('sprints').update(payload).eq('id', sprintId);
+  if (error) throw new Error(error.message);
+};
+
+export const deleteSprint = async (sprintId: string): Promise<void> => {
+  const { error } = await supabase.from('sprints').delete().eq('id', sprintId);
+  if (error) throw new Error(error.message);
+};
+
+// ── Goals / OKRs ──────────────────────────────────────────────────────────────
+
+export const fetchGoals = async (companyId: string): Promise<Goal[]> => {
+  const { data, error } = await supabase
+    .from('goals')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapGoal);
+};
+
+export const createGoal = async (companyId: string, data: Omit<Goal, 'id' | 'companyId' | 'createdBy' | 'createdAt'>): Promise<Goal> => {
+  const userId = await getCurrentUserId();
+  const { data: row, error } = await supabase
+    .from('goals')
+    .insert({
+      company_id: companyId,
+      project_id: data.projectId ?? null,
+      title: data.title,
+      description: data.description ?? null,
+      target_value: data.targetValue ?? null,
+      current_value: data.currentValue,
+      unit: data.unit,
+      due_date: data.dueDate ?? null,
+      status: data.status,
+      created_by: userId,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return mapGoal(row);
+};
+
+export const updateGoal = async (goalId: string, data: Partial<Goal>): Promise<void> => {
+  const payload: Record<string, any> = {};
+  if (data.title !== undefined) payload.title = data.title;
+  if (data.description !== undefined) payload.description = data.description ?? null;
+  if (data.targetValue !== undefined) payload.target_value = data.targetValue ?? null;
+  if (data.currentValue !== undefined) payload.current_value = data.currentValue;
+  if (data.unit !== undefined) payload.unit = data.unit;
+  if (data.dueDate !== undefined) payload.due_date = data.dueDate ?? null;
+  if (data.status !== undefined) payload.status = data.status;
+  if (data.projectId !== undefined) payload.project_id = data.projectId ?? null;
+  const { error } = await supabase.from('goals').update(payload).eq('id', goalId);
+  if (error) throw new Error(error.message);
+};
+
+export const deleteGoal = async (goalId: string): Promise<void> => {
+  const { error } = await supabase.from('goals').delete().eq('id', goalId);
+  if (error) throw new Error(error.message);
+};
+
+// ── Intake Forms ──────────────────────────────────────────────────────────────
+
+export const fetchIntakeForms = async (projectId: string): Promise<IntakeForm[]> => {
+  const { data, error } = await supabase
+    .from('intake_forms')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapIntakeForm);
+};
+
+export const fetchIntakeFormByToken = async (token: string): Promise<IntakeForm | null> => {
+  const { data, error } = await supabase
+    .from('intake_forms')
+    .select('*')
+    .eq('token', token)
+    .single();
+  if (error) return null;
+  return mapIntakeForm(data);
+};
+
+export const createIntakeForm = async (projectId: string, data: Omit<IntakeForm, 'id' | 'projectId' | 'token' | 'createdAt'>): Promise<IntakeForm> => {
+  const { data: row, error } = await supabase
+    .from('intake_forms')
+    .insert({
+      project_id: projectId,
+      pod_id: data.podId ?? null,
+      name: data.name,
+      description: data.description ?? null,
+      fields: data.fields,
+      is_public: data.isPublic,
+      default_priority: data.defaultPriority,
+      default_status: data.defaultStatus,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return mapIntakeForm(row);
+};
+
+export const updateIntakeForm = async (formId: string, data: Partial<IntakeForm>): Promise<void> => {
+  const payload: Record<string, any> = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.description !== undefined) payload.description = data.description ?? null;
+  if (data.fields !== undefined) payload.fields = data.fields;
+  if (data.isPublic !== undefined) payload.is_public = data.isPublic;
+  if (data.defaultPriority !== undefined) payload.default_priority = data.defaultPriority;
+  if (data.defaultStatus !== undefined) payload.default_status = data.defaultStatus;
+  if (data.podId !== undefined) payload.pod_id = data.podId ?? null;
+  const { error } = await supabase.from('intake_forms').update(payload).eq('id', formId);
+  if (error) throw new Error(error.message);
+};
+
+export const deleteIntakeForm = async (formId: string): Promise<void> => {
+  const { error } = await supabase.from('intake_forms').delete().eq('id', formId);
+  if (error) throw new Error(error.message);
+};
+
+export const submitIntakeForm = async (
+  formId: string,
+  data: Record<string, string>,
+  submitterName?: string,
+  submitterEmail?: string,
+): Promise<string> => {
+  const { data: row, error } = await supabase
+    .from('intake_submissions')
+    .insert({
+      form_id: formId,
+      submitter_name: submitterName ?? null,
+      submitter_email: submitterEmail ?? null,
+      data,
+    })
+    .select('id')
+    .single();
+  if (error) throw new Error(error.message);
+  return row.id;
+};
+
+export const fetchIntakeSubmissions = async (formId: string): Promise<IntakeSubmission[]> => {
+  const { data, error } = await supabase
+    .from('intake_submissions')
+    .select('*')
+    .eq('form_id', formId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapIntakeSubmission);
+};
+
+// ── Task Approvals ────────────────────────────────────────────────────────────
+
+export const fetchTaskApprovals = async (taskId: string): Promise<TaskApproval[]> => {
+  const { data, error } = await supabase
+    .from('task_approvals')
+    .select('*')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapTaskApproval);
+};
+
+export const requestApproval = async (taskId: string, projectId: string, approverId: string): Promise<TaskApproval> => {
+  const userId = await getCurrentUserId();
+  const { data: row, error } = await supabase
+    .from('task_approvals')
+    .insert({
+      task_id: taskId,
+      project_id: projectId,
+      requested_by: userId,
+      approver_id: approverId,
+      status: 'pending',
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return mapTaskApproval(row);
+};
+
+export const respondToApproval = async (approvalId: string, status: 'approved' | 'rejected', note?: string): Promise<void> => {
+  const { error } = await supabase
+    .from('task_approvals')
+    .update({ status, note: note ?? null, updated_at: new Date().toISOString() })
+    .eq('id', approvalId);
   if (error) throw new Error(error.message);
 };
 

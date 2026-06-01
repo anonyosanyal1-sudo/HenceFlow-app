@@ -33,12 +33,14 @@ import {
   deleteSavedFilter,
   fetchAutomations,
   addActivityLog,
+  fetchSprints,
+  fetchGoals,
 } from './services/api';
 import { useServerEvents } from './hooks/useServerEvents';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Project, Task, TaskStatus, TaskPriority, UserProfile, Company, Pod, DEFAULT_STAGES, Stage, Milestone, CustomFieldDefinition, TaskTemplate, Notification, SavedFilter, AutomationRule, Subtask } from './types';
+import { Project, Task, TaskStatus, TaskPriority, UserProfile, Company, Pod, DEFAULT_STAGES, Stage, Milestone, CustomFieldDefinition, TaskTemplate, Notification, SavedFilter, AutomationRule, Subtask, Sprint, Goal } from './types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -64,7 +66,14 @@ import { AutomationsDialog } from './components/AutomationsDialog';
 import { PodDialog } from './components/PodDialog';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { Logo } from './components/Logo';
-import { Hash, Filter, Search, Menu, Settings, Milestone as MilestoneIcon, CheckSquare, Zap, Bookmark, BookmarkPlus, MoreHorizontal, Lock } from 'lucide-react';
+import { MyWorkView } from './components/MyWorkView';
+import { CalendarView } from './components/CalendarView';
+import { RoadmapView } from './components/RoadmapView';
+import { SprintDialog } from './components/SprintDialog';
+import { GoalDialog } from './components/GoalDialog';
+import { IntakeFormDialog } from './components/IntakeFormDialog';
+import { IntakeFormPage } from './components/IntakeFormPage';
+import { Hash, Filter, Search, Menu, Settings, Milestone as MilestoneIcon, CheckSquare, Zap, Bookmark, BookmarkPlus, MoreHorizontal, Lock, Target, Inbox } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -165,7 +174,8 @@ function AppContent() {
   }, []);
 
   // View state
-  const [activeView, setActiveView] = React.useState<'board' | 'analytics' | 'timeline'>('board');
+  const [activeView, setActiveView] = React.useState<'board' | 'analytics' | 'timeline' | 'calendar'>('board');
+  const [activeGlobalView, setActiveGlobalView] = React.useState<'my-work' | 'roadmap' | null>(null);
 
   // New feature states
   const [swimlaneBy, setSwimlaneBy] = React.useState<SwimlaneBy>(null);
@@ -187,6 +197,36 @@ function AppContent() {
   const automationsRef = React.useRef<AutomationRule[]>([]);
   React.useEffect(() => { automationsRef.current = automations; }, [automations]);
   const [automationsDialogOpen, setAutomationsDialogOpen] = React.useState(false);
+
+  // New differentiator features state
+  const [sprints, setSprints] = React.useState<Sprint[]>([]);
+  const [goals, setGoals] = React.useState<Goal[]>([]);
+  const [allMilestones, setAllMilestones] = React.useState<Milestone[]>([]);
+  const [sprintDialogOpen, setSprintDialogOpen] = React.useState(false);
+  const [goalDialogOpen, setGoalDialogOpen] = React.useState(false);
+  const [intakeFormDialogOpen, setIntakeFormDialogOpen] = React.useState(false);
+
+  // Pinned tasks stored in localStorage per user
+  const [pinnedTaskIds, setPinnedTaskIds] = React.useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('hf-pinned-tasks');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+  const handlePinToggle = React.useCallback((taskId: string) => {
+    setPinnedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId); else next.add(taskId);
+      try { localStorage.setItem('hf-pinned-tasks', JSON.stringify(Array.from(next))); } catch {}
+      return next;
+    });
+  }, []);
+
+  // Check for intake form token in URL
+  const intakeToken = React.useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('intake');
+  }, []);
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = React.useState(false);
   const [savingFilter, setSavingFilter] = React.useState(false);
   const [filterNameInput, setFilterNameInput] = React.useState('');
@@ -370,6 +410,26 @@ function AppContent() {
     fetchSavedFilters(activeProject.id).then(setSavedFilters).catch(() => {});
   }, [activeProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load sprints when active project changes
+  React.useEffect(() => {
+    if (!activeProject) { setSprints([]); return; }
+    fetchSprints(activeProject.id).then(setSprints).catch(() => {});
+  }, [activeProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load goals when company changes
+  React.useEffect(() => {
+    if (!company) { setGoals([]); return; }
+    fetchGoals(company.id).then(setGoals).catch(() => {});
+  }, [company?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load all milestones for roadmap view
+  React.useEffect(() => {
+    if (projects.length === 0) { setAllMilestones([]); return; }
+    Promise.all(projects.map(p => fetchMilestones(p.id).catch(() => [] as Milestone[])))
+      .then(results => setAllMilestones(results.flat()));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects.map(p => p.id).join(',')]);
+
   React.useEffect(() => {
     if (!activeProject) { setAutomations([]); return; }
     fetchAutomations(activeProject.id).then(rules => {
@@ -473,8 +533,8 @@ function AppContent() {
     onFocusSearch: () => searchInputRef.current?.focus(),
     onShowShortcuts: () => setShortcutsHelpOpen(true),
     onGoTimeline: () => { if (activePod) setActiveView('timeline'); },
-    onGoBoard: () => setActiveView('board'),
-    onGoAnalytics: () => { setActiveView('analytics'); },
+    onGoBoard: () => { setActiveView('board'); setActiveGlobalView(null); },
+    onGoAnalytics: () => { setActiveView('analytics'); setActiveGlobalView(null); },
   }, !!user);
 
   const handleSaveCompany = async (data: {
@@ -729,6 +789,28 @@ function AppContent() {
     }
   };
 
+  const handleDuplicateTask = async (task: Task) => {
+    const targetPodId = task.podId ?? activePod?.id;
+    const targetProjectId = task.projectId ?? activeProject?.id;
+    if (!targetPodId || !targetProjectId) return;
+    const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = task;
+    const dupeData: Partial<Task> = { ...rest, title: `${task.title} (Copy)` };
+    const tempId = `temp-dup-${Date.now()}`;
+    const tempTask: Task = { ...task, id: tempId, title: dupeData.title! };
+    setTasks(prev => [...prev, tempTask]);
+    setAllTasks(prev => [...prev, tempTask]);
+    try {
+      const newId = await createTask(targetPodId, targetProjectId, dupeData);
+      setTasks(prev => prev.map(t => t.id === tempId ? { ...t, id: newId } : t));
+      setAllTasks(prev => prev.map(t => t.id === tempId ? { ...t, id: newId } : t));
+      toast.success('Task duplicated');
+    } catch {
+      setTasks(prev => prev.filter(t => t.id !== tempId));
+      setAllTasks(prev => prev.filter(t => t.id !== tempId));
+      toast.error('Failed to duplicate task');
+    }
+  };
+
   const handleDeleteTask = async (taskId: string, projectId?: string) => {
     if (isViewer) { toast.error('Viewers cannot delete tasks'); return; }
     const targetProjectId = projectId ?? selectedTask?.projectId ?? activeProject?.id;
@@ -785,11 +867,16 @@ function AppContent() {
     });
   }, [tasks, debouncedSearch, filterAssignee, filterCreator, filterPriority, filterDueDate, todayTs]);
 
+  // Public intake form page — render without auth
+  if (intakeToken) {
+    return <IntakeFormPage token={intakeToken} />;
+  }
+
   if (loading) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-background">
         <div className="flex flex-col items-center space-y-4">
-          <motion.div 
+          <motion.div
             animate={{ rotate: 360 }}
             transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
             className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full"
@@ -840,15 +927,18 @@ function AppContent() {
                 projects={projects}
                 activeProject={activeProject}
                 activeView={activeView}
+                activeGlobalView={activeGlobalView}
                 onNewPod={() => { setSelectedPodForEdit(null); setPodDialogOpen(true); setSidebarOpen(false); }}
                 onEditPod={(pod) => { setSelectedPodForEdit(pod); setPodDialogOpen(true); setSidebarOpen(false); }}
                 onCompanySettings={() => { setShowCompanySettings(true); setSidebarOpen(false); }}
-                onProjectSelect={(p) => { setActiveProject(p); setActivePod(null); setActiveView('board'); setShowCompanySettings(false); setSidebarOpen(false); }}
-                onPodSelect={(pod) => { setActivePod(pod); setActiveView('board'); setSidebarOpen(false); }}
+                onProjectSelect={(p) => { setActiveProject(p); setActivePod(null); setActiveView('board'); setActiveGlobalView(null); setShowCompanySettings(false); setSidebarOpen(false); }}
+                onPodSelect={(pod) => { setActivePod(pod); setActiveView('board'); setActiveGlobalView(null); setSidebarOpen(false); }}
                 onNewProject={() => { setSelectedProjectForEdit(null); setProjectDialogOpen(true); setSidebarOpen(false); }}
                 onEditProject={(proj) => { setSelectedProjectForEdit(proj); setProjectDialogOpen(true); setSidebarOpen(false); }}
-                onDashboardSelect={() => { setActiveProject(null); setActivePod(null); setActiveView('board'); setShowCompanySettings(false); setSidebarOpen(false); }}
-                onAnalyticsSelect={() => { setActiveProject(null); setActivePod(null); setActiveView('analytics'); setShowCompanySettings(false); setSidebarOpen(false); }}
+                onDashboardSelect={() => { setActiveProject(null); setActivePod(null); setActiveView('board'); setActiveGlobalView(null); setShowCompanySettings(false); setSidebarOpen(false); }}
+                onAnalyticsSelect={() => { setActiveProject(null); setActivePod(null); setActiveView('analytics'); setActiveGlobalView(null); setShowCompanySettings(false); setSidebarOpen(false); }}
+                onMyWorkSelect={() => { setActiveGlobalView('my-work'); setShowCompanySettings(false); setSidebarOpen(false); }}
+                onRoadmapSelect={() => { setActiveGlobalView('roadmap'); setShowCompanySettings(false); setSidebarOpen(false); }}
                 onEditProfile={() => { setProfileSetupOpen(true); setSidebarOpen(false); }}
                 onLogout={logout}
                 user={user}
@@ -871,15 +961,18 @@ function AppContent() {
         projects={projects}
         activeProject={activeProject}
         activeView={activeView}
+        activeGlobalView={activeGlobalView}
         onNewPod={() => { setSelectedPodForEdit(null); setPodDialogOpen(true); }}
         onEditPod={(pod) => { setSelectedPodForEdit(pod); setPodDialogOpen(true); }}
         onCompanySettings={() => setShowCompanySettings(true)}
-        onProjectSelect={(p) => { setActiveProject(p); setActivePod(null); setActiveView('board'); setShowCompanySettings(false); }}
-        onPodSelect={(pod) => { setActivePod(pod); setActiveView('board'); }}
+        onProjectSelect={(p) => { setActiveProject(p); setActivePod(null); setActiveView('board'); setActiveGlobalView(null); setShowCompanySettings(false); }}
+        onPodSelect={(pod) => { setActivePod(pod); setActiveView('board'); setActiveGlobalView(null); }}
         onNewProject={() => { setSelectedProjectForEdit(null); setProjectDialogOpen(true); }}
         onEditProject={(proj) => { setSelectedProjectForEdit(proj); setProjectDialogOpen(true); }}
-        onDashboardSelect={() => { setActiveProject(null); setActivePod(null); setActiveView('board'); setShowCompanySettings(false); }}
-        onAnalyticsSelect={() => { setActiveProject(null); setActivePod(null); setActiveView('analytics'); setShowCompanySettings(false); }}
+        onDashboardSelect={() => { setActiveProject(null); setActivePod(null); setActiveView('board'); setActiveGlobalView(null); setShowCompanySettings(false); }}
+        onAnalyticsSelect={() => { setActiveProject(null); setActivePod(null); setActiveView('analytics'); setActiveGlobalView(null); setShowCompanySettings(false); }}
+        onMyWorkSelect={() => { setActiveGlobalView('my-work'); setShowCompanySettings(false); }}
+        onRoadmapSelect={() => { setActiveGlobalView('roadmap'); setShowCompanySettings(false); }}
         onEditProfile={() => setProfileSetupOpen(true)}
         onLogout={logout}
         user={user}
@@ -904,6 +997,39 @@ function AppContent() {
                 setSelectedCompanyForEdit(null);
                 await handleSaveCompany(data);
               }}
+            />
+          </div>
+        ) : activeGlobalView === 'my-work' ? (
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="lg:hidden h-16 border-b border-border flex items-center px-6 bg-card shrink-0">
+              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="mr-4">
+                <Menu className="w-5 h-5" />
+              </Button>
+              <h2 className="text-lg font-bold tracking-tight text-foreground">My Work</h2>
+            </div>
+            <MyWorkView
+              allTasks={allTasks}
+              projects={projects}
+              users={users}
+              milestones={allMilestones}
+              currentUserId={user.uid}
+              pinnedTaskIds={pinnedTaskIds}
+              onTaskClick={(task) => { setSelectedTask(task); setTaskDialogOpen(true); }}
+              onPinToggle={handlePinToggle}
+            />
+          </div>
+        ) : activeGlobalView === 'roadmap' ? (
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="lg:hidden h-16 border-b border-border flex items-center px-6 bg-card shrink-0">
+              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="mr-4">
+                <Menu className="w-5 h-5" />
+              </Button>
+              <h2 className="text-lg font-bold tracking-tight text-foreground">Roadmap</h2>
+            </div>
+            <RoadmapView
+              projects={projects}
+              allMilestones={allMilestones}
+              allTasks={allTasks}
             />
           </div>
         ) : showCompanySettings && company ? (
@@ -1059,10 +1185,10 @@ function AppContent() {
                 {/* ── Divider ── */}
                 <div className="hidden md:block w-px h-5 bg-border/50 mx-1" />
 
-                {/* ── Board / Timeline tab ── */}
+                {/* ── Board / Timeline / Calendar tab ── */}
                 <div className="hidden md:flex items-center bg-muted/50 border border-border/30 rounded-lg p-0.5 gap-0.5">
-                  {(['Board', 'Timeline'] as const).map(label => {
-                    const val = label.toLowerCase() as 'board' | 'timeline';
+                  {(['Board', 'Timeline', 'Calendar'] as const).map(label => {
+                    const val = label.toLowerCase() as 'board' | 'timeline' | 'calendar';
                     return (
                       <button key={label} onClick={() => setActiveView(val)}
                         className={cn(
@@ -1179,6 +1305,26 @@ function AppContent() {
                       <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5" onClick={() => setAutomationsDialogOpen(true)}>
                         <Zap className="w-3.5 h-3.5 text-muted-foreground" />
                         <span className="text-sm font-medium">Automations</span>
+                      </DropdownMenuItem>
+                    )}
+                    {activeProject && (
+                      <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5" onClick={() => setSprintDialogOpen(true)}>
+                        <Zap className="w-3.5 h-3.5 text-primary/70" />
+                        <span className="text-sm font-medium">Sprints</span>
+                        {sprints.length > 0 && <span className="ml-auto text-xs text-muted-foreground">{sprints.filter(s => s.status === 'active').length} active</span>}
+                      </DropdownMenuItem>
+                    )}
+                    {company && (
+                      <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5" onClick={() => setGoalDialogOpen(true)}>
+                        <Target className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-sm font-medium">Goals & OKRs</span>
+                        {goals.length > 0 && <span className="ml-auto text-xs text-muted-foreground">{goals.filter(g => g.status === 'active').length} active</span>}
+                      </DropdownMenuItem>
+                    )}
+                    {activeProject && (
+                      <DropdownMenuItem className="rounded-lg h-9 cursor-pointer gap-2.5" onClick={() => setIntakeFormDialogOpen(true)}>
+                        <Inbox className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-sm font-medium">Intake Forms</span>
                       </DropdownMenuItem>
                     )}
                     {savedFilters.length > 0 && (
@@ -1304,13 +1450,26 @@ function AppContent() {
               </div>
             )}
 
-            {/* Board or Timeline */}
+            {/* Board, Timeline or Calendar */}
             {activeView === 'timeline' ? (
               <GanttView
                 tasks={filteredTasks}
                 stages={activePod.stages?.length ? activePod.stages : DEFAULT_STAGES}
                 users={companyUsers}
                 onTaskClick={(task) => { setSelectedTask(task); setTaskDialogOpen(true); }}
+              />
+            ) : activeView === 'calendar' ? (
+              <CalendarView
+                tasks={filteredTasks}
+                projects={projects}
+                onTaskClick={(task) => { setSelectedTask(task); setTaskDialogOpen(true); }}
+                onNewTask={(dueDate) => {
+                  if (!activePod) return;
+                  setSelectedTask(null);
+                  setDefaultStatus('todo');
+                  setTaskDialogOpen(true);
+                  // Pass due date as query — will be set in the create dialog
+                }}
               />
             ) : (
               <TaskBoard
@@ -1392,9 +1551,11 @@ function AppContent() {
           customFieldDefs={customFieldDefs}
           templates={taskTemplates}
           allTasks={allTasks}
+          sprints={sprints}
           currentUserId={user.uid}
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
+          onDuplicate={handleDuplicateTask}
         />
 
         <ProjectDialog
@@ -1471,6 +1632,46 @@ function AppContent() {
           users={companyUsers}
           stages={activePod?.stages?.length ? activePod.stages : DEFAULT_STAGES}
         />
+
+        {/* Sprint Dialog */}
+        {activeProject && (
+          <SprintDialog
+            open={sprintDialogOpen}
+            onOpenChange={setSprintDialogOpen}
+            projectId={activeProject.id}
+            sprints={sprints}
+            tasks={tasks}
+            onSprintsChange={setSprints}
+            onAssignTaskToSprint={async (taskId, sprintId) => {
+              setTasks(prev => prev.map(t => t.id === taskId ? { ...t, sprintId: sprintId ?? undefined } : t));
+              setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, sprintId: sprintId ?? undefined } : t));
+              updateTask(activeProject.id, taskId, { sprintId: sprintId ?? undefined }).catch(() => {});
+            }}
+          />
+        )}
+
+        {/* Goal Dialog */}
+        {company && (
+          <GoalDialog
+            open={goalDialogOpen}
+            onOpenChange={setGoalDialogOpen}
+            companyId={company.id}
+            projects={projects}
+            goals={goals}
+            currentUserId={user.uid}
+            onGoalsChange={setGoals}
+          />
+        )}
+
+        {/* Intake Form Dialog */}
+        {activeProject && (
+          <IntakeFormDialog
+            open={intakeFormDialogOpen}
+            onOpenChange={setIntakeFormDialogOpen}
+            projectId={activeProject.id}
+            pods={pods.filter(p => p.projectId === activeProject.id)}
+          />
+        )}
 
         {/* Keyboard Shortcuts Help */}
         <KeyboardShortcutsHelp

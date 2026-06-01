@@ -98,6 +98,8 @@ export interface Task {
   recurrenceRule?: RecurrenceRule;
   recurrenceParentId?: string;
   milestoneId?: string;
+  sprintId?: string;
+  isPinned?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -238,4 +240,91 @@ export interface AutomationRule {
   actionValue?: string;
   isActive: boolean;
   createdAt: string;
+}
+
+// ── Sprints / Cycles ──────────────────────────────────────────────────────────
+
+export interface Sprint {
+  id: string;
+  projectId: string;
+  name: string;
+  goal?: string;
+  startDate?: string;
+  endDate?: string;
+  status: 'planning' | 'active' | 'completed';
+  createdAt: string;
+}
+
+// ── Goals / OKRs ──────────────────────────────────────────────────────────────
+
+export interface Goal {
+  id: string;
+  companyId: string;
+  projectId?: string;
+  title: string;
+  description?: string;
+  targetValue?: number;
+  currentValue: number;
+  unit: string;
+  dueDate?: string;
+  status: 'active' | 'achieved' | 'missed';
+  createdBy: string;
+  createdAt: string;
+}
+
+// ── Intake Forms ──────────────────────────────────────────────────────────────
+
+export interface IntakeFormField {
+  id: string;
+  name: string;
+  type: 'text' | 'textarea' | 'select' | 'email';
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+}
+
+export interface IntakeForm {
+  id: string;
+  projectId: string;
+  podId?: string;
+  name: string;
+  description?: string;
+  fields: IntakeFormField[];
+  isPublic: boolean;
+  defaultPriority: string;
+  defaultStatus: string;
+  token: string;
+  createdAt: string;
+}
+
+export interface IntakeSubmission {
+  id: string;
+  formId: string;
+  taskId?: string;
+  submitterName?: string;
+  submitterEmail?: string;
+  data: Record<string, string>;
+  createdAt: string;
+}
+
+// ── Task Approvals ────────────────────────────────────────────────────────────
+
+export interface TaskApproval {
+  id: string;
+  taskId: string;
+  projectId: string;
+  requestedBy: string;
+  approverId: string;
+  status: 'pending' | 'approved' | 'rejected';
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Extended task dependency with relation type ───────────────────────────────
+
+export type DependencyRelationType = 'blocks' | 'relates_to' | 'duplicates';
+
+export interface TaskRelation extends TaskDependency {
+  relationType: DependencyRelationType;
 }

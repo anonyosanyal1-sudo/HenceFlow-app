@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Task, TaskStatus, TaskPriority, UserProfile, Stage, Milestone, CustomFieldDefinition, TaskTemplate, RecurrenceRule } from '../types';
+import { Task, TaskStatus, TaskPriority, UserProfile, Stage, Milestone, CustomFieldDefinition, TaskTemplate, RecurrenceRule, Sprint } from '../types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskComments } from './TaskComments';
 import { SubtasksPanel } from './SubtasksPanel';
@@ -18,7 +18,8 @@ import { ActivityLogPanel } from './ActivityLogPanel';
 import { CustomFieldsPanel } from './CustomFieldsPanel';
 import { cn } from '@/lib/utils';
 import { createTaskTemplate, fetchWatchers, watchTask, unwatchTask } from '../services/api';
-import { Milestone as MilestoneIcon, RefreshCw, LayoutTemplate, Eye, EyeOff, Trash2, X, Hash } from 'lucide-react';
+import { Milestone as MilestoneIcon, RefreshCw, LayoutTemplate, Eye, EyeOff, Trash2, X, Hash, Copy, Zap, Clock } from 'lucide-react';
+import { ApprovalPanel } from './ApprovalPanel';
 import { TaskWatcher } from '../types';
 import { UserAvatar } from './UserAvatar';
 
@@ -34,9 +35,11 @@ interface TaskDialogProps {
   customFieldDefs?: CustomFieldDefinition[];
   templates?: TaskTemplate[];
   allTasks?: Task[];
+  sprints?: Sprint[];
   currentUserId?: string;
   onSave: (task: Partial<Task>) => void;
   onDelete?: (taskId: string) => void;
+  onDuplicate?: (task: Task) => void;
 }
 
 const MAX_DESCRIPTION_LENGTH = 1000;
@@ -63,7 +66,8 @@ function stageColorDot(stages: Stage[], stageId: string) {
 export function TaskDialog({
   open, onOpenChange, task, defaultStatus, users, stages, activeProjectId,
   milestones = [], customFieldDefs = [], templates = [], allTasks = [],
-  currentUserId = '', onSave, onDelete,
+  sprints = [],
+  currentUserId = '', onSave, onDelete, onDuplicate,
 }: TaskDialogProps) {
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
@@ -81,8 +85,16 @@ export function TaskDialog({
   const [showTemplateSave, setShowTemplateSave] = React.useState(false);
   const [watchers, setWatchers] = React.useState<TaskWatcher[]>([]);
   const isWatching = watchers.some(w => w.userId === currentUserId);
+  const [sprintId, setSprintId] = React.useState<string | undefined>(undefined);
   const [isDirty, setIsDirty] = React.useState(false);
   const [confirmDiscard, setConfirmDiscard] = React.useState(false);
+
+  // SLA: days since updatedAt
+  const daysInStage = React.useMemo(() => {
+    if (!task?.updatedAt) return 0;
+    const diff = Date.now() - new Date(task.updatedAt).getTime();
+    return Math.floor(diff / 86400_000);
+  }, [task?.updatedAt]);
 
   const requestClose = (open: boolean) => {
     if (!open && isDirty && task) {
@@ -125,6 +137,7 @@ export function TaskDialog({
       setMilestoneId(task.milestoneId);
       setRecurrenceRule(task.recurrenceRule);
       setLocalSubtasks(task.subtasks ?? []);
+      setSprintId(task.sprintId);
       setActiveTab('details');
       setIsConfirmingDelete(false);
       setShowTemplateSave(false);
@@ -138,6 +151,7 @@ export function TaskDialog({
       setMilestoneId(undefined);
       setRecurrenceRule(undefined);
       setLocalSubtasks([]);
+      setSprintId(undefined);
       setActiveTab('details');
       setIsConfirmingDelete(false);
       setShowTemplateSave(false);
@@ -151,7 +165,7 @@ export function TaskDialog({
 
   const handleSave = () => {
     if (!title.trim() || isDescriptionTooLong) return;
-    onSave({ title, description, status, priority, assigneeId, dueDate: dueDate || undefined, milestoneId: milestoneId || undefined, recurrenceRule: recurrenceRule || undefined, subtasks: localSubtasks });
+    onSave({ title, description, status, priority, assigneeId, dueDate: dueDate || undefined, milestoneId: milestoneId || undefined, recurrenceRule: recurrenceRule || undefined, subtasks: localSubtasks, sprintId: sprintId || undefined });
     onOpenChange(false);
   };
 
@@ -349,6 +363,26 @@ export function TaskDialog({
               <span className="text-xs font-mono">{task.id.slice(0, 8).toUpperCase()}</span>
             </div>
             <div className="flex items-center gap-1">
+              {/* SLA badge */}
+              {daysInStage >= 3 && task.status !== 'closed' && (
+                <div className={cn(
+                  "h-7 px-2 flex items-center gap-1 rounded-lg text-xs font-semibold",
+                  daysInStage >= 7 ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"
+                )} title={`In current stage for ${daysInStage} days`}>
+                  <Clock className="w-3 h-3" />
+                  {daysInStage}d
+                </div>
+              )}
+              {/* Duplicate */}
+              {onDuplicate && (
+                <button
+                  onClick={() => { onDuplicate(task); onOpenChange(false); }}
+                  className="h-7 px-2.5 flex items-center gap-1.5 rounded-lg text-xs font-medium text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50 transition-colors"
+                  title="Duplicate task"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              )}
               <button
                 onClick={handleToggleWatch}
                 className={cn(
@@ -397,7 +431,7 @@ export function TaskDialog({
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <div className="shrink-0 px-6 pt-3">
             <TabsList className="bg-transparent p-0 h-auto gap-0 border-b border-border/30 w-full justify-start rounded-none">
-              {['details', 'discussion', 'time', 'activity', 'watchers'].map(tab => (
+              {['details', 'discussion', 'approvals', 'time', 'activity', 'watchers'].map(tab => (
                 <TabsTrigger
                   key={tab}
                   value={tab}
@@ -569,6 +603,22 @@ export function TaskDialog({
                       </div>
                     </PropertyRow>
 
+                    {/* Sprint */}
+                    {sprints.length > 0 && (
+                      <PropertyRow label="Sprint">
+                        <Select value={sprintId ?? 'none'} onValueChange={v => { setSprintId(v === 'none' ? undefined : v); markDirty(); }}>
+                          <SelectTrigger className="h-8 bg-transparent border-none focus:ring-0 shadow-none text-sm px-0 gap-1 w-full justify-start">
+                            <Zap className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            <span className="text-foreground text-sm truncate">{sprintId ? sprints.find(s => s.id === sprintId)?.name : <span className="text-muted-foreground italic">None</span>}</span>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none" className="text-sm italic text-muted-foreground">No sprint</SelectItem>
+                            {sprints.map(s => <SelectItem key={s.id} value={s.id} className="text-sm">{s.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </PropertyRow>
+                    )}
+
                     {/* Template save */}
                     {projectId && (
                       <div className="pt-4 border-t border-border/20 mt-2">
@@ -600,6 +650,18 @@ export function TaskDialog({
               <TabsContent value="discussion" className="h-full mt-0 data-[state=inactive]:hidden overflow-hidden">
                 <div className="h-full px-6 pt-4">
                   <TaskComments key={task.id} projectId={task.projectId || activeProjectId || ''} taskId={task.id} users={users} />
+                </div>
+              </TabsContent>
+
+              {/* Approvals */}
+              <TabsContent value="approvals" className="h-full overflow-y-auto mt-0 data-[state=inactive]:hidden">
+                <div className="px-6 pt-4">
+                  <ApprovalPanel
+                    task={task}
+                    projectId={task.projectId || activeProjectId || ''}
+                    users={users}
+                    currentUserId={currentUserId}
+                  />
                 </div>
               </TabsContent>
 

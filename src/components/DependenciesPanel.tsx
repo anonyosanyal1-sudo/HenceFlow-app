@@ -1,10 +1,16 @@
 import React from 'react';
-import { Task, TaskDependency } from '../types';
+import { Task, TaskDependency, DependencyRelationType } from '../types';
 import { getDependencies, addDependency, removeDependency } from '../services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X, Link, AlertTriangle } from 'lucide-react';
+import { X, Link, AlertTriangle, Copy, GitMerge } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const RELATION_TYPES: { value: DependencyRelationType; label: string; icon: React.ElementType; color: string }[] = [
+  { value: 'blocks',      label: 'Blocks',      icon: AlertTriangle, color: 'text-amber-400' },
+  { value: 'relates_to',  label: 'Relates to',  icon: Link,          color: 'text-sky-400'   },
+  { value: 'duplicates',  label: 'Duplicates',  icon: Copy,          color: 'text-violet-400' },
+];
 
 interface DependenciesPanelProps {
   task: Task;
@@ -15,6 +21,7 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
   const [blockedBy, setBlockedBy] = React.useState<TaskDependency[]>([]);
   const [blocking, setBlocking] = React.useState<TaskDependency[]>([]);
   const [search, setSearch] = React.useState('');
+  const [relationType, setRelationType] = React.useState<DependencyRelationType>('blocks');
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -68,12 +75,12 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
 
   const handleAdd = async (dependsOnId: string) => {
     setError(null);
-    if (wouldCreateCycle(dependsOnId)) {
+    if (relationType === 'blocks' && wouldCreateCycle(dependsOnId)) {
       setError('This dependency would create a circular reference.');
       return;
     }
     try {
-      await addDependency(task.id, dependsOnId);
+      await addDependency(task.id, dependsOnId, relationType);
       setSearch('');
       load();
     } catch (e: any) {
@@ -164,11 +171,30 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
         <p className="text-xs text-muted-foreground/50 italic">No dependencies set</p>
       )}
 
-      <div className="relative">
+      <div className="space-y-1.5">
+        {/* Relation type selector */}
+        <div className="flex gap-1">
+          {RELATION_TYPES.map(rt => (
+            <button
+              key={rt.value}
+              onClick={() => setRelationType(rt.value)}
+              className={cn(
+                "flex items-center gap-1 px-2 h-6 rounded-md text-[11px] font-semibold transition-all border",
+                relationType === rt.value
+                  ? cn("bg-muted/60", rt.color, "border-current/30")
+                  : "text-muted-foreground/40 border-border/20 hover:text-muted-foreground"
+              )}
+            >
+              <rt.icon className="w-3 h-3" />
+              {rt.label}
+            </button>
+          ))}
+        </div>
+        <div className="relative">
         <Input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Add dependency…"
+          placeholder="Search tasks to link…"
           className="h-8 text-sm bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary"
         />
         {suggestions.length > 0 && (
@@ -184,6 +210,7 @@ export function DependenciesPanel({ task, allTasks }: DependenciesPanelProps) {
             ))}
           </div>
         )}
+        </div>
       </div>
     </div>
   );
