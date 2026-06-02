@@ -1,7 +1,7 @@
 import React from 'react';
 import { Project, Milestone, Task } from '../types';
 import { ChevronLeft, ChevronRight, Flag, Circle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, parseLocalDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 interface RoadmapViewProps {
@@ -41,7 +41,7 @@ export function RoadmapView({ projects, allMilestones, allTasks, onMilestoneClic
   const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / 86400_000);
 
   const getXPercent = (dateStr: string) => {
-    const d = new Date(dateStr);
+    const d = parseLocalDate(dateStr) ?? new Date(dateStr);
     const diff = Math.ceil((d.getTime() - startDate.getTime()) / 86400_000);
     return Math.max(0, Math.min(100, (diff / totalDays) * 100));
   };
@@ -163,7 +163,7 @@ export function RoadmapView({ projects, allMilestones, allTasks, onMilestoneClic
                     const pct = getXPercent(milestone.dueDate!);
                     const completedTasks = tasks.filter(t => t.status === 'closed').length;
                     const progress = tasks.length > 0 ? completedTasks / tasks.length : 0;
-                    const isPast = new Date(milestone.dueDate!) < today;
+                    const isPast = (parseLocalDate(milestone.dueDate) ?? new Date(milestone.dueDate!)) < today;
                     const isComplete = progress === 1;
 
                     return (

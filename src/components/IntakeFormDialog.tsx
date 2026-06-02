@@ -77,7 +77,7 @@ export function IntakeFormDialog({ open, onOpenChange, projectId, pods }: Intake
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [showSubmissions, setShowSubmissions] = React.useState<string | null>(null);
-  const [copied, setCopied] = React.useState(false);
+  const [copiedToken, setCopiedToken] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
 
   // Form state
@@ -113,12 +113,17 @@ export function IntakeFormDialog({ open, onOpenChange, projectId, pods }: Intake
 
   const handleSave = async () => {
     if (!formName.trim()) return;
+    // Reject unnamed fields — they would render broken inputs on the public form.
+    if (formFields.some(f => !f.name.trim())) {
+      toast.error('Every field needs a name');
+      return;
+    }
     setSaving(true);
     const data = {
       name: formName.trim(),
       description: formDesc.trim() || undefined,
       podId: formPodId || undefined,
-      fields: formFields,
+      fields: formFields.map(f => ({ ...f, name: f.name.trim() })),
       isPublic: formPublic,
       defaultPriority: 'medium',
       defaultStatus: 'todo',
@@ -158,7 +163,7 @@ export function IntakeFormDialog({ open, onOpenChange, projectId, pods }: Intake
 
   const copyLink = (token: string) => {
     const url = `${window.location.origin}?intake=${token}`;
-    navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+    navigator.clipboard.writeText(url).then(() => { setCopiedToken(token); setTimeout(() => setCopiedToken(c => c === token ? null : c), 2000); });
   };
 
   const FormEditor = () => (
@@ -291,8 +296,8 @@ export function IntakeFormDialog({ open, onOpenChange, projectId, pods }: Intake
                     onClick={() => copyLink(form.token)}
                     title="Copy form link"
                   >
-                    {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    {copied ? 'Copied!' : 'Copy link'}
+                    {copiedToken === form.token ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    {copiedToken === form.token ? 'Copied!' : 'Copy link'}
                   </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/40 hover:text-foreground" onClick={() => startEdit(form)}>
                     <Pencil className="w-3.5 h-3.5" />

@@ -24,6 +24,62 @@ deferrals (changes requiring a DB schema column or a product decision).
 
 ---
 
+## Second Audit Pass — Additional Fixes
+
+A deeper second pass audited the dialogs and panels not covered the first time
+(Goals, Sprints, Milestones, Time Tracking, Approvals, Custom Fields, Intake forms,
+Pod/Project/Company dialogs, Roadmap, My Work). The following additional issues were
+found and **fixed**:
+
+### FIX-12 · GoalDialog crashed when goals were added/removed  🔴 High  (Rules of Hooks)
+**File:** `src/components/GoalDialog.tsx`
+`React.useState` was called **inside `goals.map(...)`**, violating the Rules of Hooks. Adding or
+deleting a goal changed the hook count between renders, throwing *"Rendered more/fewer hooks
+than during the previous render"* and crashing the dialog.
+**Fix:** Extracted a standalone `GoalRow` component that owns its own edit state.
+
+### FIX-13 · Pervasive date off-by-one (UTC vs local)  🟠 Medium  (logic)
+**Files:** `lib/utils.ts` (new helper), `MyWorkView.tsx`, `RoadmapView.tsx`, `GoalDialog.tsx`,
+`SprintDialog.tsx`, `MilestoneDialog.tsx`
+`new Date('YYYY-MM-DD')` parses as **UTC midnight**, so due dates rendered/compared a day early
+for users west of UTC — affecting "Overdue"/"Today"/"Due soon" classification, the My Work stat
+tiles, roadmap milestone placement/colors, and displayed dates.
+**Fix:** Added `parseLocalDate()` to `lib/utils.ts` and routed all bare-date parsing through it.
+
+### FIX-14 · MilestoneDialog create/update had no error handling & no immediate refresh  🟠 Medium
+**Files:** `src/components/MilestoneDialog.tsx`, `src/App.tsx`
+Create/update awaited the API with no try/catch (a failure left the dialog stuck with
+`saving=true`) and relied solely on realtime to reflect changes.
+**Fix:** Wrapped all three operations in try/catch with toasts, and added an `onMilestonesChanged`
+callback that App uses to refetch immediately.
+
+### FIX-15 · IntakeFormDialog "Copy link" flipped every form's button  🟠 Medium  (UI)
+**File:** `src/components/IntakeFormDialog.tsx`
+A single shared `copied` boolean meant clicking copy on one form showed "Copied!" on all forms.
+**Fix:** Track the copied form's token instead of a boolean.
+
+### FIX-16 · CustomFieldsPanel — silent data loss & broken external links  🟠 Medium
+**File:** `src/components/CustomFieldsPanel.tsx`
+Optimistic value saves had no rollback (UI showed unsaved values on failure), and URL fields
+without a scheme (`example.com`) produced links relative to the app origin.
+**Fix:** Added try/catch rollback and a `withScheme()` helper that prefixes `https://`.
+
+### FIX-17 · ProjectDialog custom-field delete failed silently  🟡 Low
+**File:** `src/components/ProjectDialog.tsx`
+Delete was fire-and-forget with no `.catch`. **Fix:** Added error toast; added `maxLength` to the
+new-field-name input.
+
+### FIX-18 · Intake form could be saved with unnamed fields  🟡 Low  (validation)
+**File:** `src/components/IntakeFormDialog.tsx`
+**Fix:** Reject save when any field name is blank; trim field names on save.
+
+### FIX-19 · Light-mode / validation polish  🟡 Low
+- `PodDialog` & `ProjectDialog`: selected color swatch used `border-white` (invisible on light
+  cards) → `border-foreground`.
+- `PodDialog`: added `maxLength` to the stage-label input.
+
+---
+
 ## Section 1 — Issues Fixed In This Pass
 
 ### FIX-01 · Analytics charts unreadable in light mode  🟠 Medium  (theme)
@@ -123,6 +179,10 @@ a server-side job, or a product/UX decision. They are recorded here for follow-u
 | DEF-06 | Realtime channels scale O(projects × tables) in `useServerEvents`. | `useServerEvents.ts` | Performance refactor (consolidate channels / `in` filter); needs careful testing against Supabase. |
 | DEF-07 | Member-role invitees get company membership but no project-level access (project RLS is `auth.uid() = ANY(members)`). | `App.tsx` / `InviteDialog.tsx` | Intended scope is a product decision (company vs. project membership). |
 | DEF-08 | `CompanySettingsPage` auto-save paths (role change/remove/invite) send persisted detail values, not in-progress edits. | `CompanySettingsPage.tsx` | Needs UX decision on whether member actions should also commit unsaved detail edits. |
+| DEF-09 | `ApprovalPanel` accepts a `note` and `respondToApproval(..., note)` but has no UI to enter one — approvals can only be sent without notes. | `ApprovalPanel.tsx` | Needs a note-input UX decision; feature, not a bug. |
+| DEF-10 | `CompanyDialog` declares `users`/`onDelete` props and `memberIds`/`adminIds` in `onSave`, but renders no member/admin/delete UI (member mgmt lives in `CompanySettingsPage`). | `CompanyDialog.tsx` | Vestigial dead props; harmless. Cleanup, not user-facing. |
+| DEF-11 | SprintDialog "Add from backlog" hard-caps at 5 unassigned tasks with no "show more". | `SprintDialog.tsx` | Needs pagination/UX decision. |
+| DEF-12 | RoadmapView month gridlines (`(idx+1)/months.length`) don't perfectly align with milestone X positions (`diff/totalDays`) because months have unequal day counts. | `RoadmapView.tsx` | Cosmetic; correct alignment needs per-month proportional columns. |
 
 ---
 

@@ -5,7 +5,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { cn, parseLocalDate } from '@/lib/utils';
 import { Plus, Play, CheckCircle2, Clock, Trash2, ChevronDown, ChevronRight, Zap } from 'lucide-react';
 import { createSprint, updateSprint, deleteSprint } from '../services/api';
 import { toast } from 'sonner';
@@ -186,9 +186,9 @@ export function SprintDialog({
                     {sprint.goal && <p className="text-xs text-muted-foreground/60 mt-0.5 truncate">{sprint.goal}</p>}
                     {(sprint.startDate || sprint.endDate) && (
                       <p className="text-[11px] text-muted-foreground/40 mt-0.5">
-                        {sprint.startDate ? new Date(sprint.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '?'}
+                        {parseLocalDate(sprint.startDate)?.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) ?? '?'}
                         {' → '}
-                        {sprint.endDate ? new Date(sprint.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '?'}
+                        {parseLocalDate(sprint.endDate)?.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) ?? '?'}
                       </p>
                     )}
                   </div>

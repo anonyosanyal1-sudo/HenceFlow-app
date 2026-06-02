@@ -8,6 +8,8 @@ import { Milestone } from '../types';
 import { createMilestone, updateMilestone, deleteMilestone } from '../services/api';
 import { Plus, Trash2, Pencil, Check, X, Milestone as MilestoneIcon } from 'lucide-react';
 import { format } from 'date-fns';
+import { parseLocalDate } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface MilestoneDialogProps {
   open: boolean;
@@ -15,9 +17,11 @@ interface MilestoneDialogProps {
   projectId: string;
   milestones: Milestone[];
   onMilestoneDeleted?: (milestoneId: string) => void;
+  /** Called after a milestone is created or updated so the parent can refresh. */
+  onMilestonesChanged?: () => void;
 }
 
-export function MilestoneDialog({ open, onOpenChange, projectId, milestones, onMilestoneDeleted }: MilestoneDialogProps) {
+export function MilestoneDialog({ open, onOpenChange, projectId, milestones, onMilestoneDeleted, onMilestonesChanged }: MilestoneDialogProps) {
   const [newName, setNewName] = React.useState('');
   const [newDate, setNewDate] = React.useState('');
   const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -28,10 +32,16 @@ export function MilestoneDialog({ open, onOpenChange, projectId, milestones, onM
   const handleCreate = async () => {
     if (!newName.trim()) return;
     setSaving(true);
-    await createMilestone(projectId, newName.trim(), newDate || undefined);
-    setNewName('');
-    setNewDate('');
-    setSaving(false);
+    try {
+      await createMilestone(projectId, newName.trim(), newDate || undefined);
+      setNewName('');
+      setNewDate('');
+      onMilestonesChanged?.();
+    } catch {
+      toast.error('Failed to create milestone');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const startEdit = (m: Milestone) => {
@@ -42,14 +52,24 @@ export function MilestoneDialog({ open, onOpenChange, projectId, milestones, onM
 
   const handleUpdate = async (milestoneId: string) => {
     setSaving(true);
-    await updateMilestone(milestoneId, { name: editName.trim() || undefined, dueDate: editDate || undefined });
-    setEditingId(null);
-    setSaving(false);
+    try {
+      await updateMilestone(milestoneId, { name: editName.trim() || undefined, dueDate: editDate || undefined });
+      setEditingId(null);
+      onMilestonesChanged?.();
+    } catch {
+      toast.error('Failed to update milestone');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (milestoneId: string) => {
-    await deleteMilestone(milestoneId);
-    onMilestoneDeleted?.(milestoneId);
+    try {
+      await deleteMilestone(milestoneId);
+      onMilestoneDeleted?.(milestoneId);
+    } catch {
+      toast.error('Failed to delete milestone');
+    }
   };
 
   return (
@@ -98,7 +118,7 @@ export function MilestoneDialog({ open, onOpenChange, projectId, milestones, onM
                     <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
                     {m.dueDate && (
                       <p className="text-[11px] text-muted-foreground">
-                        Due {format(new Date(m.dueDate), 'MMM d, yyyy')}
+                        Due {format(parseLocalDate(m.dueDate) ?? new Date(m.dueDate), 'MMM d, yyyy')}
                       </p>
                     )}
                   </div>

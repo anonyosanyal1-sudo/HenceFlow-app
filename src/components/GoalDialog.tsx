@@ -5,7 +5,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { cn, parseLocalDate } from '@/lib/utils';
 import { Plus, Target, TrendingUp, CheckCircle, XCircle, Pencil, Trash2 } from 'lucide-react';
 import { createGoal, updateGoal, deleteGoal } from '../services/api';
 import { toast } from 'sonner';
@@ -40,6 +40,86 @@ function GoalProgressBar({ goal }: { goal: Goal }) {
           className={cn("h-full rounded-full transition-all", pct >= 100 ? "bg-emerald-500" : "bg-primary")}
           style={{ width: `${pct}%` }}
         />
+      </div>
+    </div>
+  );
+}
+
+// Extracted so each goal row owns its own edit state — calling React.useState
+// inside the goals.map() callback violates the Rules of Hooks and crashes when
+// the number of goals changes (create/delete).
+function GoalRow({
+  goal, project, onProgressUpdate, onEdit, onDelete,
+}: {
+  goal: Goal;
+  project?: Project;
+  onProgressUpdate: (goal: Goal, value: string) => void;
+  onEdit: (goal: Goal) => void;
+  onDelete: (goalId: string) => void;
+}) {
+  const meta = STATUS_META[goal.status];
+  const [editingProgress, setEditingProgress] = React.useState(false);
+  const [progressInput, setProgressInput] = React.useState(String(goal.currentValue));
+  const dueDate = parseLocalDate(goal.dueDate);
+
+  return (
+    <div className="border border-border/40 rounded-xl p-4">
+      <div className="flex items-start gap-3">
+        <meta.icon className={cn("w-4 h-4 mt-0.5 shrink-0", meta.color)} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm text-foreground">{goal.title}</span>
+            <span className={cn("text-[11px] font-semibold px-1.5 py-0.5 rounded-md", meta.color, meta.bg)}>
+              {meta.label}
+            </span>
+            {project && (
+              <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-muted/40 text-muted-foreground/60" style={{ borderLeft: `3px solid ${project.color}` }}>
+                {project.name}
+              </span>
+            )}
+          </div>
+          {goal.description && <p className="text-xs text-muted-foreground/60 mt-0.5">{goal.description}</p>}
+          {dueDate && (
+            <p className="text-[11px] text-muted-foreground/40 mt-0.5">
+              Due {dueDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+            </p>
+          )}
+          <GoalProgressBar goal={goal} />
+
+          {/* Quick progress update */}
+          {editingProgress ? (
+            <div className="flex items-center gap-2 mt-2">
+              <Input
+                type="number"
+                value={progressInput}
+                onChange={e => setProgressInput(e.target.value)}
+                className="h-7 w-24 text-xs bg-background border-border/50"
+                autoFocus
+              />
+              <span className="text-xs text-muted-foreground">{goal.unit}</span>
+              <Button size="sm" className="h-7 text-xs px-2" onClick={() => {
+                onProgressUpdate(goal, progressInput);
+                setEditingProgress(false);
+              }}>Save</Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingProgress(false)}>Cancel</Button>
+            </div>
+          ) : (
+            <button onClick={() => { setProgressInput(String(goal.currentValue)); setEditingProgress(true); }}
+              className="mt-1 text-[11px] text-primary/60 hover:text-primary transition-colors">
+              Update progress
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/40 hover:text-foreground"
+            onClick={() => onEdit(goal)}>
+            <Pencil className="w-3.5 h-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/40 hover:text-red-400"
+            onClick={() => onDelete(goal.id)}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -235,74 +315,16 @@ export function GoalDialog({
             </div>
           )}
 
-          {goals.map(goal => {
-            const meta = STATUS_META[goal.status];
-            const project = projects.find(p => p.id === goal.projectId);
-            const [editingProgress, setEditingProgress] = React.useState(false);
-            const [progressInput, setProgressInput] = React.useState(String(goal.currentValue));
-
-            return (
-              <div key={goal.id} className="border border-border/40 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <meta.icon className={cn("w-4 h-4 mt-0.5 shrink-0", meta.color)} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-sm text-foreground">{goal.title}</span>
-                      <span className={cn("text-[11px] font-semibold px-1.5 py-0.5 rounded-md", meta.color, meta.bg)}>
-                        {meta.label}
-                      </span>
-                      {project && (
-                        <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-muted/40 text-muted-foreground/60" style={{ borderLeft: `3px solid ${project.color}` }}>
-                          {project.name}
-                        </span>
-                      )}
-                    </div>
-                    {goal.description && <p className="text-xs text-muted-foreground/60 mt-0.5">{goal.description}</p>}
-                    {goal.dueDate && (
-                      <p className="text-[11px] text-muted-foreground/40 mt-0.5">
-                        Due {new Date(goal.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </p>
-                    )}
-                    <GoalProgressBar goal={goal} />
-
-                    {/* Quick progress update */}
-                    {editingProgress ? (
-                      <div className="flex items-center gap-2 mt-2">
-                        <Input
-                          type="number"
-                          value={progressInput}
-                          onChange={e => setProgressInput(e.target.value)}
-                          className="h-7 w-24 text-xs bg-background border-border/50"
-                          autoFocus
-                        />
-                        <span className="text-xs text-muted-foreground">{goal.unit}</span>
-                        <Button size="sm" className="h-7 text-xs px-2" onClick={() => {
-                          handleProgressUpdate(goal, progressInput);
-                          setEditingProgress(false);
-                        }}>Save</Button>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingProgress(false)}>Cancel</Button>
-                      </div>
-                    ) : (
-                      <button onClick={() => { setProgressInput(String(goal.currentValue)); setEditingProgress(true); }}
-                        className="mt-1 text-[11px] text-primary/60 hover:text-primary transition-colors">
-                        Update progress
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/40 hover:text-foreground"
-                      onClick={() => startEdit(goal)}>
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/40 hover:text-red-400"
-                      onClick={() => handleDelete(goal.id)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {goals.map(goal => (
+            <GoalRow
+              key={goal.id}
+              goal={goal}
+              project={projects.find(p => p.id === goal.projectId)}
+              onProgressUpdate={handleProgressUpdate}
+              onEdit={startEdit}
+              onDelete={handleDelete}
+            />
+          ))}
         </div>
       </DialogContent>
     </Dialog>
