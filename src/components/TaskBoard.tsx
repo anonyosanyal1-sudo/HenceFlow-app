@@ -4,7 +4,7 @@ import { CardContent } from '@/components/ui/card';
 import { Plus, Clock, Calendar, RefreshCw, Milestone as MilestoneIcon, CheckSquare } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { cn, getClosedStageId } from '@/lib/utils';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { UserAvatar } from './UserAvatar';
 
@@ -52,22 +52,27 @@ interface TaskCardProps {
   selected: boolean;
   selectionMode: boolean;
   isViewer?: boolean;
+  closedStageId: string;
   onClick: (task: Task) => void;
   onToggleSelect: (id: string) => void;
   onInlineEdit?: (taskId: string, newTitle: string) => void;
 }
 
-function TaskCard({ task, index, users, milestones, selected, selectionMode, isViewer, onClick, onToggleSelect, onInlineEdit }: TaskCardProps) {
+function TaskCard({ task, index, users, milestones, selected, selectionMode, isViewer, closedStageId, onClick, onToggleSelect, onInlineEdit }: TaskCardProps) {
   const pCfg = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
-  const todayStr = new Date().toISOString().split('T')[0];
-  const isOverdue = task.dueDate && task.status !== 'closed' && (task.dueDate.split('T')[0]) < todayStr;
+  const isClosed = task.status === closedStageId;
+  // Local (not UTC) date so overdue/today is correct near midnight in any timezone.
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const isOverdue = task.dueDate && !isClosed && (task.dueDate.split('T')[0]) < todayStr;
   const isToday = (task.dueDate?.split('T')[0]) === todayStr;
 
-  // SLA: days since last status update (proxy via updatedAt)
+  // SLA: days since the task last changed status (not since any edit).
   const daysInStage = React.useMemo(() => {
-    if (!task.updatedAt || task.status === 'closed') return 0;
-    return Math.floor((Date.now() - new Date(task.updatedAt).getTime()) / 86400_000);
-  }, [task.updatedAt, task.status]);
+    const since = task.statusChangedAt ?? task.updatedAt;
+    if (!since || isClosed) return 0;
+    return Math.floor((Date.now() - new Date(since).getTime()) / 86400_000);
+  }, [task.statusChangedAt, task.updatedAt, isClosed]);
   const slaWarning = daysInStage >= 3;
   const slaCritical = daysInStage >= 7;
   const milestone = task.milestoneId ? milestones.find(m => m.id === task.milestoneId) : undefined;
@@ -254,13 +259,14 @@ interface ColumnProps {
   isViewer?: boolean;
   swimlaneLabel?: string;
   droppableId?: string;
+  closedStageId: string;
   onTaskClick: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
   onToggleSelect: (id: string) => void;
   onInlineEdit?: (taskId: string, newTitle: string) => void;
 }
 
-function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode, isViewer, droppableId, onTaskClick, onAddTask, onToggleSelect, onInlineEdit }: ColumnProps) {
+function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode, isViewer, droppableId, closedStageId, onTaskClick, onAddTask, onToggleSelect, onInlineEdit }: ColumnProps) {
   const bgColorRaw = col.color.split(' ').find(c => c.startsWith('bg-'));
   const bgColor = bgColorRaw ? bgColorRaw.split('/')[0] : 'bg-violet-500';
 
@@ -308,6 +314,7 @@ function Column({ col, tasks, users, milestones, selectedTaskIds, selectionMode,
                 selected={selectedTaskIds.has(task.id)}
                 selectionMode={selectionMode}
                 isViewer={isViewer}
+                closedStageId={closedStageId}
                 onClick={onTaskClick}
                 onToggleSelect={onToggleSelect}
                 onInlineEdit={onInlineEdit}
@@ -337,6 +344,7 @@ export function TaskBoard({
   isViewer = false,
   onTaskClick, onAddTask, onStatusChange, onSwimlaneChange, onSelectionChange, onInlineEdit,
 }: TaskBoardProps) {
+  const closedStageId = getClosedStageId(stages);
 
   const onDragEnd = (result: DropResult) => {
     if (isViewer) return;
@@ -394,6 +402,7 @@ export function TaskBoard({
                 selectionMode={selectionMode}
                 onTaskClick={onTaskClick}
                 isViewer={isViewer}
+                closedStageId={closedStageId}
                 onAddTask={onAddTask}
                 onToggleSelect={handleToggleSelect}
                 onInlineEdit={onInlineEdit}
@@ -466,6 +475,7 @@ export function TaskBoard({
                   selectedTaskIds={selectedTaskIds}
                   selectionMode={selectionMode}
                   isViewer={isViewer}
+                  closedStageId={closedStageId}
                   onTaskClick={onTaskClick}
                   onAddTask={onAddTask}
                   onToggleSelect={handleToggleSelect}

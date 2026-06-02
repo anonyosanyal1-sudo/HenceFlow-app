@@ -49,7 +49,7 @@ export function NotificationBell({ notifications, onNotificationsChange, onTaskC
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "relative h-8 w-8 text-muted-foreground hover:text-foreground")}>
+      <PopoverTrigger aria-label="Notifications" className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "relative h-8 w-8 text-muted-foreground hover:text-foreground")}>
         <Bell className="w-4 h-4" />
         {unread > 0 && (
           <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">

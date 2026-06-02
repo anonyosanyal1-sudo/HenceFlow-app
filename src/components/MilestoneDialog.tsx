@@ -123,6 +123,7 @@ export function MilestoneDialog({ open, onOpenChange, projectId, milestones, onM
                     )}
                   </div>
                   <Button
+                    aria-label="Edit milestone"
                     size="icon" variant="ghost"
                     className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground"
                     onClick={() => startEdit(m)}
@@ -130,6 +131,7 @@ export function MilestoneDialog({ open, onOpenChange, projectId, milestones, onM
                     <Pencil className="w-3 h-3" />
                   </Button>
                   <Button
+                    aria-label="Delete milestone"
                     size="icon" variant="ghost"
                     className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-red-400/60 hover:text-red-400"
                     onClick={() => handleDelete(m.id)}

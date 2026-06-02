@@ -14,6 +14,7 @@ const PRIORITY_COLOR: Record<string, string> = {
 interface CalendarViewProps {
   tasks: Task[];
   projects: Project[];
+  isClosed: (task: Task) => boolean;
   onTaskClick: (task: Task) => void;
   onNewTask: (dueDate: string) => void;
 }
@@ -26,7 +27,7 @@ function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month, 1).getDay();
 }
 
-export function CalendarView({ tasks, projects, onTaskClick, onNewTask }: CalendarViewProps) {
+export function CalendarView({ tasks, projects, isClosed, onTaskClick, onNewTask }: CalendarViewProps) {
   const today = new Date();
   const [viewYear, setViewYear] = React.useState(today.getFullYear());
   const [viewMonth, setViewMonth] = React.useState(today.getMonth());
@@ -153,7 +154,7 @@ export function CalendarView({ tasks, projects, onTaskClick, onNewTask }: Calend
                       className={cn(
                         "w-full text-left px-1.5 py-0.5 rounded text-[11px] font-medium truncate transition-opacity hover:opacity-80",
                         PRIORITY_COLOR[task.priority] ?? PRIORITY_COLOR.medium,
-                        task.status === 'closed' && "opacity-40 line-through"
+                        isClosed(task) && "opacity-40 line-through"
                       )}
                     >
                       {task.title}

@@ -91,6 +91,9 @@ function mapTask(r: Record<string, any>): Task {
     recurrenceParentId: r.recurrence_parent_id ?? undefined,
     milestoneId: r.milestone_id ?? undefined,
     sprintId: r.sprint_id ?? undefined,
+    startDate: r.start_date ?? undefined,
+    // Fall back to updated_at for DBs that haven't run migration 010 yet.
+    statusChangedAt: r.status_changed_at ?? r.updated_at,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -290,7 +293,7 @@ export const updateUserProfile = async (displayName: string, photoURL?: string |
 };
 
 export const fetchUsers = async (): Promise<UserProfile[]> => {
-  const { data, error } = await supabase.from('users').select('*');
+  const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: true }).limit(1000);
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapUser);
 };
@@ -350,7 +353,7 @@ export const deleteCompany = async (companyId: string) => {
 // ── Pods ──────────────────────────────────────────────────────────────────────
 
 export const fetchPods = async (projectId: string): Promise<Pod[]> => {
-  const { data, error } = await supabase.from('pods').select('*').eq('project_id', projectId);
+  const { data, error } = await supabase.from('pods').select('*').eq('project_id', projectId).order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapPod);
 };
@@ -394,7 +397,7 @@ export const deletePod = async (podId: string) => {
 // ── Projects ──────────────────────────────────────────────────────────────────
 
 export const fetchProjects = async (companyId: string): Promise<Project[]> => {
-  const { data, error } = await supabase.from('projects').select('*').eq('company_id', companyId);
+  const { data, error } = await supabase.from('projects').select('*').eq('company_id', companyId).order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapProject);
 };
@@ -445,13 +448,13 @@ export const deleteProject = async (projectId: string) => {
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 
 export const fetchTasks = async (projectId: string): Promise<Task[]> => {
-  const { data, error } = await supabase.from('tasks').select('*').eq('project_id', projectId);
+  const { data, error } = await supabase.from('tasks').select('*').eq('project_id', projectId).order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapTask);
 };
 
 export const fetchPodTasks = async (podId: string): Promise<Task[]> => {
-  const { data, error } = await supabase.from('tasks').select('*').eq('pod_id', podId);
+  const { data, error } = await supabase.from('tasks').select('*').eq('pod_id', podId).order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapTask);
 };
@@ -476,6 +479,7 @@ export const createTask = async (podId: string, projectId: string, data: Partial
       recurrence_parent_id: data.recurrenceParentId ?? null,
       milestone_id: data.milestoneId ?? null,
       sprint_id: data.sprintId ?? null,
+      start_date: data.startDate ?? null,
     })
     .select('id')
     .single();
@@ -496,6 +500,7 @@ export const updateTask = async (_projectId: string, taskId: string, updates: Pa
   if ('recurrenceRule' in updates) payload.recurrence_rule = updates.recurrenceRule ?? null;
   if ('milestoneId' in updates) payload.milestone_id = updates.milestoneId ?? null;
   if ('sprintId' in updates) payload.sprint_id = updates.sprintId ?? null;
+  if ('startDate' in updates) payload.start_date = updates.startDate ?? null;
   const { error } = await supabase.from('tasks').update(payload).eq('id', taskId);
   if (error) throw new Error(error.message);
 };
@@ -523,7 +528,7 @@ export const bulkDeleteTasks = async (taskIds: string[]) => {
 // ── Comments ──────────────────────────────────────────────────────────────────
 
 export const fetchComments = async (taskId: string): Promise<Comment[]> => {
-  const { data, error } = await supabase.from('comments').select('*').eq('task_id', taskId);
+  const { data, error } = await supabase.from('comments').select('*').eq('task_id', taskId).order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapComment);
 };
@@ -669,7 +674,7 @@ export const deleteTimeEntry = async (entryId: string) => {
 // ── Milestones ────────────────────────────────────────────────────────────────
 
 export const fetchMilestones = async (projectId: string): Promise<Milestone[]> => {
-  const { data, error } = await supabase.from('milestones').select('*').eq('project_id', projectId);
+  const { data, error } = await supabase.from('milestones').select('*').eq('project_id', projectId).order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapMilestone);
 };
@@ -819,47 +824,8 @@ export const updateSubtasks = async (taskId: string, subtasks: Subtask[], projec
 // This stub is kept so any callers don't crash.
 export const createRecurringInstance = async () => {};
 
-// ── Subscribe helpers (fetch wrappers, real-time handled by useServerEvents) ──
-
-export const subscribeToCompanies = (callback: (companies: Company[]) => void) => {
-  fetchCompanies().then(callback).catch(console.error);
-  return () => {};
-};
-
-export const subscribeToProjects = (companyId: string, callback: (projects: Project[]) => void) => {
-  fetchProjects(companyId).then(callback).catch(console.error);
-  return () => {};
-};
-
-export const subscribeToUsers = (callback: (users: UserProfile[]) => void) => {
-  fetchUsers().then(callback).catch(console.error);
-  return () => {};
-};
-
-export const subscribeToTasks = (podId: string, callback: (tasks: Task[]) => void) => {
-  fetchPodTasks(podId).then(callback).catch(console.error);
-  return () => {};
-};
-
-export const subscribeToComments = (_projectId: string, taskId: string, callback: (comments: Comment[]) => void) => {
-  fetchComments(taskId).then(callback).catch(console.error);
-  return () => {};
-};
-
-export const subscribeToMilestones = (projectId: string, callback: (milestones: Milestone[]) => void) => {
-  fetchMilestones(projectId).then(callback).catch(console.error);
-  return () => {};
-};
-
-export const subscribeToCustomFieldDefinitions = (projectId: string, callback: (defs: CustomFieldDefinition[]) => void) => {
-  fetchCustomFieldDefinitions(projectId).then(callback).catch(console.error);
-  return () => {};
-};
-
-export const subscribeToTaskTemplates = (projectId: string, callback: (templates: TaskTemplate[]) => void) => {
-  fetchTaskTemplates(projectId).then(callback).catch(console.error);
-  return () => {};
-};
+// Real-time updates are handled centrally by useServerEvents; one-shot fetches
+// use the fetch* functions above directly.
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 

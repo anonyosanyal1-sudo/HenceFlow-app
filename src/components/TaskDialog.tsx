@@ -16,7 +16,7 @@ import { DependenciesPanel } from './DependenciesPanel';
 import { TimeTrackingPanel } from './TimeTrackingPanel';
 import { ActivityLogPanel } from './ActivityLogPanel';
 import { CustomFieldsPanel } from './CustomFieldsPanel';
-import { cn } from '@/lib/utils';
+import { cn, getClosedStageId } from '@/lib/utils';
 import { createTaskTemplate, fetchWatchers, watchTask, unwatchTask } from '../services/api';
 import { Milestone as MilestoneIcon, RefreshCw, LayoutTemplate, Eye, EyeOff, Trash2, X, Hash, Copy, Zap, Clock } from 'lucide-react';
 import { ApprovalPanel } from './ApprovalPanel';
@@ -90,12 +90,13 @@ export function TaskDialog({
   const [isDirty, setIsDirty] = React.useState(false);
   const [confirmDiscard, setConfirmDiscard] = React.useState(false);
 
-  // SLA: days since updatedAt
+  // SLA: days since the task last changed status (not since any edit).
   const daysInStage = React.useMemo(() => {
-    if (!task?.updatedAt) return 0;
-    const diff = Date.now() - new Date(task.updatedAt).getTime();
+    const since = task?.statusChangedAt ?? task?.updatedAt;
+    if (!since) return 0;
+    const diff = Date.now() - new Date(since).getTime();
     return Math.floor(diff / 86400_000);
-  }, [task?.updatedAt]);
+  }, [task?.statusChangedAt, task?.updatedAt]);
 
   const requestClose = (open: boolean) => {
     if (!open && isDirty && task) {
@@ -365,7 +366,7 @@ export function TaskDialog({
             </div>
             <div className="flex items-center gap-1">
               {/* SLA badge */}
-              {daysInStage >= 3 && task.status !== 'closed' && (
+              {daysInStage >= 3 && task.status !== getClosedStageId(stages) && (
                 <div className={cn(
                   "h-7 px-2 flex items-center gap-1 rounded-lg text-xs font-semibold",
                   daysInStage >= 7 ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"

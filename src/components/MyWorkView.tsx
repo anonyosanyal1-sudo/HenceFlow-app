@@ -19,6 +19,7 @@ interface MyWorkViewProps {
   milestones: Milestone[];
   currentUserId: string;
   pinnedTaskIds: Set<string>;
+  isClosed: (task: Task) => boolean;
   onTaskClick: (task: Task) => void;
   onPinToggle: (taskId: string) => void;
 }
@@ -27,19 +28,22 @@ function TaskRow({
   task,
   project,
   isPinned,
+  isClosed,
   onTaskClick,
   onPinToggle,
 }: {
   task: Task;
   project?: Project;
   isPinned: boolean;
+  isClosed: (task: Task) => boolean;
   onTaskClick: (task: Task) => void;
   onPinToggle: (taskId: string) => void;
 }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const dueDate = parseLocalDate(task.dueDate);
-  const isOverdue = dueDate && dueDate < today && task.status !== 'closed';
+  const closed = isClosed(task);
+  const isOverdue = dueDate && dueDate < today && !closed;
   const isDueToday = dueDate && dueDate.toDateString() === today.toDateString();
   const pm = PRIORITY_META[task.priority] ?? PRIORITY_META.medium;
 
@@ -50,7 +54,7 @@ function TaskRow({
     >
       {/* Status dot */}
       <div className="mt-0.5 shrink-0">
-        {task.status === 'closed' ? (
+        {closed ? (
           <CheckCircle2 className="w-4 h-4 text-green-400" />
         ) : (
           <div className={cn("w-4 h-4 rounded-full border-2", isOverdue ? "border-red-400" : "border-muted-foreground/30")} />
@@ -59,7 +63,7 @@ function TaskRow({
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className={cn("text-sm font-medium leading-snug truncate", task.status === 'closed' && "line-through text-muted-foreground/50")}>
+        <p className={cn("text-sm font-medium leading-snug truncate", closed && "line-through text-muted-foreground/50")}>
           {task.title}
         </p>
         <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -113,6 +117,7 @@ export function MyWorkView({
   milestones: _milestones,
   currentUserId,
   pinnedTaskIds,
+  isClosed,
   onTaskClick,
   onPinToggle,
 }: MyWorkViewProps) {
@@ -133,9 +138,9 @@ export function MyWorkView({
   const filtered = React.useMemo(() => {
     switch (filter) {
       case 'active':
-        return myTasks.filter(t => t.status !== 'closed');
+        return myTasks.filter(t => !isClosed(t));
       case 'overdue':
-        return myTasks.filter(t => { const d = parseLocalDate(t.dueDate); return d && d < today && t.status !== 'closed'; });
+        return myTasks.filter(t => { const d = parseLocalDate(t.dueDate); return d && d < today && !isClosed(t); });
       case 'upcoming':
         return myTasks.filter(t => {
           const d = parseLocalDate(t.dueDate);
@@ -144,7 +149,7 @@ export function MyWorkView({
       default:
         return myTasks;
     }
-  }, [myTasks, filter, today, weekEnd]);
+  }, [myTasks, filter, today, weekEnd, isClosed]);
 
   const pinnedTasks = filtered.filter(t => pinnedTaskIds.has(t.id));
   const unpinnedTasks = filtered.filter(t => !pinnedTaskIds.has(t.id));
@@ -163,11 +168,11 @@ export function MyWorkView({
 
   const stats = {
     total: myTasks.length,
-    active: myTasks.filter(t => t.status !== 'closed').length,
-    overdue: myTasks.filter(t => { const d = parseLocalDate(t.dueDate); return d && d < today && t.status !== 'closed'; }).length,
+    active: myTasks.filter(t => !isClosed(t)).length,
+    overdue: myTasks.filter(t => { const d = parseLocalDate(t.dueDate); return d && d < today && !isClosed(t); }).length,
     upcoming: myTasks.filter(t => {
       const d = parseLocalDate(t.dueDate);
-      return d && d >= today && d <= weekEnd && t.status !== 'closed';
+      return d && d >= today && d <= weekEnd && !isClosed(t);
     }).length,
   };
 
@@ -236,6 +241,7 @@ export function MyWorkView({
                 task={task}
                 project={getProject(task.projectId)}
                 isPinned={true}
+                isClosed={isClosed}
                 onTaskClick={onTaskClick}
                 onPinToggle={onPinToggle}
               />
@@ -264,6 +270,7 @@ export function MyWorkView({
                   task={task}
                   project={project}
                   isPinned={pinnedTaskIds.has(task.id)}
+                  isClosed={isClosed}
                   onTaskClick={onTaskClick}
                   onPinToggle={onPinToggle}
                 />

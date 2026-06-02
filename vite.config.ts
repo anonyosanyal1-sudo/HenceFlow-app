@@ -13,6 +13,20 @@ export default defineConfig(({ mode }) => {
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // Split heavy vendor libraries out of the main bundle for better
+          // caching and a smaller initial payload.
+          manualChunks: {
+            charts: ['recharts'],
+            motion: ['motion'],
+            dnd: ['@hello-pangea/dnd'],
+            datefns: ['date-fns'],
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
