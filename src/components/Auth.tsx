@@ -224,6 +224,7 @@ export function Auth() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  maxLength={254}
                   autoComplete="email"
                   className="pl-10 h-12 bg-white/[0.05] border-border/50 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-violet-500/40 focus-visible:border-violet-500/50 rounded-xl transition-all"
                 />
@@ -253,6 +254,7 @@ export function Auth() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    maxLength={128}
                     autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                     className="pl-10 pr-10 h-12 bg-white/[0.05] border-border/50 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-violet-500/40 focus-visible:border-violet-500/50 rounded-xl transition-all"
                   />
@@ -286,6 +288,7 @@ export function Auth() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
+                      maxLength={128}
                       autoComplete="new-password"
                       className="pl-10 h-12 bg-white/[0.05] border-border/50 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-violet-500/40 focus-visible:border-violet-500/50 rounded-xl transition-all"
                     />

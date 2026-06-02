@@ -8,7 +8,7 @@ const PRIORITY_COLOR: Record<string, string> = {
   urgent: 'bg-red-500/80 text-white',
   high:   'bg-orange-500/80 text-white',
   medium: 'bg-blue-500/80 text-white',
-  low:    'bg-zinc-500/60 text-zinc-200',
+  low:    'bg-muted-foreground/40 text-foreground',
 };
 
 interface CalendarViewProps {
