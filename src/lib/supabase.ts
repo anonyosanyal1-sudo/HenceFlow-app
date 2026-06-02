@@ -4,7 +4,10 @@ import type { AppUser } from '../types';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-if (!(supabaseUrl && supabaseAnonKey) && typeof window !== 'undefined') {
+/** True only when both required env vars are present. */
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+
+if (!isSupabaseConfigured && typeof window !== 'undefined') {
   console.warn('Supabase configuration is missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
 }
 

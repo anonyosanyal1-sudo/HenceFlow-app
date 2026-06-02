@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 
 import { Project, UserProfile, CustomFieldDefinition } from '../types';
 import {
-  subscribeToCustomFieldDefinitions,
+  fetchCustomFieldDefinitions,
   createCustomFieldDefinition,
   deleteCustomFieldDefinition,
 } from '../services/api';
@@ -53,8 +53,11 @@ export function ProjectDialog({
 
   React.useEffect(() => {
     if (!project?.id) return;
-    const unsub = subscribeToCustomFieldDefinitions(project.id, setCustomFields);
-    return () => unsub();
+    let active = true;
+    fetchCustomFieldDefinitions(project.id)
+      .then(defs => { if (active) setCustomFields(defs); })
+      .catch(() => {});
+    return () => { active = false; };
   }, [project?.id]);
 
   React.useEffect(() => {

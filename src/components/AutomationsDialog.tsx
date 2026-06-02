@@ -158,10 +158,10 @@ export function AutomationsDialog({ open, onOpenChange, projectId, automations, 
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggle(rule)}>
+                    <Button aria-label={rule.isActive ? 'Disable rule' : 'Enable rule'} variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggle(rule)}>
                       <Power className={cn("w-3.5 h-3.5", rule.isActive ? "text-emerald-400" : "text-muted-foreground")} />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-400 hover:text-rose-500" onClick={() => handleDelete(rule.id)}>
+                    <Button aria-label="Delete rule" variant="ghost" size="icon" className="h-7 w-7 text-rose-400 hover:text-rose-500" onClick={() => handleDelete(rule.id)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
@@ -175,13 +175,13 @@ export function AutomationsDialog({ open, onOpenChange, projectId, automations, 
             <h4 className="text-sm font-bold text-foreground">New Rule</h4>
             <Input placeholder="Rule name" value={name} onChange={e => setName(e.target.value)} className="h-9" maxLength={80} />
             <div className="flex gap-2">
-              <select className="flex-1 h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground" value={triggerType} onChange={e => setTriggerType(e.target.value)}>
+              <select aria-label="Trigger type" className="flex-1 h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground" value={triggerType} onChange={e => setTriggerType(e.target.value)}>
                 {Object.entries(TRIGGER_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
               <TriggerValueSelect />
             </div>
             <div className="flex gap-2">
-              <select className="flex-1 h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground" value={actionType} onChange={e => setActionType(e.target.value)}>
+              <select aria-label="Action type" className="flex-1 h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground" value={actionType} onChange={e => setActionType(e.target.value)}>
                 {Object.entries(ACTION_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
               <ActionValueSelect />

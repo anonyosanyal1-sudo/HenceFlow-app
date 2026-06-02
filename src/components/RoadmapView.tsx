@@ -8,6 +8,7 @@ interface RoadmapViewProps {
   projects: Project[];
   allMilestones: Milestone[];
   allTasks: Task[];
+  isClosed: (task: Task) => boolean;
   onMilestoneClick?: (milestone: Milestone) => void;
 }
 
@@ -22,7 +23,7 @@ function getMonthsBetween(start: Date, end: Date): Date[] {
   return months;
 }
 
-export function RoadmapView({ projects, allMilestones, allTasks, onMilestoneClick }: RoadmapViewProps) {
+export function RoadmapView({ projects, allMilestones, allTasks, isClosed, onMilestoneClick }: RoadmapViewProps) {
   const today = new Date();
   const [offset, setOffset] = React.useState(0); // months offset from "today - 1 month"
 
@@ -55,7 +56,14 @@ export function RoadmapView({ projects, allMilestones, allTasks, onMilestoneClic
     }));
   }, [allMilestones, allTasks]);
 
-  const monthWidth = `${(1 / visibleMonths) * 100}%`;
+  // Position of each month's first day on the same proportional (day-based)
+  // scale used for milestones, so month columns and gridlines line up with the
+  // diamonds instead of using equal-width columns.
+  const monthStartPct = (i: number) => {
+    if (i >= months.length) return 100;
+    const m = months[i];
+    return getXPercent(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}-01`);
+  };
 
   if (activeProjects.length === 0) {
     return (
@@ -119,7 +127,7 @@ export function RoadmapView({ projects, allMilestones, allTasks, onMilestoneClic
             {months.map((month, idx) => (
               <div
                 key={idx}
-                style={{ width: monthWidth }}
+                style={{ width: `${monthStartPct(idx + 1) - monthStartPct(idx)}%` }}
                 className="shrink-0 flex items-center justify-center border-r border-border/20 text-xs font-semibold text-muted-foreground/60"
               >
                 {month.toLocaleString('default', { month: 'short' })} {month.getFullYear()}
@@ -148,7 +156,7 @@ export function RoadmapView({ projects, allMilestones, allTasks, onMilestoneClic
               <div
                 key={idx}
                 className="absolute top-0 bottom-0 border-r border-border/15"
-                style={{ left: `${((idx + 1) / months.length) * 100}%` }}
+                style={{ left: `${monthStartPct(idx + 1)}%` }}
               />
             ))}
 
@@ -161,7 +169,7 @@ export function RoadmapView({ projects, allMilestones, allTasks, onMilestoneClic
                 <div key={project.id} className="relative h-16 border-b border-border/20">
                   {projectMilestones.map(({ milestone, tasks }) => {
                     const pct = getXPercent(milestone.dueDate!);
-                    const completedTasks = tasks.filter(t => t.status === 'closed').length;
+                    const completedTasks = tasks.filter(t => isClosed(t)).length;
                     const progress = tasks.length > 0 ? completedTasks / tasks.length : 0;
                     const isPast = (parseLocalDate(milestone.dueDate) ?? new Date(milestone.dueDate!)) < today;
                     const isComplete = progress === 1;

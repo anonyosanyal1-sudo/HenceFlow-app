@@ -16,19 +16,20 @@ interface SprintDialogProps {
   projectId: string;
   sprints: Sprint[];
   tasks: Task[];
+  isClosed: (task: Task) => boolean;
   onSprintsChange: (sprints: Sprint[]) => void;
   onAssignTaskToSprint: (taskId: string, sprintId: string | null) => void;
 }
 
 const STATUS_META = {
-  planning:  { label: 'Planning',   color: 'text-zinc-400',    bg: 'bg-zinc-500/10',    icon: Clock },
+  planning:  { label: 'Planning',   color: 'text-muted-foreground', bg: 'bg-muted/40',  icon: Clock },
   active:    { label: 'Active',     color: 'text-blue-400',    bg: 'bg-blue-500/10',    icon: Play },
   completed: { label: 'Completed',  color: 'text-emerald-400', bg: 'bg-emerald-500/10', icon: CheckCircle2 },
 };
 
-function SprintProgressBar({ tasks }: { tasks: Task[] }) {
+function SprintProgressBar({ tasks, isClosed }: { tasks: Task[]; isClosed: (task: Task) => boolean }) {
   if (!tasks.length) return null;
-  const done = tasks.filter(t => t.status === 'closed').length;
+  const done = tasks.filter(t => isClosed(t)).length;
   const pct = Math.round((done / tasks.length) * 100);
   return (
     <div className="mt-2">
@@ -49,6 +50,7 @@ export function SprintDialog({
   projectId,
   sprints,
   tasks,
+  isClosed,
   onSprintsChange,
   onAssignTaskToSprint,
 }: SprintDialogProps) {
@@ -102,7 +104,7 @@ export function SprintDialog({
   };
 
   const getSprintTasks = (sprintId: string) => tasks.filter(t => t.sprintId === sprintId);
-  const unassignedTasks = tasks.filter(t => !t.sprintId && t.status !== 'closed');
+  const unassignedTasks = tasks.filter(t => !t.sprintId && !isClosed(t));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -212,7 +214,7 @@ export function SprintDialog({
                 {/* Progress bar */}
                 {sprintTasks.length > 0 && (
                   <div className="px-3 pb-2">
-                    <SprintProgressBar tasks={sprintTasks} />
+                    <SprintProgressBar tasks={sprintTasks} isClosed={isClosed} />
                   </div>
                 )}
 
@@ -226,9 +228,9 @@ export function SprintDialog({
                       <div key={task.id} className="flex items-center gap-2 py-1 group">
                         <div className={cn(
                           "w-2 h-2 rounded-full shrink-0",
-                          task.status === 'closed' ? 'bg-emerald-400' : 'bg-muted-foreground/30'
+                          isClosed(task) ? 'bg-emerald-400' : 'bg-muted-foreground/30'
                         )} />
-                        <span className={cn("flex-1 text-xs truncate", task.status === 'closed' && 'line-through text-muted-foreground/40')}>
+                        <span className={cn("flex-1 text-xs truncate", isClosed(task) && 'line-through text-muted-foreground/40')}>
                           {task.title}
                         </span>
                         <button

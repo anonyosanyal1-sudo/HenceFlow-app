@@ -24,6 +24,72 @@ deferrals (changes requiring a DB schema column or a product decision).
 
 ---
 
+## Third Pass — Adversarial Teardown Remediation
+
+A hostile audit (security/architecture/UX) surfaced server-side and structural
+flaws the client-only passes missed. All were fixed:
+
+### Security (new migration `010_security_hardening.sql`)
+- **CRITICAL — company ownership seizure.** Company UPDATE had no `WITH CHECK`, so any
+  admin could rewrite `owner_id`. Added a `BEFORE UPDATE` trigger that blocks ownership
+  transfer by anyone but the current owner (admins keep member management).
+- **CRITICAL — open public intake writes.** `intake_submissions` INSERT was `WITH CHECK (true)`.
+  Now gated on the target form being `is_public`, plus DB-level `CHECK` constraints capping
+  payload (16 KB) / name (200) / email (254) — server-enforced, not just client.
+- **HIGH — task authorship spoofing.** Trigger now keeps `tasks.creator_id` immutable on update.
+- **HIGH — project injection.** Project INSERT now requires the creator to be a member of the
+  target company (`WITH CHECK`), not just `owner_id = auth.uid()`.
+- **Realtime:** confirmed every published table has a scoped RLS SELECT policy
+  (notifications by `user_id`, others by membership), so `postgres_changes` is RLS-bounded;
+  documented that the `useServerEvents` client filter is optimization, not access control.
+
+### Server / config
+- `server.ts`: added security headers (nosniff, X-Frame-Options DENY, Referrer-Policy,
+  Permissions-Policy, HSTS in prod), a global rate limiter, `PORT` from env, static cache
+  headers, `x-powered-by` disabled, and fixed the stale "NexFlow" branding → "HenceFlow".
+- `supabase.ts` + `main.tsx`: missing env now renders a hard configuration-error screen via
+  `isSupabaseConfigured` instead of silently booting a placeholder client.
+
+### Correctness / data
+- **Recurrence implemented.** Closing a recurring task now spawns the next instance (advanced
+  due date, reset to the pod's first stage, linked via `recurrence_parent_id`) from both the
+  board status-change and the task dialog — the old `createRecurringInstance` stub did nothing.
+- **Hardcoded `'closed'` eliminated.** Added an `isTaskClosed` resolver in App (pod stages →
+  project stages → default) threaded into MyWorkView, CalendarView, RoadmapView, SprintDialog;
+  TaskBoard/TaskDialog resolve the closed stage from their `stages` prop. Custom-stage pods now
+  compute overdue/strikethrough/SLA/completion correctly.
+- **Real metrics.** New `status_changed_at` column (+ trigger) drives velocity, the weekly chart,
+  and "days in stage" instead of `updated_at` (which any edit reset). `mapTask` falls back to
+  `updated_at` for pre-migration DBs.
+- **Gantt start date.** New optional `start_date` column; bars use it (short fallback) instead of
+  fabricating a start from `created_at`.
+- **Optimistic automations** now roll back and toast on write failure (were fire-and-forget).
+- **TimeTrackingPanel** rejects non-numeric/negative time (was logging `NaN`).
+- Added `.order('created_at')` to all list fetches (deterministic ordering) and a bound on
+  `fetchUsers`; removed 8 misleadingly-named one-shot `subscribeTo*` wrappers (call site now
+  fetches directly); removed the dead `Task.isPinned` field.
+
+### Performance / architecture
+- Vite `manualChunks` splits recharts / motion / dnd / date-fns out of the main bundle, and
+  Analytics / Gantt / Roadmap are now `React.lazy` + `Suspense`. Initial JS dropped from
+  ~1,669 KB to ~1,042 KB (charts 379 KB now loads only when Analytics opens).
+
+### UX / accessibility
+- RoadmapView month columns and gridlines now use the same proportional day-based scale as the
+  milestone diamonds (they previously drifted with unequal month lengths).
+- Added `aria-label`s to icon-only controls (notifications, automation enable/delete, milestone
+  edit/delete) and the automation `<select>`s.
+- Error surfacing: critical loaders (company/projects/pod tasks) now toast on failure instead of
+  silently rendering empty states. (Mobile search/filter was already implemented.)
+
+### Deferred (documented, not changed)
+- App.tsx remains a single large `useState` root — a full store refactor is out of scope for a
+  bug-fix pass and high-risk; the heavy subtrees are now lazy-loaded to mitigate.
+- DB type inconsistency in `008` (auth.uid()::text vs UUID[] arrays) left as-is to match the
+  existing migration's conventions.
+
+---
+
 ## Second Audit Pass — Additional Fixes
 
 A deeper second pass audited the dialogs and panels not covered the first time

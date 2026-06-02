@@ -99,7 +99,10 @@ export interface Task {
   recurrenceParentId?: string;
   milestoneId?: string;
   sprintId?: string;
-  isPinned?: boolean;
+  /** Optional planned start date (YYYY-MM-DD); used by the Gantt chart. */
+  startDate?: string;
+  /** Set server-side whenever `status` changes; basis for SLA / velocity metrics. */
+  statusChangedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -31,11 +31,16 @@ export function GanttView({ tasks, stages, users, onTaskClick }: GanttViewProps)
   const tasksWithDates = React.useMemo(
     () => tasks.filter(t => t.dueDate).map(t => {
       const due = parseISO(t.dueDate!);
-      // Use today as bar start if no meaningful start date exists,
-      // capped to at most 7 days before due to avoid very long bars.
-      const created = t.createdAt ? parseISO(t.createdAt) : new Date();
-      const minStart = addDays(due, -7);
-      const start = max([created, minStart]);
+      // Prefer the task's real planned start date. Fall back to a short bar
+      // (3 days before due) rather than created_at, which could span months
+      // and misrepresent the actual duration.
+      let start: Date;
+      if (t.startDate) {
+        const parsed = parseISO(t.startDate);
+        start = parsed <= due ? parsed : addDays(due, -1);
+      } else {
+        start = addDays(due, -3);
+      }
       return { task: t, start, end: due };
     }),
     [tasks]

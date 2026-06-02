@@ -41,9 +41,20 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Project, Task, TaskStatus, TaskPriority, UserProfile, Company, Pod, DEFAULT_STAGES, Stage, Milestone, CustomFieldDefinition, TaskTemplate, Notification, SavedFilter, AutomationRule, Subtask, Sprint, Goal } from './types';
+import { getClosedStageId } from '@/lib/utils';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+/** Advance a YYYY-MM-DD date string by one recurrence interval. */
+function advanceDate(dateStr: string | undefined, rule: 'daily' | 'weekly' | 'monthly'): string {
+  const d = dateStr ? new Date(`${dateStr.split('T')[0]}T00:00:00`) : new Date();
+  if (rule === 'daily') d.setDate(d.getDate() + 1);
+  else if (rule === 'weekly') d.setDate(d.getDate() + 7);
+  else d.setMonth(d.getMonth() + 1);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 import { Sidebar } from './components/Sidebar';
 import { ProjectOverview } from './components/ProjectOverview';
@@ -57,18 +68,18 @@ import { CompanySettingsPage } from './components/CompanySettingsPage';
 import { InviteDialog } from './components/InviteDialog';
 import { CreateCompanyPage } from './components/CreateCompanyPage';
 import { ProfileSetup } from './components/ProfileSetup';
-import { AnalyticsDashboard } from './components/AnalyticsDashboard';
+const AnalyticsDashboard = React.lazy(() => import('./components/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 import { MilestoneDialog } from './components/MilestoneDialog';
 import { BulkActionBar } from './components/BulkActionBar';
 import { NotificationBell } from './components/NotificationBell';
-import { GanttView } from './components/GanttView';
+const GanttView = React.lazy(() => import('./components/GanttView').then(m => ({ default: m.GanttView })));
 import { AutomationsDialog } from './components/AutomationsDialog';
 import { PodDialog } from './components/PodDialog';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { Logo } from './components/Logo';
 import { MyWorkView } from './components/MyWorkView';
 import { CalendarView } from './components/CalendarView';
-import { RoadmapView } from './components/RoadmapView';
+const RoadmapView = React.lazy(() => import('./components/RoadmapView').then(m => ({ default: m.RoadmapView })));
 import { SprintDialog } from './components/SprintDialog';
 import { GoalDialog } from './components/GoalDialog';
 import { IntakeFormDialog } from './components/IntakeFormDialog';
@@ -157,7 +168,56 @@ function AppContent() {
   const [tasks, setTasks] = React.useState<Task[]>([]);
   const [allTasks, setAllTasks] = React.useState<Task[]>([]);
   const [users, setUsers] = React.useState<UserProfile[]>([]);
-  
+
+  // Resolve the "closed/done" stage per task. Stages are pod-scoped (with a
+  // project fallback) and the closed stage is the LAST stage — it is not always
+  // literally 'closed' for custom-stage pods. Use this everywhere instead of
+  // comparing status === 'closed'.
+  const closedStageByPod = React.useMemo(
+    () => new Map(pods.map(p => [p.id, getClosedStageId(p.stages)])),
+    [pods],
+  );
+  const closedStageByProject = React.useMemo(
+    () => new Map(projects.map(p => [p.id, getClosedStageId(p.stages)])),
+    [projects],
+  );
+  const isTaskClosed = React.useCallback((task: Task) => {
+    const closed =
+      (task.podId ? closedStageByPod.get(task.podId) : undefined) ??
+      closedStageByProject.get(task.projectId) ??
+      'closed';
+    return task.status === closed;
+  }, [closedStageByPod, closedStageByProject]);
+
+  // When a recurring task is closed, spawn the next instance (the server-side
+  // stub never did). Resets to the pod's first stage with an advanced due date.
+  const spawnRecurrenceIfNeeded = React.useCallback(async (task: Task) => {
+    if (!task.recurrenceRule || !task.podId || !task.projectId) return;
+    const pod = pods.find(p => p.id === task.podId);
+    const firstStage = pod?.stages?.[0]?.id ?? DEFAULT_STAGES[0].id;
+    try {
+      const newId = await createTask(task.podId, task.projectId, {
+        title: task.title,
+        description: task.description,
+        status: firstStage as TaskStatus,
+        priority: task.priority,
+        assigneeId: task.assigneeId,
+        dueDate: advanceDate(task.dueDate, task.recurrenceRule),
+        tags: task.tags,
+        recurrenceRule: task.recurrenceRule,
+        recurrenceParentId: task.recurrenceParentId ?? task.id,
+        milestoneId: task.milestoneId,
+      });
+      if (task.projectId === activeProject?.id) {
+        fetchPodTasks(task.podId).then(setTasks).catch(() => {});
+      }
+      void newId;
+      toast.success('Next recurring task created');
+    } catch {
+      toast.error('Could not create the next recurring task');
+    }
+  }, [pods, activeProject]);
+
   // Search and Filter States
   const [searchQuery, setSearchQuery] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
@@ -280,9 +340,14 @@ function AppContent() {
 
   const loadCompany = React.useCallback(async () => {
     if (!user) return;
-    const comps = await fetchCompanies().catch(() => [] as Company[]);
-    setCompany(comps.length > 0 ? comps[0] : null);
-    setCompanyLoaded(true);
+    try {
+      const comps = await fetchCompanies();
+      setCompany(comps.length > 0 ? comps[0] : null);
+    } catch {
+      toast.error('Could not load your workspace. Check your connection and reload.');
+    } finally {
+      setCompanyLoaded(true);
+    }
   }, [user]);
 
   const loadPods = React.useCallback(async (projectId: string) => {
@@ -298,7 +363,13 @@ function AppContent() {
 
   const loadProjects = React.useCallback(async () => {
     if (!user || !company) return;
-    const projs = await fetchProjects(company.id).catch(() => [] as Project[]);
+    let projs: Project[];
+    try {
+      projs = await fetchProjects(company.id);
+    } catch {
+      toast.error('Could not load projects.');
+      return;
+    }
     setProjects(projs);
     if (activeProject && !projs.find(p => p.id === activeProject.id)) {
       setActiveProject(null);
@@ -306,8 +377,11 @@ function AppContent() {
   }, [user, company, activeProject]);
 
   const loadPodData = React.useCallback(async (podId: string) => {
-    const taskList = await fetchPodTasks(podId).catch(() => [] as Task[]);
-    setTasks(taskList);
+    try {
+      setTasks(await fetchPodTasks(podId));
+    } catch {
+      toast.error('Could not load tasks for this pod.');
+    }
   }, []);
 
   const loadProjectFeatureData = React.useCallback(async (projectId: string) => {
@@ -714,9 +788,20 @@ function AppContent() {
       }
 
       if (Object.keys(actionUpdates).length > 0) {
-        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...actionUpdates } : t));
+        // Snapshot the affected fields so we can roll back if the write fails.
+        const prevFields: Partial<Task> = {};
+        setTasks(prev => prev.map(t => {
+          if (t.id !== taskId) return t;
+          (Object.keys(actionUpdates) as (keyof Task)[]).forEach(k => { (prevFields as any)[k] = t[k]; });
+          return { ...t, ...actionUpdates };
+        }));
         setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...actionUpdates } : t));
-        updateTask(projectId, taskId, actionUpdates).catch(() => {});
+        updateTask(projectId, taskId, actionUpdates).catch(() => {
+          // Roll back the optimistic automation update on failure.
+          setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...prevFields } : t));
+          setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...prevFields } : t));
+          toast.error('Automation could not be applied');
+        });
       }
     }
   }, []);
@@ -743,6 +828,7 @@ function AppContent() {
       const prevTasks = tasks;
       const prevAllTasks = allTasks;
       const updatedTask = { ...selectedTask, ...taskData };
+      const becameClosed = isTaskClosed(updatedTask) && !isTaskClosed(selectedTask);
       setTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
       setAllTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
       try {
@@ -750,6 +836,7 @@ function AppContent() {
         toast.success('Task updated');
         addActivityLog(selectedTask.id, targetProjectId, 'task_updated').catch(() => {});
         executeAutomations(targetProjectId, selectedTask.id, taskData);
+        if (becameClosed) spawnRecurrenceIfNeeded(updatedTask);
       } catch {
         setTasks(prevTasks);
         setAllTasks(prevAllTasks);
@@ -1016,6 +1103,7 @@ function AppContent() {
               milestones={allMilestones}
               currentUserId={user.uid}
               pinnedTaskIds={pinnedTaskIds}
+              isClosed={isTaskClosed}
               onTaskClick={(task) => { setSelectedTask(task); setTaskDialogOpen(true); }}
               onPinToggle={handlePinToggle}
             />
@@ -1028,11 +1116,14 @@ function AppContent() {
               </Button>
               <h2 className="text-lg font-bold tracking-tight text-foreground">Roadmap</h2>
             </div>
-            <RoadmapView
-              projects={projects}
-              allMilestones={allMilestones}
-              allTasks={allTasks}
-            />
+            <React.Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground/50 text-sm">Loading…</div>}>
+              <RoadmapView
+                projects={projects}
+                allMilestones={allMilestones}
+                allTasks={allTasks}
+                isClosed={isTaskClosed}
+              />
+            </React.Suspense>
           </div>
         ) : showCompanySettings && company ? (
           <div className="flex-1 min-w-0 overflow-hidden">
@@ -1054,13 +1145,15 @@ function AppContent() {
               </Button>
               <h2 className="text-lg font-bold tracking-tight text-foreground">Analytics</h2>
             </div>
-            <AnalyticsDashboard
-              tasks={allTasks}
-              projects={projects}
-              users={users}
-              currentUserId={user.uid}
-              activeProjectId={activeProject?.id}
-            />
+            <React.Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground/50 text-sm">Loading…</div>}>
+              <AnalyticsDashboard
+                tasks={allTasks}
+                projects={projects}
+                users={users}
+                currentUserId={user.uid}
+                activeProjectId={activeProject?.id}
+              />
+            </React.Suspense>
           </div>
         ) : !activeProject ? (
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -1454,16 +1547,19 @@ function AppContent() {
 
             {/* Board, Timeline or Calendar */}
             {activeView === 'timeline' ? (
-              <GanttView
-                tasks={filteredTasks}
-                stages={activePod.stages?.length ? activePod.stages : DEFAULT_STAGES}
-                users={companyUsers}
-                onTaskClick={(task) => { setSelectedTask(task); setTaskDialogOpen(true); }}
-              />
+              <React.Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground/50 text-sm">Loading…</div>}>
+                <GanttView
+                  tasks={filteredTasks}
+                  stages={activePod.stages?.length ? activePod.stages : DEFAULT_STAGES}
+                  users={companyUsers}
+                  onTaskClick={(task) => { setSelectedTask(task); setTaskDialogOpen(true); }}
+                />
+              </React.Suspense>
             ) : activeView === 'calendar' ? (
               <CalendarView
                 tasks={filteredTasks}
                 projects={projects}
+                isClosed={isTaskClosed}
                 onTaskClick={(task) => { setSelectedTask(task); setTaskDialogOpen(true); }}
                 onNewTask={(dueDate) => {
                   if (!activePod) return;
@@ -1501,8 +1597,14 @@ function AppContent() {
                     setAllTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: s as TaskStatus } : t));
                   };
                   applyStatus(newStatus);
+                  const becameClosed = task && prevStatus !== newStatus &&
+                    isTaskClosed({ ...task, status: newStatus as TaskStatus }) &&
+                    !isTaskClosed(task);
                   updateTask(activeProject.id, taskId, { status: newStatus })
-                    .then(() => executeAutomations(activeProject.id, taskId, { status: newStatus }))
+                    .then(() => {
+                      executeAutomations(activeProject.id, taskId, { status: newStatus });
+                      if (becameClosed && task) spawnRecurrenceIfNeeded({ ...task, status: newStatus as TaskStatus });
+                    })
                     .catch(() => {
                       if (prevStatus !== undefined) applyStatus(prevStatus);
                       toast.error('Failed to update status');
@@ -1648,6 +1750,7 @@ function AppContent() {
             projectId={activeProject.id}
             sprints={sprints}
             tasks={tasks}
+            isClosed={isTaskClosed}
             onSprintsChange={setSprints}
             onAssignTaskToSprint={async (taskId, sprintId) => {
               setTasks(prev => prev.map(t => t.id === taskId ? { ...t, sprintId: sprintId ?? undefined } : t));

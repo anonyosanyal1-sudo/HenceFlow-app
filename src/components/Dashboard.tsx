@@ -65,7 +65,7 @@ export function Dashboard({
 
   // Velocity: tasks marked done in last 7 days ÷ 7
   const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const recentDone = tasks.filter(t => isCompleted(t) && new Date(t.updatedAt) > sevenDaysAgo).length;
+  const recentDone = tasks.filter(t => isCompleted(t) && new Date(t.statusChangedAt ?? t.updatedAt) > sevenDaysAgo).length;
   const velocity = (recentDone / 7).toFixed(1);
 
   // Tasks due this week
@@ -83,7 +83,7 @@ export function Dashboard({
     const dayStart = new Date(weekStart); dayStart.setDate(weekStart.getDate() + i);
     const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
     return tasks.filter(t => {
-      const d = new Date(t.updatedAt);
+      const d = new Date(t.statusChangedAt ?? t.updatedAt);
       return isCompleted(t) && d >= dayStart && d < dayEnd;
     }).length;
   });

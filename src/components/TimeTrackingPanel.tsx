@@ -67,7 +67,13 @@ export function TimeTrackingPanel({ taskId, projectId, currentUserId, users }: T
   };
 
   const handleLog = async () => {
-    const totalMins = (parseInt(hours || '0') * 60) + parseInt(minutes || '0');
+    const h = parseInt(hours || '0', 10);
+    const m = parseInt(minutes || '0', 10);
+    if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || m < 0) {
+      setSaveError('Enter a valid time');
+      return;
+    }
+    const totalMins = (h * 60) + m;
     if (totalMins <= 0) return;
     setSaving(true);
     setSaveError(null);
