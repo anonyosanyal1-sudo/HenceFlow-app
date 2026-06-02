@@ -140,7 +140,7 @@ export function PodDialog({ open, onOpenChange, pod, users, currentUserId, onSav
               <div className="flex gap-2 flex-wrap">
                 {POD_COLORS.map(c => (
                   <button key={c} type="button"
-                    className={cn("w-7 h-7 rounded-full transition-all border-2", color === c ? "border-white scale-110 shadow-md" : "border-transparent hover:scale-105")}
+                    className={cn("w-7 h-7 rounded-full transition-all border-2", color === c ? "border-foreground scale-110 shadow-md" : "border-transparent hover:scale-105")}
                     style={{ backgroundColor: c }}
                     onClick={() => setColor(c)}
                   />
@@ -198,6 +198,7 @@ export function PodDialog({ open, onOpenChange, pod, users, currentUserId, onSav
                     onChange={e => updateStageLabel(index, e.target.value)}
                     className="h-7 text-xs flex-1 bg-transparent border-none focus-visible:ring-0 px-2"
                     placeholder="Stage name"
+                    maxLength={24}
                   />
                   <Popover>
                     <PopoverTrigger>

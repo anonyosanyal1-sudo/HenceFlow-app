@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { UserAvatar } from './UserAvatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -220,7 +221,7 @@ export function ProjectDialog({
                   <button
                     key={c}
                     type="button"
-                    className={cn("w-7 h-7 rounded-full transition-all border-2", color === c ? "border-white scale-110 shadow-md" : "border-transparent hover:scale-105")}
+                    className={cn("w-7 h-7 rounded-full transition-all border-2", color === c ? "border-foreground scale-110 shadow-md" : "border-transparent hover:scale-105")}
                     style={{ backgroundColor: c }}
                     onClick={() => setColor(c)}
                   />
@@ -241,7 +242,9 @@ export function ProjectDialog({
                       <p className="text-xs text-muted-foreground capitalize">{field.fieldType}</p>
                     </div>
                     <button
-                      onClick={() => deleteCustomFieldDefinition(field.id).then(() => setCustomFields(prev => prev.filter(f => f.id !== field.id)))}
+                      onClick={() => deleteCustomFieldDefinition(field.id)
+                        .then(() => setCustomFields(prev => prev.filter(f => f.id !== field.id)))
+                        .catch(() => toast.error('Failed to delete custom field'))}
                       className="text-muted-foreground/40 hover:text-rose-400 transition-colors p-1 rounded-md hover:bg-rose-500/10"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -254,6 +257,7 @@ export function ProjectDialog({
                     value={newFieldName}
                     onChange={e => setNewFieldName(e.target.value)}
                     className="h-9 flex-1"
+                    maxLength={50}
                     onKeyDown={e => { if (e.key === 'Enter') handleAddField(); }}
                   />
                   <Select value={newFieldType} onValueChange={v => setNewFieldType(v as CustomFieldDefinition['fieldType'])}>

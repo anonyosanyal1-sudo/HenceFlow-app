@@ -27,9 +27,19 @@ export function CustomFieldsPanel({ taskId, fieldDefs }: CustomFieldsPanelProps)
   }, [taskId]);
 
   const handleChange = async (fieldId: string, value: string) => {
+    const prevValue = values[fieldId] ?? '';
     setValues(prev => ({ ...prev, [fieldId]: value }));
-    await upsertCustomFieldValue(taskId, fieldId, value);
+    try {
+      await upsertCustomFieldValue(taskId, fieldId, value);
+    } catch {
+      // Roll back the optimistic update so the UI doesn't show unsaved data.
+      setValues(prev => ({ ...prev, [fieldId]: prevValue }));
+    }
   };
+
+  // Ensure URL custom-field links have a scheme so they open externally rather
+  // than resolving relative to the app origin.
+  const withScheme = (url: string) => (/^https?:\/\//i.test(url) ? url : `https://${url}`);
 
   if (!loaded || fieldDefs.length === 0) return null;
 
@@ -67,7 +77,7 @@ export function CustomFieldsPanel({ taskId, fieldDefs }: CustomFieldsPanelProps)
                 />
                 {def.fieldType === 'url' && values[def.id] && (
                   <a
-                    href={values[def.id]}
+                    href={withScheme(values[def.id])}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-primary transition-colors"

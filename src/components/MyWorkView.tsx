@@ -1,7 +1,7 @@
 import React from 'react';
 import { Task, Project, UserProfile, Milestone } from '../types';
 import { Calendar, Flag, Star, ChevronRight, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, parseLocalDate } from '@/lib/utils';
 import { UserAvatar } from './UserAvatar';
 import { Button } from '@/components/ui/button';
 
@@ -38,7 +38,7 @@ function TaskRow({
 }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+  const dueDate = parseLocalDate(task.dueDate);
   const isOverdue = dueDate && dueDate < today && task.status !== 'closed';
   const isDueToday = dueDate && dueDate.toDateString() === today.toDateString();
   const pm = PRIORITY_META[task.priority] ?? PRIORITY_META.medium;
@@ -135,12 +135,11 @@ export function MyWorkView({
       case 'active':
         return myTasks.filter(t => t.status !== 'closed');
       case 'overdue':
-        return myTasks.filter(t => t.dueDate && new Date(t.dueDate) < today && t.status !== 'closed');
+        return myTasks.filter(t => { const d = parseLocalDate(t.dueDate); return d && d < today && t.status !== 'closed'; });
       case 'upcoming':
         return myTasks.filter(t => {
-          if (!t.dueDate) return false;
-          const d = new Date(t.dueDate);
-          return d >= today && d <= weekEnd;
+          const d = parseLocalDate(t.dueDate);
+          return d && d >= today && d <= weekEnd;
         });
       default:
         return myTasks;
@@ -165,11 +164,10 @@ export function MyWorkView({
   const stats = {
     total: myTasks.length,
     active: myTasks.filter(t => t.status !== 'closed').length,
-    overdue: myTasks.filter(t => t.dueDate && new Date(t.dueDate) < today && t.status !== 'closed').length,
+    overdue: myTasks.filter(t => { const d = parseLocalDate(t.dueDate); return d && d < today && t.status !== 'closed'; }).length,
     upcoming: myTasks.filter(t => {
-      if (!t.dueDate) return false;
-      const d = new Date(t.dueDate);
-      return d >= today && d <= weekEnd && t.status !== 'closed';
+      const d = parseLocalDate(t.dueDate);
+      return d && d >= today && d <= weekEnd && t.status !== 'closed';
     }).length,
   };
 

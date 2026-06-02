@@ -1623,6 +1623,9 @@ function AppContent() {
               setTasks(prev => prev.map(t => t.milestoneId === milestoneId ? { ...t, milestoneId: undefined } : t));
               setAllTasks(prev => prev.map(t => t.milestoneId === milestoneId ? { ...t, milestoneId: undefined } : t));
             }}
+            onMilestonesChanged={() => {
+              if (activeProject) fetchMilestones(activeProject.id).then(setMilestones).catch(() => {});
+            }}
           />
         )}
 
